@@ -320,6 +320,10 @@ static int check_thread_fn(void *unused) {
     if (strcmp(tag->valuestring, EB_VERSION_STRING) == 0) {
         EbUpdateProgress p = {0};
         p.status = EB_UPDATE_UP_TO_DATE;
+        /* Reuse latest_version to carry the running version too -- by
+         * definition they're equal here, and this lets the UI show it
+         * without needing a separate platform_update_* accessor. */
+        strncpy(p.latest_version, EB_VERSION_STRING, sizeof(p.latest_version) - 1);
         set_progress(&p);
         cJSON_Delete(root);
         return 0;

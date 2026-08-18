@@ -96,9 +96,14 @@ StepResult mode_step_update_check(ModeState *ms) {
         create_window(WINDOW_UPDATE_CHECK);
         set_focus_text_cursor(0, 0);
         switch (st->progress.status) {
-        case EB_UPDATE_UP_TO_DATE:
-            print_string("You're already up to date.");
+        case EB_UPDATE_UP_TO_DATE: {
+            print_string("You're on the latest");
+            set_focus_text_cursor(0, 1);
+            char buf[64];
+            snprintf(buf, sizeof(buf), "version: %s", st->progress.latest_version);
+            print_string(buf);
             break;
+        }
         case EB_UPDATE_UNSUPPORTED:
             print_string("Updates aren't available");
             set_focus_text_cursor(0, 1);
