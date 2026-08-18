@@ -71,16 +71,19 @@ StepResult mode_step_update_check(ModeState *ms) {
 
     case UPD_RESULT: {
         if (st->progress.status == EB_UPDATE_AVAILABLE) {
+            /* WINDOW_UPDATE_CHECK is height 10 -- sm_handle_input()'s
+             * cursor-search bound is (height-2)/2 rows, so only text_y
+             * 0-3 are valid (same formula that caught the file-select
+             * OOB bug and the Command Menu's earlier height bumps). Every
+             * row below is laid out within that range. */
             close_focus_window();
             create_window(WINDOW_UPDATE_CHECK);
             set_focus_text_cursor(0, 0);
-            print_string("An update is available:");
+            print_string("Update available:");
             set_focus_text_cursor(0, 1);
             print_string(st->progress.latest_version);
-            set_focus_text_cursor(0, 3);
-            print_string("Download and install now?");
-            add_menu_item("Yes", 1, 0, 5);
-            add_menu_item("No", 0, 6, 5);
+            add_menu_item("Yes", 1, 0, 3);
+            add_menu_item("No", 0, 6, 3);
             print_menu_items();
             play_sfx(27); /* SFX::MENU_OPEN_CLOSE */
             return upd_push_selection(st, UPD_CONFIRM_RESULT, 1);
@@ -108,8 +111,8 @@ StepResult mode_step_update_check(ModeState *ms) {
             print_string(st->progress.error_message);
             break;
         }
-        set_focus_text_cursor(0, 8);
-        print_string("(Press a button to continue)");
+        set_focus_text_cursor(0, 3);
+        print_string("(Press a button)");
         st->phase = UPD_MESSAGE;
         return STEP_RESULT_CONTINUE();
     }
@@ -166,8 +169,8 @@ StepResult mode_step_update_check(ModeState *ms) {
         print_string("Update failed:");
         set_focus_text_cursor(0, 1);
         print_string(st->progress.error_message);
-        set_focus_text_cursor(0, 8);
-        print_string("(Press a button to continue)");
+        set_focus_text_cursor(0, 3);
+        print_string("(Press a button)");
         st->phase = UPD_MESSAGE;
         return STEP_RESULT_CONTINUE();
     }
