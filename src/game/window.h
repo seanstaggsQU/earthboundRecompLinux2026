@@ -75,6 +75,10 @@
  * port's own addition, one past WINDOW_SETTINGS_MENU for the same reason
  * that one is one past the ROM's own WINDOW::MAX sentinel. */
 #define WINDOW_UPDATE_CHECK           0x37
+/* Command Menu "Really quit?" confirmation -- this port's own addition,
+ * one past WINDOW_UPDATE_CHECK for the same reason that's one past
+ * WINDOW_SETTINGS_MENU. */
+#define WINDOW_QUIT_CONFIRM           0x38
 
 /* Menu option - matches menu_option from structs.asm (45 bytes in asm) */
 #define MENU_LABEL_SIZE 26  /* asm: 25-byte label at offset 19, +1 for null */

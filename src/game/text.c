@@ -694,10 +694,11 @@ static uint16_t count_characters_with_psi(void) {
  * Dad, sanctuaries, etc.) -- it's the only quick-save path now that the old
  * F4/R3 hotkey has been removed (R3 is the overworld FOV/zoom cycle
  * instead, see AUX_ZOOM_TOGGLE in game_main.c). Config opens
- * GAME_MODE_SETTINGS_MENU (mode_step_settings_menu below). Quit calls
- * platform_request_quit() directly, no confirmation prompt (matches
- * exactly what was asked for; add an "Are you sure?" step later if that
- * turns out to be too easy to hit by accident). All three require
+ * GAME_MODE_SETTINGS_MENU (mode_step_settings_menu below). Quit shows a
+ * "Really quit?" Yes/No confirmation (PM_MAIN_RESULT case 9 /
+ * PM_QUIT_CONFIRM_RESULT) before calling platform_request_quit() -- added
+ * after it turned out to be too easy to hit by accident, exactly the risk
+ * flagged when this first shipped without one. All three require
  * WINDOW::COMMAND_MENU's height to be 12, not the ROM's 8 (window.c).
  */
 static uint8_t skip_adding_command_text;
@@ -2749,17 +2750,21 @@ StepResult mode_step_pause_menu(ModeState *ms) {
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_SETTINGS_MENU, &pm_child_init);
 
             /* --- Quit (this port's own addition, not in the original ROM menu) ---
-             * Requests a clean exit via the same platform_request_quit() path
-             * used for window-close/Escape -- the main loop
-             * (!platform_input_quit_requested()) notices next iteration and
-             * unwinds through the normal atexit(platform_cleanup) shutdown,
-             * so this doesn't need to pop the mode stack or do anything else
-             * itself. No confirmation prompt (see the comment above
-             * build_command_menu() for why). */
+             * Confirms first -- too easy to hit by accident, exactly the
+             * risk flagged in the comment above build_command_menu() when
+             * this shipped without a prompt. Yes/No via the same
+             * create_window/add_menu_item/push_selection shape every other
+             * confirm screen in this file uses (e.g. file_select.c's
+             * "Are you sure?" delete confirm). */
             case 9:
-                platform_request_quit();
-                st->phase = PM_MAIN;
-                continue;
+                create_window(WINDOW_QUIT_CONFIRM);
+                set_focus_text_cursor(0, 0);
+                print_string("Really quit?");
+                add_menu_item("Yes", 1, 0, 2);
+                add_menu_item("No", 0, 5, 2);
+                print_menu_items();
+                play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+                return pm_push_selection(st, PM_QUIT_CONFIRM_RESULT, 1);
 
             /* Cancel (B/Select) or unknown → cleanup */
             default:
@@ -3156,6 +3161,19 @@ StepResult mode_step_pause_menu(ModeState *ms) {
             close_window(WINDOW_INVENTORY);
             st->phase = PM_MAIN;
             continue;
+
+        case PM_QUIT_CONFIRM_RESULT: {
+            /* This port's own addition -- see case 9 above. */
+            uint16_t selection = pm_take_result(st);
+            close_window(WINDOW_QUIT_CONFIRM);
+            if (selection == 1)
+                platform_request_quit();
+            /* No/cancel, or Yes (harmless -- platform_input_quit_requested()
+             * takes over next frame; nothing left in PM_MAIN can be
+             * reached first) both return to the command menu the same way. */
+            st->phase = PM_MAIN;
+            continue;
+        }
 
         case PM_EQUIP_RESUME:
             /* Tail of the Equip case after EQUIP_MENU pops: single party plays

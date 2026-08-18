@@ -374,6 +374,7 @@ typedef enum {
     PM_DROP_RESUME,         /* after the drop text pops: close windows -> PM_MAIN */
     PM_EQUIP_RESUME,        /* after EQUIP_MENU pops: single-party sfx tail -> PM_MAIN */
     PM_PSI_RESUME,          /* after PSI_MENU pops: used->cleanup / single-PSI sfx tail */
+    PM_QUIT_CONFIRM_RESULT, /* after the "Really quit?" Yes/No -- this port's own addition */
     PM_CLEANUP,             /* @CLEANUP_AND_CLOSE; push ENTITY_FADE_WAIT */
     PM_DONE,                /* enable entities + POP */
 } PauseMenuPhase;

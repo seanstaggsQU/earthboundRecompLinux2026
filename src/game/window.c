@@ -122,6 +122,15 @@ static const uint16_t window_configs[][4] = {
      * since only one window is ever the active input focus at a time.
      * Wide enough (24 tiles) to fit a release-version line without wrapping. */
     [WINDOW_UPDATE_CHECK] = { 4, 13, 24, 10 },
+    /* "Really quit?" confirmation -- this port's own addition, opened over
+     * the Command Menu (0x00, roughly x=1..14, y=1..13 at its current
+     * height-12 size). Positioned low/right of it, same reasoning as
+     * WINDOW_SETTINGS_MENU's placement relative to its own parent. Height
+     * 8 (not a tighter fit) for the same reason as WINDOW_SETTINGS_MENU:
+     * sm_handle_input()'s cursor bound is (height-2)/2 rows, and the Yes/No
+     * row sits at text_y=2 (row 0 is the "Really quit?" message, row 1 left
+     * blank for spacing) -- height 6 would cap navigation at rows 0-1 only. */
+    [WINDOW_QUIT_CONFIRM] = { 14, 14, 16, 8 },
 };
 #define WINDOW_CONFIG_COUNT (sizeof(window_configs) / sizeof(window_configs[0]))
 
