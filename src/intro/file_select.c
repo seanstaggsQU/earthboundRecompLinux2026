@@ -1777,7 +1777,9 @@ StepResult mode_step_file_menu(ModeState *ms) {
 
         case FM_SELECT_RESULT: {
             uint16_t selected = fm_take_result(st);
+            fprintf(stderr, "[updater] FM_SELECT_RESULT selected=%u\n", selected);
             if (selected == 4) {
+                fprintf(stderr, "[updater] routing to FM_UPDATE_CHECK\n");
                 /* "Check for Updates" -- not a save slot. Must be handled
                  * before the current_save_slot assignment/slot math below:
                  * selected==4 would otherwise fall through to

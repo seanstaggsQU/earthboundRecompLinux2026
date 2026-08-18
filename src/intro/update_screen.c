@@ -53,16 +53,26 @@ StepResult mode_step_update_check(ModeState *ms) {
 
     switch ((UpdateCheckPhase)st->phase) {
     case UPD_CHECK_START: {
-        create_window(WINDOW_UPDATE_CHECK);
+        fprintf(stderr, "[updater] UPD_CHECK_START entered\n");
+        WindowInfo *w = create_window(WINDOW_UPDATE_CHECK);
+        fprintf(stderr, "[updater] create_window(WINDOW_UPDATE_CHECK) = %p, focus=%d\n",
+                (void *)w, win.current_focus_window);
         set_focus_text_cursor(0, 0);
         print_string("Checking for updates...");
         platform_update_check_start();
+        fprintf(stderr, "[updater] platform_update_check_start() returned, supported=%d\n",
+                platform_update_supported());
         st->phase = UPD_CHECKING;
         return STEP_RESULT_CONTINUE();
     }
 
     case UPD_CHECKING: {
         platform_update_poll(&st->progress);
+        static int poll_log_count = 0;
+        if (poll_log_count < 20) {
+            fprintf(stderr, "[updater] UPD_CHECKING poll #%d status=%d\n", poll_log_count, st->progress.status);
+            poll_log_count++;
+        }
         if (st->progress.status == EB_UPDATE_CHECKING)
             return STEP_RESULT_CONTINUE(); /* still waiting on the background thread */
         st->phase = UPD_RESULT;

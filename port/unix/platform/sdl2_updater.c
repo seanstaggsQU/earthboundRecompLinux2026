@@ -283,12 +283,14 @@ static bool fetch_release_asset(const char *asset_api_url, MemBuf *mem, FileWrit
  * ---------------------------------------------------------------------- */
 static int check_thread_fn(void *unused) {
     (void)unused;
+    fprintf(stderr, "[updater] check_thread_fn started\n");
     char url[256];
     snprintf(url, sizeof(url), "https://api.github.com/repos/%s/releases/latest", EB_UPDATER_REPO_STRING);
 
     MemBuf body = {0};
     char err[128] = {0};
     long code = http_get(url, true, "application/vnd.github+json", &body, NULL, err, sizeof(err));
+    fprintf(stderr, "[updater] http_get code=%ld err=%s\n", code, err);
 
     if (code < 200 || code >= 300) {
         char msg[64];
@@ -316,6 +318,8 @@ static int check_thread_fn(void *unused) {
         cJSON_Delete(root);
         return 0;
     }
+    fprintf(stderr, "[updater] tag_name=\"%s\" EB_VERSION_STRING=\"%s\"\n",
+            tag->valuestring, EB_VERSION_STRING);
 
     if (strcmp(tag->valuestring, EB_VERSION_STRING) == 0) {
         EbUpdateProgress p = {0};
@@ -585,10 +589,12 @@ bool platform_update_supported(void) {
 }
 
 void platform_update_check_start(void) {
+    fprintf(stderr, "[updater] platform_update_check_start (real backend) entered\n");
     EbUpdateProgress p = {0};
     p.status = EB_UPDATE_CHECKING;
     set_progress(&p);
     SDL_Thread *t = SDL_CreateThread(check_thread_fn, "eb_update_check", NULL);
+    fprintf(stderr, "[updater] SDL_CreateThread = %p (%s)\n", (void *)t, t ? "ok" : SDL_GetError());
     if (t) SDL_DetachThread(t);
     else set_error("Couldn't start update check");
 }
