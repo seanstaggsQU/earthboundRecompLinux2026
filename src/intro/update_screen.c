@@ -80,6 +80,8 @@ StepResult mode_step_update_check(ModeState *ms) {
     }
 
     case UPD_RESULT: {
+        fprintf(stderr, "[updater] UPD_RESULT entered, status=%d, latest_version=\"%s\", focus_before_close=%d\n",
+                st->progress.status, st->progress.latest_version, win.current_focus_window);
         if (st->progress.status == EB_UPDATE_AVAILABLE) {
             /* WINDOW_UPDATE_CHECK is height 10 -- sm_handle_input()'s
              * cursor-search bound is (height-2)/2 rows, so only text_y
@@ -103,15 +105,20 @@ StepResult mode_step_update_check(ModeState *ms) {
          * one-shot message, not a confirm — print it once here, then just
          * wait for a button in UPD_MESSAGE. */
         close_focus_window();
-        create_window(WINDOW_UPDATE_CHECK);
+        fprintf(stderr, "[updater] after close_focus_window, focus=%d\n", win.current_focus_window);
+        WindowInfo *w2 = create_window(WINDOW_UPDATE_CHECK);
+        fprintf(stderr, "[updater] create_window (msg branch) = %p, focus=%d\n", (void *)w2, win.current_focus_window);
         set_focus_text_cursor(0, 0);
         switch (st->progress.status) {
         case EB_UPDATE_UP_TO_DATE: {
+            fprintf(stderr, "[updater] printing up-to-date message\n");
             print_string("You're on the latest");
             set_focus_text_cursor(0, 1);
             char buf[64];
             snprintf(buf, sizeof(buf), "version: %s", st->progress.latest_version);
+            fprintf(stderr, "[updater] printing: \"%s\"\n", buf);
             print_string(buf);
+            fprintf(stderr, "[updater] print_string calls done\n");
             break;
         }
         case EB_UPDATE_UNSUPPORTED:
