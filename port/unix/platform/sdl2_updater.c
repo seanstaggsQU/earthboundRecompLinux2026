@@ -18,11 +18,13 @@
  * RELEASE ASSET FORMAT: deliberately NOT a zip. Unpacking a zip on this
  * side would need a vendored inflate/zip-reader library and its own
  * member-name allowlist logic; instead, the release process publishes the
- * raw platform binary (and, on macOS, its paired dylib) as individually
- * named GitHub release assets, alongside the existing user-facing zips
- * (which are for a *fresh* download, not what this updater fetches):
+ * raw platform binary (and its paired shared library, where the platform
+ * has one) as individually named GitHub release assets, alongside the
+ * existing user-facing zips (which are for a *fresh* download, not what
+ * this updater fetches):
  *   - "earthbound-macos" + "libSDL2-2.0.0.dylib" (macOS)
  *   - "earthbound-linux" (Linux)
+ *   - "earthbound-windows.exe" + "SDL2.dll" (Windows)
  *   - "checksums.txt" (sha256sum-format: "<hex>  <filename>" per line,
  *     covering the exact raw asset names above)
  * The updater only ever looks for these exact, hardcoded names -- there is
@@ -35,41 +37,78 @@
  * That signed URL must be fetched WITHOUT our Authorization header --
  * forwarding it can trip "Only one auth mechanism allowed" on S3's side,
  * and it's unnecessary since the signature in the URL's own query string
- * already grants access. http_get() below never auto-follows redirects
- * (CURLOPT_FOLLOWLOCATION stays off); the one call site that can redirect
- * (fetch_release_asset()) reads CURLINFO_REDIRECT_URL and reissues a fresh,
- * unauthenticated request itself.
+ * already grants access. http_get() below never auto-follows redirects on
+ * either backend (libcurl: CURLOPT_FOLLOWLOCATION off; WinHTTP:
+ * WINHTTP_OPTION_DISABLE_FEATURE/WINHTTP_DISABLE_REDIRECTS) -- the one call
+ * site that can redirect (fetch_release_asset()) reads the Location itself
+ * and reissues a fresh, unauthenticated request.
+ *
+ * WINDOWS SELF-REPLACE: Windows locks its own running .exe for its entire
+ * lifetime -- unlike POSIX, there is no way to rename() or exec() a
+ * replacement for the file you're currently executing from. Instead, the
+ * install step here writes a small generated .bat helper and launches it
+ * detached (CREATE_NO_WINDOW, survives this process exiting); the helper
+ * waits for this process's PID to disappear from `tasklist`, THEN moves
+ * the already-downloaded-and-verified "earthbound.new.exe" over
+ * "earthbound.exe" (and the .dll, if present), relaunches it, and deletes
+ * itself. This process's own role ends at "stage the download, spawn the
+ * helper, quit cleanly" -- it never touches main.c's POSIX relaunch path
+ * (platform_update_stage_relaunch()/execv()), which stays macOS/Linux-only.
  */
 #include "platform/platform.h"
 
 #ifdef EB_UPDATER_ENABLED
 
 #include <SDL.h>
-#include <curl/curl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+
+#ifdef _WIN32
+#include <windows.h>
+#include <winhttp.h>
+#else
+#include <curl/curl.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#endif
+
 #include "cJSON.h"
+#ifdef _WIN32
+/* sha256.h's own WORD typedef (unsigned int) collides with windows.h's
+ * (unsigned short) once both are visible in the same translation unit --
+ * rename via macro substitution during preprocessing so the vendored file
+ * itself never needs touching; BYTE doesn't need the same treatment since
+ * both headers agree it's unsigned char (identical redefinitions are legal). */
+#define WORD SHA256_WORD
 #include "sha256.h"
+#undef WORD
+#else
+#include "sha256.h"
+#endif
 #include "version.h"          /* EB_VERSION_STRING -- generated, see CMakeLists.txt */
 #include "updater_secret.h"   /* EB_UPDATER_REPO_STRING / EB_UPDATER_TOKEN_STRING -- generated, gitignored */
 
+#ifndef _WIN32
 /* Unix-specific: defined in main.c, called once the new binary is verified
  * and swapped into place. Mirrors platform_save_set_path()'s existing
  * pattern of a port/unix-local entry point forward-declared where it's
- * used, not added to the shared platform.h contract. */
+ * used, not added to the shared platform.h contract. Windows never calls
+ * this -- see the file header's "WINDOWS SELF-REPLACE" note. */
 void platform_update_stage_relaunch(const char *new_exe_path);
+#endif
 
 #if defined(__APPLE__)
 #define EB_UPDATER_ASSET_NAME "earthbound-macos"
 #define EB_UPDATER_DYLIB_NAME "libSDL2-2.0.0.dylib"
 #elif defined(__linux__)
 #define EB_UPDATER_ASSET_NAME "earthbound-linux"
+#elif defined(_WIN32)
+#define EB_UPDATER_ASSET_NAME "earthbound-windows.exe"
+#define EB_UPDATER_DLL_NAME   "SDL2.dll"
 #else
-#error "sdl2_updater.c: unhandled platform (Windows self-update is a separate, deferred backend)"
+#error "sdl2_updater.c: unhandled platform"
 #endif
 
 /* ------------------------------------------------------------------------
@@ -109,12 +148,219 @@ static void set_error(const char *msg) {
 }
 
 /* ------------------------------------------------------------------------
- * HTTP helpers
+ * HTTP helpers -- shared types; two backends (WinHTTP / libcurl) below
+ * implement the same two entry points: http_get() and fetch_release_asset().
  * ---------------------------------------------------------------------- */
 typedef struct {
     char *data;
     size_t len;
 } MemBuf;
+
+typedef struct {
+    FILE *f;
+    int *progress_percent_out; /* NULL = don't report */
+} FileWriteCtx;
+
+#ifdef _WIN32
+
+/* ---- WinHTTP backend ---- */
+
+/* Splits "https://host[:port]/path" (the only form ever used here -- the
+ * GitHub API and its S3 redirect targets) into WinHTTP's wide-string
+ * pieces. ASCII-only conversion is fine: both hosts are always plain ASCII. */
+static bool win_parse_url(const char *url, wchar_t *host, size_t host_cap,
+                           wchar_t *path, size_t path_cap, INTERNET_PORT *port, bool *https) {
+    const char *p = url;
+    if (strncmp(p, "https://", 8) == 0) { *https = true; p += 8; }
+    else if (strncmp(p, "http://", 7) == 0) { *https = false; p += 7; }
+    else return false;
+
+    const char *slash = strchr(p, '/');
+    const char *host_end = slash ? slash : p + strlen(p);
+    size_t host_len = (size_t)(host_end - p);
+    if (host_len == 0 || host_len >= host_cap) return false;
+    for (size_t i = 0; i < host_len; i++) host[i] = (wchar_t)(unsigned char)p[i];
+    host[host_len] = L'\0';
+    *port = *https ? INTERNET_DEFAULT_HTTPS_PORT : INTERNET_DEFAULT_HTTP_PORT;
+
+    const char *path_str = slash ? slash : "/";
+    size_t path_len = strlen(path_str);
+    if (path_len >= path_cap) return false;
+    for (size_t i = 0; i <= path_len; i++) path[i] = (wchar_t)(unsigned char)path_str[i];
+    return true;
+}
+
+/* One request, no auto-follow. If `redirect_out` is non-NULL and the
+ * response is a 3xx, the Location header is copied there (UTF-8) and the
+ * body is never read. Otherwise the body streams into `mem` or `file_ctx`
+ * (whichever is non-NULL; both NULL just drains and discards it, for a
+ * pure status/redirect probe). Returns the HTTP status code, or -1 on a
+ * transport-level failure. */
+static long win_http_request(const char *url, bool send_auth, const char *accept,
+                              MemBuf *mem, FileWriteCtx *file_ctx,
+                              char *redirect_out, size_t redirect_out_size,
+                              char *err, size_t err_size) {
+    wchar_t host[256], path[2048];
+    INTERNET_PORT port;
+    bool https;
+    if (!win_parse_url(url, host, 256, path, 2048, &port, &https)) {
+        snprintf(err, err_size, "Bad URL");
+        return -1;
+    }
+
+    HINTERNET hSession = WinHttpOpen(L"EarthBound-Updater/1.0",
+                                      WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+                                      WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
+    if (!hSession) { snprintf(err, err_size, "WinHttpOpen failed (%lu)", GetLastError()); return -1; }
+    WinHttpSetTimeouts(hSession, 15000, 15000, 60000, 60000);
+
+    HINTERNET hConnect = WinHttpConnect(hSession, host, port, 0);
+    if (!hConnect) {
+        snprintf(err, err_size, "WinHttpConnect failed (%lu)", GetLastError());
+        WinHttpCloseHandle(hSession);
+        return -1;
+    }
+
+    DWORD flags = https ? WINHTTP_FLAG_SECURE : 0;
+    HINTERNET hRequest = WinHttpOpenRequest(hConnect, L"GET", path, NULL,
+                                             WINHTTP_NO_REFERER, WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
+    if (!hRequest) {
+        snprintf(err, err_size, "WinHttpOpenRequest failed (%lu)", GetLastError());
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        return -1;
+    }
+
+    /* Never auto-follow -- see file header's GitHub redirect-quirk note. */
+    DWORD disable_redirects = WINHTTP_DISABLE_REDIRECTS;
+    WinHttpSetOption(hRequest, WINHTTP_OPTION_DISABLE_FEATURE, &disable_redirects, sizeof(disable_redirects));
+
+    wchar_t headers[1024] = L"";
+    if (send_auth) {
+        wchar_t token_w[400] = L"";
+        MultiByteToWideChar(CP_UTF8, 0, EB_UPDATER_TOKEN_STRING, -1, token_w, 400);
+        wchar_t auth_line[512];
+        _snwprintf(auth_line, 512, L"Authorization: token %s\r\n", token_w);
+        auth_line[511] = L'\0';
+        wcsncat(headers, auth_line, (sizeof(headers) / sizeof(wchar_t)) - wcslen(headers) - 1);
+    }
+    if (accept) {
+        wchar_t accept_w[128] = L"";
+        MultiByteToWideChar(CP_UTF8, 0, accept, -1, accept_w, 128);
+        wchar_t accept_line[160];
+        _snwprintf(accept_line, 160, L"Accept: %s\r\n", accept_w);
+        accept_line[159] = L'\0';
+        wcsncat(headers, accept_line, (sizeof(headers) / sizeof(wchar_t)) - wcslen(headers) - 1);
+    }
+    wcsncat(headers, L"User-Agent: EarthBound-Updater\r\n",
+            (sizeof(headers) / sizeof(wchar_t)) - wcslen(headers) - 1);
+
+    BOOL sent = WinHttpSendRequest(hRequest, headers, (DWORD)-1, WINHTTP_NO_REQUEST_DATA, 0, 0, 0);
+    if (!sent || !WinHttpReceiveResponse(hRequest, NULL)) {
+        snprintf(err, err_size, "Request failed (%lu)", GetLastError());
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        return -1;
+    }
+
+    DWORD status = 0, status_size = sizeof(status);
+    WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER,
+                        WINHTTP_HEADER_NAME_BY_INDEX, &status, &status_size, WINHTTP_NO_HEADER_INDEX);
+
+    if (status >= 300 && status < 400 && redirect_out) {
+        wchar_t location[2048];
+        DWORD loc_size = sizeof(location);
+        if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_LOCATION, WINHTTP_HEADER_NAME_BY_INDEX,
+                                 location, &loc_size, WINHTTP_NO_HEADER_INDEX)) {
+            WideCharToMultiByte(CP_UTF8, 0, location, -1, redirect_out, (int)redirect_out_size, NULL, NULL);
+        } else {
+            redirect_out[0] = '\0';
+        }
+        WinHttpCloseHandle(hRequest);
+        WinHttpCloseHandle(hConnect);
+        WinHttpCloseHandle(hSession);
+        return (long)status;
+    }
+
+    /* Stream the body (if the caller wants it -- a pure status/redirect
+     * probe passes mem=file_ctx=NULL and we just discard it below). */
+    DWORD total_size = 0;
+    {
+        DWORD cl = 0, cl_size = sizeof(cl);
+        if (WinHttpQueryHeaders(hRequest, WINHTTP_QUERY_CONTENT_LENGTH | WINHTTP_QUERY_FLAG_NUMBER,
+                                 WINHTTP_HEADER_NAME_BY_INDEX, &cl, &cl_size, WINHTTP_NO_HEADER_INDEX))
+            total_size = cl;
+    }
+    unsigned long long downloaded = 0;
+    for (;;) {
+        DWORD avail = 0;
+        if (!WinHttpQueryDataAvailable(hRequest, &avail) || avail == 0) break;
+        char *buf = malloc(avail);
+        if (!buf) break;
+        DWORD read_bytes = 0;
+        if (!WinHttpReadData(hRequest, buf, avail, &read_bytes)) { free(buf); break; }
+        if (mem) {
+            char *grown = realloc(mem->data, mem->len + read_bytes + 1);
+            if (grown) {
+                mem->data = grown;
+                memcpy(mem->data + mem->len, buf, read_bytes);
+                mem->len += read_bytes;
+                mem->data[mem->len] = '\0';
+            }
+        } else if (file_ctx) {
+            fwrite(buf, 1, read_bytes, file_ctx->f);
+        }
+        free(buf);
+        downloaded += read_bytes;
+        if (file_ctx && file_ctx->progress_percent_out && total_size > 0) {
+            int pct = (int)((downloaded * 100) / total_size);
+            EbUpdateProgress p;
+            SDL_LockMutex(updater_mutex());
+            p = g_progress;
+            SDL_UnlockMutex(updater_mutex());
+            p.progress_percent = pct;
+            set_progress(&p);
+        }
+    }
+
+    WinHttpCloseHandle(hRequest);
+    WinHttpCloseHandle(hConnect);
+    WinHttpCloseHandle(hSession);
+    return (long)status;
+}
+
+static long http_get(const char *url, bool send_auth, const char *accept,
+                      MemBuf *mem, FileWriteCtx *file_ctx, char *err, size_t err_size) {
+    return win_http_request(url, send_auth, accept, mem, file_ctx, NULL, 0, err, err_size);
+}
+
+static bool fetch_release_asset(const char *asset_api_url, MemBuf *mem, FileWriteCtx *file_ctx,
+                                 char *err, size_t err_size) {
+    char redirect_url[2048] = {0};
+    long code = win_http_request(asset_api_url, true, "application/octet-stream",
+                                  NULL, NULL, redirect_url, sizeof(redirect_url), err, err_size);
+
+    if (code >= 300 && code < 400 && redirect_url[0]) {
+        long final_code = http_get(redirect_url, false, NULL, mem, file_ctx, err, err_size);
+        bool ok = (final_code >= 200 && final_code < 300);
+        if (!ok && err[0] == '\0')
+            snprintf(err, err_size, "download failed (HTTP %ld)", final_code);
+        return ok;
+    }
+    if (code >= 200 && code < 300) {
+        /* Unexpected (no redirect) -- re-fetch with the body this time. */
+        long final_code = http_get(asset_api_url, true, "application/octet-stream", mem, file_ctx, err, err_size);
+        return final_code >= 200 && final_code < 300;
+    }
+    if (err[0] == '\0')
+        snprintf(err, err_size, "unexpected response (HTTP %ld)", code);
+    return false;
+}
+
+#else /* !_WIN32 */
+
+/* ---- libcurl backend (macOS/Linux) ---- */
 
 static size_t membuf_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
     MemBuf *mb = (MemBuf *)userdata;
@@ -127,11 +373,6 @@ static size_t membuf_write_cb(void *ptr, size_t size, size_t nmemb, void *userda
     mb->data[mb->len] = '\0';
     return add;
 }
-
-typedef struct {
-    FILE *f;
-    int *progress_percent_out; /* NULL = don't report */
-} FileWriteCtx;
 
 static size_t file_write_cb(void *ptr, size_t size, size_t nmemb, void *userdata) {
     FileWriteCtx *ctx = (FileWriteCtx *)userdata;
@@ -278,6 +519,8 @@ static bool fetch_release_asset(const char *asset_api_url, MemBuf *mem, FileWrit
     return false;
 }
 
+#endif /* _WIN32 */
+
 /* ------------------------------------------------------------------------
  * Check thread
  * ---------------------------------------------------------------------- */
@@ -410,7 +653,10 @@ static bool sha256_hex_of_file(const char *path, char out_hex[65]) {
 
 /* Downloads `asset_url` to `dest_path.part`, then renames to `dest_path`
  * only after both the transfer and the checksum verify succeed -- the
- * live file at `dest_path` (if any) is never touched on any failure path. */
+ * live file at `dest_path` (if any) is never touched on any failure path.
+ * On Windows `dest_path` is always a "*.new"/"*.new.exe" staging name (see
+ * install step below), so this rename never collides with the running,
+ * locked executable. */
 static bool download_and_verify(const char *asset_url, const char *dest_path,
                                  const char *expected_hex, char *err, size_t err_size) {
     char tmp_path[4160];
@@ -452,6 +698,96 @@ static bool download_and_verify(const char *asset_url, const char *dest_path,
     return true;
 }
 
+/* Fetches the current release's asset API url for `asset_name` (used for
+ * the paired shared library, whose url isn't cached from the AVAILABLE
+ * check the way the main binary's is -- see file header). */
+static bool fetch_asset_url_by_name(const char *asset_name, char *out_url, size_t out_url_size) {
+    char url[256];
+    snprintf(url, sizeof(url), "https://api.github.com/repos/%s/releases/latest", EB_UPDATER_REPO_STRING);
+    MemBuf body = {0};
+    char err[128] = {0};
+    long code = http_get(url, true, "application/vnd.github+json", &body, NULL, err, sizeof(err));
+    bool found = false;
+    if (code >= 200 && code < 300) {
+        cJSON *root = cJSON_ParseWithLength(body.data, body.len);
+        if (root) {
+            cJSON *assets = cJSON_GetObjectItemCaseSensitive(root, "assets");
+            cJSON *asset;
+            cJSON_ArrayForEach(asset, assets) {
+                cJSON *name = cJSON_GetObjectItemCaseSensitive(asset, "name");
+                cJSON *api_url = cJSON_GetObjectItemCaseSensitive(asset, "url");
+                if (cJSON_IsString(name) && cJSON_IsString(api_url) &&
+                    strcmp(name->valuestring, asset_name) == 0) {
+                    snprintf(out_url, out_url_size, "%s", api_url->valuestring);
+                    found = true;
+                }
+            }
+            cJSON_Delete(root);
+        }
+    }
+    free(body.data);
+    return found;
+}
+
+#ifdef _WIN32
+/* Writes and launches the detached helper that finishes the install after
+ * this process exits -- see file header's "WINDOWS SELF-REPLACE" note.
+ * new_exe/new_dll are the already-downloaded-and-verified staging file
+ * names ("earthbound.new.exe" / "SDL2.dll.new"); final_exe/final_dll are
+ * what they get moved to. Returns false (and sets an error) only if the
+ * helper itself couldn't be written or launched -- at that point nothing
+ * has touched the live files yet, so it's safe to just report the error. */
+static bool win32_launch_relaunch_helper(char *err, size_t err_size) {
+    const char *bat_path = "eb_update_helper.bat";
+    FILE *f = fopen(bat_path, "w");
+    if (!f) {
+        snprintf(err, err_size, "Couldn't write update helper");
+        return false;
+    }
+    /* `ping -n 2 127.0.0.1` is a ~1s delay that works even when this batch
+     * file's own console isn't interactive (unlike `timeout`, which can
+     * misbehave with redirected/absent stdin) -- a common, well-known
+     * batch-scripting substitute for `sleep`. The move is itself retried
+     * in case the OS hasn't fully released the file handle the instant
+     * tasklist stops reporting our PID. */
+    fprintf(f,
+        "@echo off\r\n"
+        "set PID=%%1\r\n"
+        ":waitloop\r\n"
+        "tasklist /FI \"PID eq %%PID%%\" 2>NUL | find /I \"%%PID%%\" >NUL\r\n"
+        "if \"%%ERRORLEVEL%%\"==\"0\" (\r\n"
+        "    ping -n 2 127.0.0.1 >NUL\r\n"
+        "    goto waitloop\r\n"
+        ")\r\n"
+        ":moveloop\r\n"
+        "move /Y \"earthbound.new.exe\" \"earthbound.exe\" >NUL 2>&1\r\n"
+        "if exist \"earthbound.new.exe\" (\r\n"
+        "    ping -n 2 127.0.0.1 >NUL\r\n"
+        "    goto moveloop\r\n"
+        ")\r\n"
+        "if exist \"%s.new\" move /Y \"%s.new\" \"%s\" >NUL 2>&1\r\n"
+        "start \"\" \"earthbound.exe\"\r\n"
+        "del \"%%~f0\"\r\n",
+        EB_UPDATER_DLL_NAME, EB_UPDATER_DLL_NAME, EB_UPDATER_DLL_NAME);
+    fclose(f);
+
+    char cmdline[256];
+    snprintf(cmdline, sizeof(cmdline), "cmd.exe /c \"%s\" %lu", bat_path, (unsigned long)GetCurrentProcessId());
+
+    STARTUPINFOA si = { .cb = sizeof(si) };
+    PROCESS_INFORMATION pi;
+    BOOL ok = CreateProcessA(NULL, cmdline, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
+    if (!ok) {
+        snprintf(err, err_size, "Couldn't launch update helper (%lu)", GetLastError());
+        remove(bat_path);
+        return false;
+    }
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    return true;
+}
+#endif
+
 static int download_thread_fn(void *unused) {
     (void)unused;
     char err[64] = {0};
@@ -473,86 +809,95 @@ static int download_thread_fn(void *unused) {
     char expected_hex[65];
     const char *found = find_checksum(checksums_copy, EB_UPDATER_ASSET_NAME);
     if (found) snprintf(expected_hex, sizeof(expected_hex), "%s", found);
-#ifdef __APPLE__
-    char expected_dylib_hex[65];
+#if defined(__APPLE__) || defined(_WIN32)
+    char expected_lib_hex[65];
+#if defined(__APPLE__)
+#define EB_UPDATER_LIB_NAME EB_UPDATER_DYLIB_NAME
+#else
+#define EB_UPDATER_LIB_NAME EB_UPDATER_DLL_NAME
+#endif
     /* Re-tokenize: find_checksum()'s strtok already consumed checksums_copy. */
     char *checksums_copy2 = strdup(checksums_copy);
-    const char *found_dylib = checksums_copy2 ? find_checksum(checksums_copy2, EB_UPDATER_DYLIB_NAME) : NULL;
-    if (found_dylib) snprintf(expected_dylib_hex, sizeof(expected_dylib_hex), "%s", found_dylib);
+    const char *found_lib = checksums_copy2 ? find_checksum(checksums_copy2, EB_UPDATER_LIB_NAME) : NULL;
+    if (found_lib) snprintf(expected_lib_hex, sizeof(expected_lib_hex), "%s", found_lib);
 #endif
     free(checksums_copy);
-#ifdef __APPLE__
+#if defined(__APPLE__) || defined(_WIN32)
     free(checksums_copy2);
 #endif
 
     if (!found) { set_error("Checksum manifest incomplete"); return 0; }
-#ifdef __APPLE__
-    if (!found_dylib) { set_error("Checksum manifest incomplete"); return 0; }
+#if defined(__APPLE__) || defined(_WIN32)
+    if (!found_lib) { set_error("Checksum manifest incomplete"); return 0; }
 #endif
 
-    /* 2. The binary itself, staged at "earthbound.new" beside the running
-     * executable (CWD is already the executable's own directory -- see
-     * chdir_to_executable_dir() in main.c, called before anything else). */
-    if (!download_and_verify(g_asset_api_url, "earthbound.new", expected_hex, err, sizeof(err))) {
+    /* 2. The binary itself, staged beside the running executable (CWD is
+     * already the executable's own directory -- see
+     * chdir_to_executable_dir() in main.c, called before anything else).
+     * Windows stages under a name distinct from the locked live .exe;
+     * POSIX stages "earthbound.new" and rename()s over the live file
+     * directly (see download_and_verify()'s own header comment). */
+#ifdef _WIN32
+    const char *new_exe_name = "earthbound.new.exe";
+#else
+    const char *new_exe_name = "earthbound.new";
+#endif
+    if (!download_and_verify(g_asset_api_url, new_exe_name, expected_hex, err, sizeof(err))) {
         set_error(err[0] ? err : "Download failed");
         return 0;
     }
 
-#ifdef __APPLE__
-    /* 3. macOS also ships its own dylib -- fetched the same way, by
-     * re-resolving its asset url from a fresh check (the AVAILABLE check
-     * only stored the platform binary + checksums URLs; the dylib isn't
-     * looked up unless we're actually installing on macOS). Simpler in
-     * practice: the dylib rarely changes version-to-version, but we still
-     * verify+replace it every update for correctness. */
-    char dylib_asset_url[512] = {0};
-    {
-        char url[256];
-        snprintf(url, sizeof(url), "https://api.github.com/repos/%s/releases/latest", EB_UPDATER_REPO_STRING);
-        MemBuf body = {0};
-        long code = http_get(url, true, "application/vnd.github+json", &body, NULL, err, sizeof(err));
-        if (code >= 200 && code < 300) {
-            cJSON *root = cJSON_ParseWithLength(body.data, body.len);
-            if (root) {
-                cJSON *assets = cJSON_GetObjectItemCaseSensitive(root, "assets");
-                cJSON *asset;
-                cJSON_ArrayForEach(asset, assets) {
-                    cJSON *name = cJSON_GetObjectItemCaseSensitive(asset, "name");
-                    cJSON *api_url = cJSON_GetObjectItemCaseSensitive(asset, "url");
-                    if (cJSON_IsString(name) && cJSON_IsString(api_url) &&
-                        strcmp(name->valuestring, EB_UPDATER_DYLIB_NAME) == 0) {
-                        snprintf(dylib_asset_url, sizeof(dylib_asset_url), "%s", api_url->valuestring);
-                    }
-                }
-                cJSON_Delete(root);
-            }
-        }
-        free(body.data);
-    }
-    if (!dylib_asset_url[0]) { set_error("No dylib in release"); remove("earthbound.new"); return 0; }
-    if (!download_and_verify(dylib_asset_url, EB_UPDATER_DYLIB_NAME ".new", expected_dylib_hex, err, sizeof(err))) {
-        set_error(err[0] ? err : "Dylib download failed");
-        remove("earthbound.new");
+#if defined(__APPLE__) || defined(_WIN32)
+    /* 3. macOS/Windows also ship a paired shared library -- fetched the
+     * same way, by re-resolving its asset url (the AVAILABLE check only
+     * cached the platform binary + checksums URLs). Rarely changes
+     * version-to-version, but verified+replaced every update regardless,
+     * for correctness. */
+    char lib_asset_url[512] = {0};
+    fetch_asset_url_by_name(EB_UPDATER_LIB_NAME, lib_asset_url, sizeof(lib_asset_url));
+    if (!lib_asset_url[0]) { set_error("No library asset in release"); remove(new_exe_name); return 0; }
+    char new_lib_name[128];
+    snprintf(new_lib_name, sizeof(new_lib_name), "%s.new", EB_UPDATER_LIB_NAME);
+    if (!download_and_verify(lib_asset_url, new_lib_name, expected_lib_hex, err, sizeof(err))) {
+        set_error(err[0] ? err : "Library download failed");
+        remove(new_exe_name);
         return 0;
     }
 #endif
 
-    /* 4. Install: swap the new file(s) into place. POSIX allows replacing
-     * a file that's currently executing -- the running process keeps its
-     * old inode open until it exits, so this is safe to do while running. */
-    chmod("earthbound.new", 0755);
-    if (rename("earthbound.new", "earthbound") != 0) {
+#ifdef _WIN32
+    /* 4. Install (Windows): can't touch the live, locked .exe from this
+     * process at all -- hand off to a detached helper that waits for us
+     * to exit, then does the actual swap. See file header. */
+    if (!win32_launch_relaunch_helper(err, sizeof(err))) {
+        set_error(err[0] ? err : "Couldn't stage install");
+        remove(new_exe_name);
+        remove(new_lib_name);
+        return 0;
+    }
+    EbUpdateProgress p = {0};
+    p.status = EB_UPDATE_DONE;
+    set_progress(&p);
+    platform_request_quit();
+    return 0;
+#else
+    /* 4. Install (macOS/Linux): swap the new file(s) into place. POSIX
+     * allows replacing a file that's currently executing -- the running
+     * process keeps its old inode open until it exits, so this is safe to
+     * do while running. */
+    chmod(new_exe_name, 0755);
+    if (rename(new_exe_name, "earthbound") != 0) {
         char msg[64];
         snprintf(msg, sizeof(msg), "Couldn't install: %s", strerror(errno));
         set_error(msg);
         return 0;
     }
 #ifdef __APPLE__
-    if (rename(EB_UPDATER_DYLIB_NAME ".new", EB_UPDATER_DYLIB_NAME) != 0) {
+    if (rename(new_lib_name, EB_UPDATER_LIB_NAME) != 0) {
         /* The main binary already swapped -- this is a genuinely bad state
          * (mismatched binary/dylib pair), but there's no safe rollback of
-         * step 4's first rename(). Surface it clearly; the player's next
-         * launch will fail to load the dylib and needs a fresh download. */
+         * the rename() above. Surface it clearly; the player's next launch
+         * will fail to load the dylib and needs a fresh download. */
         set_error("Update partially installed -- please redownload");
         return 0;
     }
@@ -574,6 +919,7 @@ static int download_thread_fn(void *unused) {
     set_progress(&p);
     platform_request_quit();
     return 0;
+#endif
 }
 
 /* ------------------------------------------------------------------------

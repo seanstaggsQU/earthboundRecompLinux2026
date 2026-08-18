@@ -108,13 +108,14 @@ endif()
 # see this file's own comment on the generated header below for why that
 # specifically does NOT go through target_compile_definitions.
 #
-# macOS/Linux only for now (EB_UPDATER_ENABLED gates sdl2_updater.c's real
-# implementation): Windows can't self-replace its own running .exe in the
-# way this file's POSIX rename()-while-running approach relies on, and
-# needs a WinHTTP backend instead of libcurl -- deferred to a follow-up.
+# Windows uses WinHTTP (ships with the OS/MinGW-w64 headers, no extra
+# dependency) instead of libcurl, and a detached helper-script relaunch
+# instead of the POSIX rename()-while-running + execv() approach, since
+# Windows locks its own running .exe and can't replace or re-exec it
+# in-process -- see sdl2_updater.c's WIN32 branches.
 set(EB_UPDATER_REPO "" CACHE STRING "owner/repo of the private GitHub releases repo (empty = updater disabled)")
 set(EB_UPDATER_TOKEN "" CACHE STRING "Fine-grained GitHub PAT, Contents:Read-only, scoped to EB_UPDATER_REPO only (empty = updater disabled)")
-if(EB_UPDATER_REPO AND EB_UPDATER_TOKEN AND NOT WIN32)
+if(EB_UPDATER_REPO AND EB_UPDATER_TOKEN)
     # Generated into the build tree only, never committed -- configure_file()
     # (not target_compile_definitions) so the token never lands in
     # compile_commands.json, which gets copied into IDE configs and shared
@@ -126,17 +127,21 @@ if(EB_UPDATER_REPO AND EB_UPDATER_TOKEN AND NOT WIN32)
         @ONLY)
     target_compile_definitions(earthbound PRIVATE EB_UPDATER_ENABLED=1)
 
-    find_package(CURL QUIET)
-    if(NOT CURL_FOUND)
-        find_package(PkgConfig REQUIRED)
-        pkg_check_modules(CURL REQUIRED libcurl)
-    endif()
-    if(TARGET CURL::libcurl)
-        target_link_libraries(earthbound CURL::libcurl)
+    if(WIN32)
+        target_link_libraries(earthbound winhttp)
     else()
-        target_include_directories(earthbound PRIVATE ${CURL_INCLUDE_DIRS})
-        target_link_libraries(earthbound ${CURL_LIBRARIES})
-        target_link_directories(earthbound PRIVATE ${CURL_LIBRARY_DIRS})
+        find_package(CURL QUIET)
+        if(NOT CURL_FOUND)
+            find_package(PkgConfig REQUIRED)
+            pkg_check_modules(CURL REQUIRED libcurl)
+        endif()
+        if(TARGET CURL::libcurl)
+            target_link_libraries(earthbound CURL::libcurl)
+        else()
+            target_include_directories(earthbound PRIVATE ${CURL_INCLUDE_DIRS})
+            target_link_libraries(earthbound ${CURL_LIBRARIES})
+            target_link_directories(earthbound PRIVATE ${CURL_LIBRARY_DIRS})
+        endif()
     endif()
 endif()
 
