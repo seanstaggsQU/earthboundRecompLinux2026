@@ -803,15 +803,28 @@ static int download_thread_fn(void *unused) {
         return 0;
     }
 
-    char *checksums_copy = malloc(checksums.len + 1);
-    if (!checksums_copy) { set_error("Out of memory"); free(checksums.data); return 0; }
-    memcpy(checksums_copy, checksums.data, checksums.len);
-    checksums_copy[checksums.len] = '\0';
+    /* checksums_pristine is NEVER passed directly to find_checksum() --
+     * only fresh strdup()'d scratch copies are, one per search. Bug found
+     * live (confirmed failing identically on both Windows and macOS
+     * before this fix): find_checksum() uses strtok(), which inserts a
+     * NUL at the *first* delimiter it scans past on its very first call,
+     * regardless of which line the eventual match is on -- so by the time
+     * the first search returns, the buffer it was given is already
+     * truncated to just its first line. The old code passed
+     * checksums_copy to the first search directly, THEN strdup()'d the
+     * now-truncated result for the second search, silently losing every
+     * line but the first from that point on. */
+    char *checksums_pristine = malloc(checksums.len + 1);
+    if (!checksums_pristine) { set_error("Out of memory"); free(checksums.data); return 0; }
+    memcpy(checksums_pristine, checksums.data, checksums.len);
+    checksums_pristine[checksums.len] = '\0';
     free(checksums.data);
 
     char expected_hex[65];
-    const char *found = find_checksum(checksums_copy, EB_UPDATER_ASSET_NAME);
+    char *scratch1 = strdup(checksums_pristine);
+    const char *found = scratch1 ? find_checksum(scratch1, EB_UPDATER_ASSET_NAME) : NULL;
     if (found) snprintf(expected_hex, sizeof(expected_hex), "%s", found);
+    free(scratch1);
 #if defined(__APPLE__) || defined(_WIN32)
     char expected_lib_hex[65];
 #if defined(__APPLE__)
@@ -819,15 +832,12 @@ static int download_thread_fn(void *unused) {
 #else
 #define EB_UPDATER_LIB_NAME EB_UPDATER_DLL_NAME
 #endif
-    /* Re-tokenize: find_checksum()'s strtok already consumed checksums_copy. */
-    char *checksums_copy2 = strdup(checksums_copy);
-    const char *found_lib = checksums_copy2 ? find_checksum(checksums_copy2, EB_UPDATER_LIB_NAME) : NULL;
+    char *scratch2 = strdup(checksums_pristine);
+    const char *found_lib = scratch2 ? find_checksum(scratch2, EB_UPDATER_LIB_NAME) : NULL;
     if (found_lib) snprintf(expected_lib_hex, sizeof(expected_lib_hex), "%s", found_lib);
+    free(scratch2);
 #endif
-    free(checksums_copy);
-#if defined(__APPLE__) || defined(_WIN32)
-    free(checksums_copy2);
-#endif
+    free(checksums_pristine);
 
     if (!found) { set_error("Checksum manifest incomplete"); return 0; }
 #if defined(__APPLE__) || defined(_WIN32)
