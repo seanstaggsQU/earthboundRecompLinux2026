@@ -12,21 +12,30 @@
  * non-blocking frame at a time and a real HTTP call here would freeze
  * rendering. This file just starts that work and polls it once a frame.
  *
- * clear_instant_printing() note: window_tick_prepare() (display_text.c,
- * the per-frame renderer every window depends on) unconditionally skips
- * rendering entirely while dt.instant_printing is set. print_menu_items()
- * sets that flag but never clears it -- callers that follow it with a
- * GAME_MODE_SELECTION_MENU push (the usual combo, e.g. this file's own
- * EB_UPDATE_AVAILABLE branch) get it cleared as a side effect of that
- * mode's own setup. Any window here that DOESN'T push a selection menu
- * afterward (the plain message screens, "Downloading...", the download
- * error message) has to clear it explicitly or nothing ever renders again
- * for the rest of the mode -- confirmed live: the whole check/download
- * flow ran correctly end-to-end (verified via temporary stderr logging)
- * right up through the print_string() calls, but nothing appeared on
- * screen, because instant_printing was left set from file-select's own
- * print_menu_items() call (building the save-slot list) before the player
- * ever reached this mode. */
+ * Two things are required for any window here to actually stay visible
+ * while idling (waiting on the background thread, or waiting for a
+ * button), found live via diagnostic logging after the naive first version
+ * created windows and printed to them correctly but nothing ever rendered:
+ *
+ * 1. clear_instant_printing() after create_window(). window_tick_prepare()
+ *    (display_text.c, the per-frame renderer every window depends on)
+ *    unconditionally skips rendering entirely while dt.instant_printing is
+ *    set. print_menu_items() sets that flag but never clears it -- normally
+ *    harmless because callers follow it with a GAME_MODE_SELECTION_MENU
+ *    push, whose own setup clears it as a side effect. File-select's own
+ *    print_menu_items() call (building the save-slot list, before the
+ *    player ever reaches this mode) leaves it stuck set otherwise.
+ *
+ * 2. window_tick_work_step() called every frame while idling. Rendering
+ *    isn't automatic just because a window is open -- something has to
+ *    drive it each frame. The EB_UPDATE_AVAILABLE branch gets this for
+ *    free by pushing GAME_MODE_SELECTION_MENU, whose own step function
+ *    ticks it internally; every phase here that idles WITHOUT pushing a
+ *    child (waiting on the background thread, waiting for a button) has to
+ *    call it directly, exactly like mode_step_hppp_display()'s HD_TICK/
+ *    HD_TICK_FLUSH does for its own idle-wait loop -- see that function
+ *    (text.c) for the precedent this mirrors.
+ */
 #include "core/mode_stack.h"
 #include "platform/platform.h"
 #include "game/window.h"
@@ -80,11 +89,24 @@ StepResult mode_step_update_check(ModeState *ms) {
 
     case UPD_CHECKING: {
         platform_update_poll(&st->progress);
-        if (st->progress.status == EB_UPDATE_CHECKING)
-            return STEP_RESULT_CONTINUE(); /* still waiting on the background thread */
-        st->phase = UPD_RESULT;
+        if (st->progress.status != EB_UPDATE_CHECKING) {
+            st->phase = UPD_RESULT;
+            return STEP_RESULT_CONTINUE();
+        }
+        /* Still waiting on the background thread -- keep driving the
+         * window's per-frame render (see file header, point 2) until it's
+         * done. */
+        if (window_tick_work_step()) {
+            st->phase = UPD_CHECKING_FLUSH;
+            return actionscript_frame_take_push();
+        }
         return STEP_RESULT_CONTINUE();
     }
+
+    case UPD_CHECKING_FLUSH:
+        window_tick_work_flush();
+        st->phase = UPD_CHECKING;
+        return STEP_RESULT_CONTINUE();
 
     case UPD_RESULT: {
         if (st->progress.status == EB_UPDATE_AVAILABLE) {
@@ -104,13 +126,14 @@ StepResult mode_step_update_check(ModeState *ms) {
             add_menu_item("No", 0, 6, 3);
             print_menu_items();
             play_sfx(27); /* SFX::MENU_OPEN_CLOSE */
+            /* No window_tick_work_step() needed here -- the SELECTION_MENU
+             * push below ticks it internally every frame from here on. */
             return upd_push_selection(st, UPD_CONFIRM_RESULT, 1);
         }
 
         /* Every other outcome (up to date / unsupported / error) is a
          * one-shot message, not a confirm — print it once here, then just
-         * wait for a button in UPD_MESSAGE. No SELECTION_MENU push follows,
-         * so clear_instant_printing() here is required (see file header). */
+         * wait for a button in UPD_MESSAGE (which drives its own ticking). */
         close_focus_window();
         create_window(WINDOW_UPDATE_CHECK);
         clear_instant_printing();
@@ -176,6 +199,10 @@ StepResult mode_step_update_check(ModeState *ms) {
             if (n > 100) n = 100;
             snprintf(pct, sizeof(pct), "%d%%", n);
             print_string(pct);
+            if (window_tick_work_step()) {
+                st->phase = UPD_DOWNLOADING_FLUSH;
+                return actionscript_frame_take_push();
+            }
             return STEP_RESULT_CONTINUE();
         }
         if (st->progress.status == EB_UPDATE_DONE) {
@@ -202,13 +229,28 @@ StepResult mode_step_update_check(ModeState *ms) {
         return STEP_RESULT_CONTINUE();
     }
 
+    case UPD_DOWNLOADING_FLUSH:
+        window_tick_work_flush();
+        st->phase = UPD_DOWNLOADING;
+        return STEP_RESULT_CONTINUE();
+
     case UPD_MESSAGE: {
         if (core.pad1_pressed & (PAD_CONFIRM | PAD_CANCEL)) {
             play_sfx(2); /* SFX::CURSOR2 */
             st->phase = UPD_CLEANUP;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (window_tick_work_step()) {
+            st->phase = UPD_MESSAGE_FLUSH;
+            return actionscript_frame_take_push();
         }
         return STEP_RESULT_CONTINUE();
     }
+
+    case UPD_MESSAGE_FLUSH:
+        window_tick_work_flush();
+        st->phase = UPD_MESSAGE;
+        return STEP_RESULT_CONTINUE();
 
     case UPD_CLEANUP:
         close_focus_window();

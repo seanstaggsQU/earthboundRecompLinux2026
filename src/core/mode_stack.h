@@ -484,11 +484,14 @@ typedef struct {
 typedef enum {
     UPD_CHECK_START = 0,   /* build the window, call platform_update_check_start() once */
     UPD_CHECKING,           /* poll-only: waiting for status to advance past EB_UPDATE_CHECKING */
+    UPD_CHECKING_FLUSH,      /* park-propagating resume of an idle UPD_CHECKING window frame */
     UPD_RESULT,              /* got a status: show it, and if available, offer a Yes/No confirm */
     UPD_CONFIRM_RESULT,      /* dispatch the Yes/No selection_menu result */
     UPD_DOWNLOAD_START,      /* rebuild the window, call platform_update_download_start() once */
     UPD_DOWNLOADING,         /* poll-only: waiting for status to leave EB_UPDATE_DOWNLOADING (progress_percent updates each frame) */
+    UPD_DOWNLOADING_FLUSH,   /* park-propagating resume of an idle UPD_DOWNLOADING window frame */
     UPD_MESSAGE,             /* terminal message (up to date / unsupported / error) shown until a button is pressed */
+    UPD_MESSAGE_FLUSH,       /* park-propagating resume of an idle UPD_MESSAGE window frame */
     UPD_CLEANUP,             /* close the window, push ENTITY_FADE_WAIT */
     UPD_DONE,                /* POP 0 */
 } UpdateCheckPhase;
