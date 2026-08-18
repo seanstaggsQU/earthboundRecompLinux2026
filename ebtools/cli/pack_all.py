@@ -567,13 +567,26 @@ def pack_all(
         pack_guardian_text(guardian_json, text_table, out)
         packed += 1
         print("  Packed guardian text")
-    dont_care_json = assets_dir / "locale" / "data" / "dont_care_names.json"
+    # A custom_assets override (src/custom_assets/dont_care_names.json) wins
+    # over the ROM-extracted default (assets_dir/locale/data/dont_care_names.json,
+    # which lives under the gitignored extraction cache and gets silently
+    # regenerated from the donor ROM by every `ebtools extract`). This is the
+    # one JSON asset type with a custom_assets override today: unlike the
+    # ROM-extracted default, a customized name list is original, non-ROM text
+    # a modder/maintainer wants version-controlled and durable across re-extracts.
+    dont_care_custom_json = assets_dir.parent / "custom_assets" / "dont_care_names.json"
+    dont_care_json = (
+        dont_care_custom_json
+        if dont_care_custom_json.exists()
+        else assets_dir / "locale" / "data" / "dont_care_names.json"
+    )
     if dont_care_json.exists():
         out = output_dir / "US" / "data" / "dont_care_names.bin"
         out.parent.mkdir(parents=True, exist_ok=True)
         pack_dont_care_names(dont_care_json, text_table, out)
         packed += 1
-        print("  Packed don't-care names")
+        label = "custom" if dont_care_json == dont_care_custom_json else "default"
+        print(f"  Packed don't-care names ({label})")
 
     # --- Dialogue files (MUST run before config packers so addr_remap is available) ---
     addr_remap: dict[int, int] = {}  # original SNES addr → new compiled SNES addr
