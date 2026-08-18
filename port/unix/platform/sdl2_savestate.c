@@ -9,7 +9,11 @@
  */
 #include "platform/platform.h"
 #include <stdio.h>
-#include <unistd.h>
+#ifdef _WIN32
+#include <io.h>        /* _commit, _fileno */
+#else
+#include <unistd.h>    /* fsync, fileno */
+#endif
 
 static const char *slot_path(int slot) {
     return slot == 0 ? "savestate.bin.0" : "savestate.bin.1";
@@ -46,8 +50,13 @@ bool platform_savestate_commit(int slot) {
     FILE *f = slot_writer[slot];
     slot_writer[slot] = NULL;
     bool ok = (fflush(f) == 0);
+#ifdef _WIN32
+    if (ok && _commit(_fileno(f)) != 0) /* durability: the new slot must hit stable storage */
+        ok = false;
+#else
     if (ok && fsync(fileno(f)) != 0) /* durability: the new slot must hit stable storage */
         ok = false;
+#endif
     if (fclose(f) != 0)
         ok = false;
     return ok;

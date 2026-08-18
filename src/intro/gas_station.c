@@ -188,6 +188,7 @@ static void gas_station_load(void) {
      * EB_VIEWPORT_PAD_TOP when the static is removed and rendering falls back
      * to the centered non-wide path. Matches file_select.c / battle_ui.c. */
     ppu.sprite_y_offset = EB_VIEWPORT_PAD_TOP;
+    ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP;
 
     ert.palette_upload_mode = PALETTE_UPLOAD_FULL;
 }
@@ -324,6 +325,7 @@ StepResult mode_step_gas_station(ModeState *st) {
             sync_palettes_to_cgram();
             ppu.bg_viewport_fill[1] = BG_VIEWPORT_CENTER;
             ppu.sprite_y_offset = 0;
+            ppu.bg_win_y_offset = 0;
             ppu.ts = 0x00;
             s->phase = GS_PH6;
             s->remaining = 30;

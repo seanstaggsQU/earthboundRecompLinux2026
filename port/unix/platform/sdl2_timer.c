@@ -1,6 +1,10 @@
 #include "platform/platform.h"
 #include "game_main.h"
 #include <SDL.h>
+#ifdef _WIN32
+#include <windows.h>
+#include <mmsystem.h>  /* timeBeginPeriod/timeEndPeriod (winmm) */
+#endif
 
 static uint64_t frame_start_ticks;
 static uint64_t ticks_per_sec;
@@ -17,10 +21,30 @@ static uint32_t fps_tenths_acc;    /* FPS * 10, shifted by IIR_SHIFT */
 bool platform_timer_init(void) {
     ticks_per_sec = SDL_GetPerformanceFrequency();
     fps_tenths_acc = (uint32_t)TARGET_FPS * 10 << IIR_SHIFT;
+#ifdef _WIN32
+    /* platform_timer_frame_end() paces frames with a manual SDL_Delay()
+     * sleep-to-deadline, running alongside the renderer's blocking VSync
+     * (SDL_RenderSetVSync in sdl2_video.c) -- two independent pacers on
+     * the same loop. That's fine when the sleep is precise, but Windows'
+     * *default* system timer resolution is ~15.6ms (vs ~1ms typical on
+     * Linux/macOS), so SDL_Delay(1) there can genuinely block for up to
+     * 15ms: the manual pacer routinely overshoots its 1/60s budget by an
+     * amount comparable to a whole frame, which then collides with
+     * VSync's own blocking wait unpredictably from frame to frame. That's
+     * exactly the shape of "slight desync"/jitter a player would notice
+     * on Windows and nowhere else. timeBeginPeriod(1) raises the *process*
+     * timer resolution to 1ms, which is the standard, well-known fix for
+     * this class of Sleep()-imprecision issue in Windows games. Paired
+     * with timeEndPeriod(1) in platform_timer_shutdown(). */
+    timeBeginPeriod(1);
+#endif
     return true;
 }
 
 void platform_timer_shutdown(void) {
+#ifdef _WIN32
+    timeEndPeriod(1);
+#endif
 }
 
 uint64_t platform_timer_ticks(void) {

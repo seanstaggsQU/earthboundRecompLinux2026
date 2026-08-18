@@ -108,6 +108,7 @@ static StepResult title_fadeout_step(TitleScreenState *s) {
         ppu.bg_viewport_fill[0] = BG_VIEWPORT_CENTER;
         ppu.sprite_x_offset = 0;
         ppu.sprite_y_offset = 0;
+        ppu.bg_win_y_offset = 0;
         ert.actionscript_state = 0;
         setup_entity_color_math();
         entity_system_init();
@@ -279,12 +280,13 @@ void title_screen_setup(uint16_t quick_mode) {
      * on exit so the following attract-mode overworld (camera-centered) isn't
      * double-shifted. Matches gas_station.c / file_select.c. */
     ppu.sprite_y_offset = EB_VIEWPORT_PAD_TOP;
+    ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP;
 
     /* ROM: JSL OAM_CLEAR */
     memset(ppu.oam, 0, sizeof(ppu.oam));
     memset(ppu.oam_hi, 0, sizeof(ppu.oam_hi));
     for (int i = 0; i < 128; i++) {
-        ppu.oam[i].y = EB_VIEWPORT_HEIGHT;
+        ppu.oam[i].y = PPU_OAM_Y_HIDDEN;
         ppu.oam_full_y[i] = EB_VIEWPORT_HEIGHT;
     }
 

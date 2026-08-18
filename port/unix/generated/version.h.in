@@ -1,0 +1,13 @@
+/*
+ * Generated at CMake configure time from `git describe --tags --always
+ * --dirty` (falls back to "dev" if git or tags aren't available -- e.g. a
+ * shallow clone or a source tarball with no .git directory). Not hand
+ * edited -- see port/unix/CMakeLists.txt for the configure_file() call
+ * that produces the real generated/version.h in the build tree.
+ */
+#ifndef EB_VERSION_H
+#define EB_VERSION_H
+
+#define EB_VERSION_STRING "@EB_GIT_VERSION@"
+
+#endif /* EB_VERSION_H */

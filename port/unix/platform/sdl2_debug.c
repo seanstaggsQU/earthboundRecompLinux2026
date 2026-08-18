@@ -2,7 +2,13 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <sys/stat.h>
+#ifdef _WIN32
+#include <direct.h>    /* _mkdir */
+#define MKDIR(path) _mkdir(path)
+#else
+#include <sys/stat.h>  /* mkdir */
+#define MKDIR(path) mkdir(path, 0755)
+#endif
 
 #include "snes/ppu.h"
 #include "game/window.h"
@@ -35,8 +41,12 @@ static void write_bmp(const char *path, const uint32_t *fb, int w, int h) {
 
     fwrite(hdr, 1, 54, f);
 
-    /* Max row: 256 pixels * 3 bytes + 3 padding = 771 bytes */
-    uint8_t row[772];
+    /* Sized for the widest row write_bmp() is ever called with (the
+     * EB_VIEWPORT_WIDTH-wide screenshot below) -- was a fixed 256-pixel
+     * buffer, which silently became a stack overflow once a wider
+     * (widescreen) viewport was introduced. */
+    uint8_t row[(EB_VIEWPORT_WIDTH * 3 + 3) & ~3u];
+    if (row_size > sizeof(row)) row_size = sizeof(row); /* defensive: truncate, never overflow */
     memset(row, 0, row_size);
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
@@ -53,7 +63,7 @@ static void write_bmp(const char *path, const uint32_t *fb, int w, int h) {
 /* Dump PPU state to files in debug/ directory.
  * Called with the current framebuffer (from locked texture or local buffer). */
 void platform_debug_dump_ppu(const pixel_t *framebuffer) {
-    mkdir("debug", 0755);
+    MKDIR("debug");
 
     char path[256];
 
@@ -143,7 +153,7 @@ void platform_debug_dump_ppu(const pixel_t *framebuffer) {
 /* Render VRAM tiles as an image for visual inspection.
    Renders 4bpp tiles in a 16-tile-wide grid. */
 void platform_debug_dump_vram_image(void) {
-    mkdir("debug", 0755);
+    MKDIR("debug");
 
     /* Render as 4bpp: 64KB / 32 bytes per tile = 2048 tiles
        Arrange as 32 columns x 64 rows = 2048 tiles

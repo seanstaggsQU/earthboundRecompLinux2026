@@ -149,7 +149,9 @@ uint8_t find_door_at_position(uint16_t x_tile, uint16_t y_tile) {
 
 static void check_door_event_flag(uint16_t door_offset) {
     const uint8_t *door = get_door_data_entry(door_offset & 0x7FFF);
-    if (!door) return;
+    if (!door) {
+        return;
+    }
 
     /* Assembly lines 20-22: read event_flag (offset 0) and check it */
     uint16_t event_flag_raw = read_u16_le(door);  /* door_data::event_flag at offset 0 */
@@ -160,10 +162,11 @@ static void check_door_event_flag(uint16_t door_offset) {
      * If event_flag > 0x8000 (BLTEQ: unsigned <=), expected = 1; else expected = 0. */
     bool expected = (event_flag_raw > 0x8000);
 
+    uint32_t text_ptr = read_u32_le(door + 2); /* door_data::text at offset 2 */
+
     /* If flag matches expected, queue the door's text interaction */
     if (flag_value == expected) {
         /* Assembly lines 37-52: read text pointer (offset 2, dword) and queue */
-        uint32_t text_ptr = read_u32_le(door + 2);  /* door_data::text at offset 2 */
         queue_interaction(0, text_ptr);
         ow.ladder_stairs_tile_y = 0;
         ow.ladder_stairs_tile_x = 0;

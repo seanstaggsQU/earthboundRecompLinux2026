@@ -443,6 +443,69 @@ void host_process_frame(void) {
 
     if (aux_new & AUX_FPS_TOGGLE)
         show_fps = !show_fps;
+    /* R3 wide-FOV zoom toggle. Originally gated on "GAME_MODE_OVERWORLD is
+     * the exact top of the mode stack," which sounded right but wasn't:
+     * nearly every ordinary interaction (talking to an NPC, checking a
+     * sign, opening the pause menu) pushes a *child* mode on top of the
+     * overworld for the duration of a text box/menu, which isn't the
+     * overworld's own screen replacing itself -- it's an overlay drawn on
+     * top of the still-correctly-zoomed map underneath. Gating that
+     * strictly meant the zoom silently reset on almost every action,
+     * which is exactly the annoyance reported after shipping it that way.
+     *
+     * The screens that actually need protecting (persistently -- the
+     * player has to press R3 again after leaving) are the ones with their
+     * own separate, unconditionally-wide (not zoom-aware) rendering setup:
+     * GAME_MODE_BATTLE (battle_ui.c always sets sprite_y_offset/
+     * bg_win_y_offset = EB_VIEWPORT_PAD_TOP regardless of the zoom flag,
+     * same footprint whether the player was zoomed or not) and
+     * GAME_MODE_TOWN_MAP (its own full-screen map graphic, not an overlay
+     * on the walking-around scene -- untested against any zoom crop, and
+     * visually wrong to show zoomed regardless). Scans the whole stack, not
+     * just the top, since either can be pushed while a text box is still an
+     * ancestor frame. Everywhere else (dialogue, menus, ...) leaves the
+     * player's persistent zoom *choice* alone -- see the separate
+     * any_window_open() check below for the one case that still needs
+     * a temporary (not persistent) override. */
+    bool needs_zoom_reset = false;
+    for (int i = 0; i < g_mode_stack.depth; i++) {
+        if (g_mode_stack.mode[i] == GAME_MODE_BATTLE ||
+            g_mode_stack.mode[i] == GAME_MODE_TOWN_MAP) {
+            needs_zoom_reset = true;
+            break;
+        }
+    }
+    if (!needs_zoom_reset) {
+        if (aux_new & AUX_ZOOM_TOGGLE) {
+            /* Cycle EB_ZOOM_OFF -> EB_ZOOM_OUT -> EB_ZOOM_IN -> EB_ZOOM_OFF. */
+            ow.zoom_mode = (ow.zoom_mode + 1) % 3;
+        }
+    } else if (ow.zoom_mode != EB_ZOOM_OFF) {
+        ow.zoom_mode = EB_ZOOM_OFF;
+    }
+
+    /* Zoom In specifically can't safely show while any text/menu window is
+     * open: EarthBound positions windows (e.g. the standard dialogue box,
+     * WINDOW::TEXT_STANDARD at y=1, near the very top of the screen --
+     * window.c) freely across the full native height, but a ~1.5x zoom-in
+     * crop only shows the center ~2/3 of that height -- a window that close
+     * to an edge gets its border clipped clean off (confirmed live: the
+     * dialogue box's whole top edge was missing). Zoom Out has no such
+     * problem (it only ever reveals more area, never less, so nothing that
+     * was visible before can become clipped) and doesn't need this.
+     *
+     * This is a per-frame *effective* override, not a change to the
+     * player's persisted ow.zoom_mode choice -- unlike the battle/town-map
+     * case above, zoom-in resumes on its own the instant the window closes,
+     * no extra R3 press needed, since suspending it here is purely a
+     * rendering safety concern, not a "the player probably wants a
+     * different screen now" one. Recomputed every frame (not just on the
+     * aux_new edge) since any_window_open() can change independently of
+     * an R3 press. */
+    EbZoomMode effective_zoom = (EbZoomMode)ow.zoom_mode;
+    if (effective_zoom == EB_ZOOM_IN && any_window_open())
+        effective_zoom = EB_ZOOM_OFF;
+    platform_video_set_zoom(effective_zoom);
     if (aux_new & AUX_FAST_FORWARD) {
         fast_forward_active = !fast_forward_active;
         platform_video_set_vsync(!fast_forward_active);
@@ -581,6 +644,15 @@ void host_root_boundary(void) {
              * named by the restored audio_state — otherwise the pre-load track keeps
              * playing over the loaded game. */
             audio_resync_after_load();
+            /* ow.zoom_mode is part of the wholesale ow blob (see
+             * state_dump.c's SECTION_OVERWORLD), so a load could restore a
+             * stale zoom mode with no matching platform_video_set_zoom()
+             * call -- the mode and sdl2_video.c's actual presented crop
+             * would disagree until the next R3 press. Force it off here,
+             * same as a fresh launch, rather than trying to resync the
+             * display to whatever the snapshot says. */
+            ow.zoom_mode = EB_ZOOM_OFF;
+            platform_video_set_zoom(EB_ZOOM_OFF);
             g_capture_status = HOST_CAPTURE_COMMITTED;
             LOG_WARN("savestate: loaded slot\n");
         } else {

@@ -287,3 +287,92 @@ src/assets/
 └── town_maps/
     └── <id>_tileset.png, <id>_arrangement.json, <id>.pal
 ```
+
+---
+
+## Runtime Asset Loading (`assets.pak`)
+
+By default (`EB_RUNTIME_ASSETS=OFF`, the CMake default) the port embeds every
+game asset into the executable at compile time via `INCBIN`, exactly as
+described above — this is the normal dev workflow. `EB_RUNTIME_ASSETS=ON`
+switches to loading assets from a separate `assets.pak` file at startup
+instead, so a prebuilt binary can be shipped without needing Python, ebtools,
+or a ROM on the end user's machine at build time — they only need their own
+legally-dumped ROM once, to build the pak.
+
+### `assets.pak` format
+
+A single flat file, `mmap`'d read-only at startup:
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 4 | magic: `"EBPK"` |
+| 4 | 4 | version: u32 LE (currently `1`) |
+| 8 | 4 | `asset_count`: u32 LE — must equal this build's `ASSET_COUNT` |
+| 12 | 32 | `layout_hash`: SHA-256 of the resolved asset *order* (enum names, not file bytes) — see below |
+| 44 | 8×N | index table: `(offset: u32 LE, length: u32 LE)` per asset, in ID order; `(0, 0)` for a gap/sentinel entry |
+| ... | ... | blob region: raw asset bytes, back-to-back, in ID order |
+
+`layout_hash` is **not** a hash of `assets.manifest` — it hashes the final
+ordered list of asset enum names, which is what `ASSET_COUNT` and every
+`AssetId` slot actually depend on (manifest **and** `--exclude`/`--locale`
+together — e.g. `--exclude audiopacks/*` changes the layout without
+touching the manifest file at all). This is what the runtime loader checks
+an `assets.pak` against, to refuse a stale/mismatched pack.
+
+### Building a pack
+
+```
+ebtools pack assets <manifest> <bin_dir> <output_pak> [--custom-dir PATH] [--exclude PATTERN...] [--locale US|JP]
+```
+
+Uses the exact same asset ordering as `embed-registry --runtime` (below) —
+both share the `_resolve_asset_order()` helper in `ebtools/cli/embed.py`, so
+they can't drift out of sync. Typical use:
+
+```
+ebtools extract earthbound.yml <rom> -d asm/bin
+ebtools pack assets asm/bin/assets.manifest asm/bin assets.pak
+```
+
+### Building the game against a pack (`EB_RUNTIME_ASSETS`)
+
+`EB_RUNTIME_ASSETS=ON` needs metadata describing the asset layout —
+`asset_ids.h`, `embedded_assets.h`, `asset_pack_layout.c/.h` — but *not*
+asset bytes, since a release/CI machine has no ROM by design. This metadata
+is generated once by a maintainer who has a legal ROM, and committed to
+`src/data/runtime_generated/`:
+
+```
+ebtools embed-registry --runtime asm/bin/assets.manifest asm/bin src/data/runtime_generated src/vendor/incbin --locale US
+```
+
+Re-run and commit whenever the manifest, `--exclude` set, or locale changes
+(the same inputs that change `ebtools pack assets`'s output). Then:
+
+```
+cmake -S src -B build -DEB_RUNTIME_ASSETS=ON
+cmake --build build
+./build/earthbound --assets /path/to/assets.pak
+```
+
+`--assets` can be omitted — it falls back to the `EB_ASSETS_PAK` environment
+variable, then the platform data dir (`eb_runtime_assets_default_path()` in
+`src/data/runtime_assets.h`: `$XDG_DATA_HOME/EarthBoundRecomp/assets.pak` or
+`~/.local/share/EarthBoundRecomp/assets.pak` on Linux/macOS, `%APPDATA%\EarthBoundRecomp\assets.pak`
+on Windows).
+
+Without the committed metadata, `earthbound_game`/`earthbound` won't build
+(you'll get a `CMake Warning` at configure time explaining why), but
+`test_runtime_assets` — a standalone self-test of the loader against its own
+small fixture in `src/data/tests/fixtures/` — configures and builds
+regardless, and is the fastest way to sanity-check the C loader without a
+ROM:
+
+```
+cmake --build build --target test_runtime_assets
+./build/test_runtime_assets build/runtime_assets_test/assets_test.pak /tmp
+```
+
+Custom-asset overrides (`src/custom_assets/`, the compile-time modding
+mechanism) aren't supported in `EB_RUNTIME_ASSETS` builds.

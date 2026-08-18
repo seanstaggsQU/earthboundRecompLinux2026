@@ -3,6 +3,7 @@
 #include "game/display_text.h"
 #include "game/display_text_internal.h"  /* dt_make_child_init */
 #include "game/game_state.h"
+#include "game/settings.h"
 #include "game/inventory.h"
 #include "game/overworld.h"
 #include "game/audio.h"
@@ -670,10 +671,12 @@ static uint16_t count_characters_with_psi(void) {
     return psi_count;
 }
 
-/* BUILD_COMMAND_MENU — Port of asm/text/menu/build_command_menu.asm.
+/* BUILD_COMMAND_MENU — Port of asm/text/menu/build_command_menu.asm, plus
+ * "Save"/"Config"/"Quit" items that do not exist in the original ROM (see
+ * below).
  *
- * Builds the 6-item command menu (Talk to, Goods, PSI, Equip, Check, Status)
- * in a 2-column × 3-row grid on WINDOW::COMMAND_MENU.
+ * Builds the command menu (Talk to, Goods, PSI, Equip, Check, Status, Save,
+ * Config, Quit) in a 2-column grid on WINDOW::COMMAND_MENU.
  *
  * PSI is omitted if no party member can use PSI.
  * Sound effect per item: Talk to/Check = 1 (CURSOR1), others = 27 (MENU_OPEN_CLOSE).
@@ -683,6 +686,19 @@ static uint16_t count_characters_with_psi(void) {
  *   Talk to(0,0)  Goods(6,0)
  *   PSI(0,1)      Equip(6,1)
  *   Check(0,2)    Status(6,2)
+ *
+ * "Save" (0,3), "Config" (6,3), and "Quit" (0,4) are this port's own
+ * additions, not from the ROM's CMD_WINDOW_TEXT table (which only has 6
+ * entries) -- their labels are hardcoded C strings. Save calls the same
+ * save_game() used by the in-game SAVE_GAME text control (phone call to
+ * Dad, sanctuaries, etc.) -- it's the only quick-save path now that the old
+ * F4/R3 hotkey has been removed (R3 is the overworld FOV/zoom cycle
+ * instead, see AUX_ZOOM_TOGGLE in game_main.c). Config opens
+ * GAME_MODE_SETTINGS_MENU (mode_step_settings_menu below). Quit calls
+ * platform_request_quit() directly, no confirmation prompt (matches
+ * exactly what was asked for; add an "Are you sure?" step later if that
+ * turns out to be too easy to hit by accident). All three require
+ * WINDOW::COMMAND_MENU's height to be 12, not the ROM's 8 (window.c).
  */
 static uint8_t skip_adding_command_text;
 /* restore_menu_backup moved to win.restore_menu_backup (window.h WindowSystemState) */
@@ -735,6 +751,28 @@ static void build_command_menu(void) {
         if (w && w->menu_count > 0) {
             w->menu_items[w->menu_count - 1].sound_effect = sfx;
         }
+    }
+
+    /* "Save", "Config", and "Quit" -- this port's own 7th/8th/9th items, not
+     * part of the ROM's 6-entry CMD_WINDOW_TEXT table. userdata 7/8/9 are
+     * handled in mode_step_pause_menu() (PM_MAIN_RESULT, text.c). */
+    add_menu_item("Save", 7, 0, 3);
+    {
+        WindowInfo *w = get_window(win.current_focus_window);
+        if (w && w->menu_count > 0)
+            w->menu_items[w->menu_count - 1].sound_effect = 27;  /* SFX::MENU_OPEN_CLOSE */
+    }
+    add_menu_item("Config", 8, 6, 3);
+    {
+        WindowInfo *w = get_window(win.current_focus_window);
+        if (w && w->menu_count > 0)
+            w->menu_items[w->menu_count - 1].sound_effect = 27;  /* SFX::MENU_OPEN_CLOSE */
+    }
+    add_menu_item("Quit", 9, 0, 4);
+    {
+        WindowInfo *w = get_window(win.current_focus_window);
+        if (w && w->menu_count > 0)
+            w->menu_items[w->menu_count - 1].sound_effect = 27;  /* SFX::MENU_OPEN_CLOSE */
     }
 
     skip_adding_command_text = 0;
@@ -2695,6 +2733,34 @@ StepResult mode_step_pause_menu(ModeState *ms) {
                 st->phase = PM_MAIN;
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_STATUS_MENU, &pm_child_init);
 
+            /* --- Save (this port's own addition, not in the original ROM menu) --- */
+            case 7: {
+                if (current_save_slot >= 1 && save_game(current_save_slot - 1))
+                    play_sfx(94);  /* SFX::NAMING_CONFIRM -- audible confirmation it worked */
+                st->phase = PM_MAIN;
+                continue;
+            }
+
+            /* --- Config (this port's own addition, not in the original ROM menu) --- */
+            case 8:
+                pm_child_init = (ModeState){0};
+                pm_child_init.settings_menu.phase = SET_BUILD;
+                st->phase = PM_MAIN;
+                return STEP_RESULT_PUSH_INIT(GAME_MODE_SETTINGS_MENU, &pm_child_init);
+
+            /* --- Quit (this port's own addition, not in the original ROM menu) ---
+             * Requests a clean exit via the same platform_request_quit() path
+             * used for window-close/Escape -- the main loop
+             * (!platform_input_quit_requested()) notices next iteration and
+             * unwinds through the normal atexit(platform_cleanup) shutdown,
+             * so this doesn't need to pop the mode stack or do anything else
+             * itself. No confirmation prompt (see the comment above
+             * build_command_menu() for why). */
+            case 9:
+                platform_request_quit();
+                st->phase = PM_MAIN;
+                continue;
+
             /* Cancel (B/Select) or unknown → cleanup */
             default:
                 st->phase = PM_CLEANUP;
@@ -3131,6 +3197,97 @@ StepResult mode_step_pause_menu(ModeState *ms) {
             enable_all_entities();
             return STEP_RESULT_POP(0);
         }
+    }
+}
+
+/* GAME_MODE_SETTINGS_MENU step — this port's own addition, not a port of
+ * any ROM routine (see SettingsMenuState/SettingsMenuPhase, mode_stack.h).
+ * Reached from the command menu's "Config" item (build_command_menu()
+ * above). One selectable row per engine preference; confirming a row
+ * cycles its value, persists it, and rebuilds the window so the new value
+ * shows immediately -- same build/dispatch/rebuild loop shape as
+ * mode_step_debug_menu (game_main.c). Cancel (B/Select) closes the screen
+ * and returns to the command menu underneath.
+ *
+ * Three rows exist today (Sprint Speed, High Quality Audio, Alt Controls);
+ * more engine preferences can be added as additional userdata cases
+ * without changing this shape. */
+static const char *sprint_speed_labels[SPRINT_SPEED_COUNT] = {
+    [SPRINT_SPEED_OFF]    = "Sprint: Off",
+    [SPRINT_SPEED_MEDIUM] = "Sprint: Medium (+50%)",
+    [SPRINT_SPEED_STINKY] = "Sprint: Stinky (+100%)",
+};
+static const char *hq_audio_labels[HQ_AUDIO_COUNT] = {
+    [HQ_AUDIO_OFF] = "HQ Audio: Off",
+    [HQ_AUDIO_ON]  = "HQ Audio: On",
+};
+static const char *alt_controls_labels[ALT_CONTROLS_COUNT] = {
+    [ALT_CONTROLS_OFF] = "Alt Controls: Off",
+    [ALT_CONTROLS_ON]  = "Alt Controls: On",
+};
+
+StepResult mode_step_settings_menu(ModeState *ms) {
+    SettingsMenuState *st = &ms->settings_menu;
+
+    switch ((SettingsMenuPhase)st->phase) {
+    case SET_BUILD: {
+        create_window(WINDOW_SETTINGS_MENU);
+        add_menu_item(sprint_speed_labels[engine_sprint_speed], 1, 0, 0);
+        add_menu_item(hq_audio_labels[engine_hq_audio], 2, 0, 1);
+        add_menu_item(alt_controls_labels[engine_alt_controls], 3, 0, 2);
+        open_window_and_print_menu(1, 0);
+        st->phase = SET_RESULT;
+        return menu_push_selection(&st->result_ready, &st->result, 1);
+    }
+
+    case SET_RESULT: {
+        uint16_t selection = menu_take_result(&st->result_ready, &st->result);
+        if (selection == 1) {
+            /* Sprint Speed row confirmed: cycle Off -> Medium -> Stinky -> Off. */
+            engine_sprint_speed = (uint8_t)((engine_sprint_speed + 1) % SPRINT_SPEED_COUNT);
+            settings_save();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 2) {
+            /* HQ Audio row confirmed: cycle Off <-> On, then re-trigger
+             * whatever's currently playing so the switch (SPC700 <-> MSU1)
+             * is audible immediately, not just on the next track change.
+             * audio_resync_after_load() already does exactly this "force
+             * change_music() to fully re-evaluate the current track" dance
+             * for savestate loads; reusing it here needs no new logic. */
+            engine_hq_audio = (uint8_t)((engine_hq_audio + 1) % HQ_AUDIO_COUNT);
+            settings_save();
+            audio_resync_after_load();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 3) {
+            /* Alt Controls row confirmed: cycle Off <-> On. Takes effect on
+             * the very next button read -- controller_button_to_pad()
+             * (sdl2_input.c) reads engine_alt_controls fresh every poll, no
+             * resync/rebuild needed the way HQ Audio's live track needed. */
+            engine_alt_controls = (uint8_t)((engine_alt_controls + 1) % ALT_CONTROLS_COUNT);
+            settings_save();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        /* Cancel (B/Select) or unrecognized -> close. */
+        st->phase = SET_CLEANUP;
+        return STEP_RESULT_CONTINUE();
+    }
+
+    case SET_CLEANUP:
+        close_focus_window();
+        st->phase = SET_DONE;
+        return STEP_RESULT_PUSH(GAME_MODE_ENTITY_FADE_WAIT);
+
+    case SET_DONE:
+    default:
+        return STEP_RESULT_POP(0);
     }
 }
 

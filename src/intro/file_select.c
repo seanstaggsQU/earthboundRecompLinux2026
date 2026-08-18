@@ -102,7 +102,7 @@ static void file_select_init(void) {
     /* Step 2: Initialize entity/graphics systems (simplified) */
     /* In the ROM: INIT_ENTITY_SYSTEM, OAM_CLEAR, UPDATE_SCREEN, etc. */
     for (int i = 0; i < 128; i++) {
-        ppu.oam[i].y = EB_VIEWPORT_HEIGHT;
+        ppu.oam[i].y = PPU_OAM_Y_HIDDEN;
         ppu.oam_full_y[i] = EB_VIEWPORT_HEIGHT;
     }
 
@@ -180,6 +180,7 @@ static void file_select_init(void) {
     /* Sprites use SNES-native coordinates; offset them to match centered BG3 */
     ppu.sprite_x_offset = EB_VIEWPORT_PAD_LEFT;
     ppu.sprite_y_offset = EB_VIEWPORT_PAD_TOP;
+    ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP;
 
     /* Step 13: Clear scroll positions */
     ppu.bg_hofs[0] = 0; ppu.bg_vofs[0] = 0;
@@ -227,6 +228,16 @@ static int fm_file_select_build(void) {
         }
         add_menu_item(slot_labels[slot], (uint16_t)(slot + 1), 0, (uint16_t)slot);
     }
+
+    /* This port's own addition, not in WINDOW_CONFIGURATION_TABLE or the
+     * original assembly -- a 4th row below the 3 save slots, only shown on
+     * builds that actually have a self-update backend (a desktop build
+     * compiled with a private release feed configured; see platform.h).
+     * Absent entirely otherwise, so this never shows a dead menu item on a
+     * build/port where it could never work. userdata 4 is handled as a
+     * special case in FM_SELECT_RESULT, before the save-slot math below. */
+    if (platform_update_supported())
+        add_menu_item("Check for Updates", 4, 0, 3);
 
     /* Assembly (file_select_menu.asm:111): OPEN_WINDOW_AND_PRINT_MENU(columns=1)
      * lays out and prints menu item labels BEFORE slot details. */
@@ -1766,6 +1777,16 @@ StepResult mode_step_file_menu(ModeState *ms) {
 
         case FM_SELECT_RESULT: {
             uint16_t selected = fm_take_result(st);
+            if (selected == 4) {
+                /* "Check for Updates" -- not a save slot. Must be handled
+                 * before the current_save_slot assignment/slot math below:
+                 * selected==4 would otherwise fall through to
+                 * save_files_present[3], one past the end of a
+                 * SAVE_COUNT(3)-element array, and stomp current_save_slot
+                 * with a value every other reader of it assumes is 1..3. */
+                st->phase = FM_UPDATE_CHECK;
+                continue;
+            }
             st->selected = selected;
             current_save_slot = (uint8_t)selected;   /* file_select_menu() did this */
             if (selected == 0) { st->phase = FM_SELECT; continue; }
@@ -1776,6 +1797,23 @@ StepResult mode_step_file_menu(ModeState *ms) {
                 game_state_init();
                 st->phase = FM_NG_TS;
             }
+            continue;
+        }
+
+        case FM_UPDATE_CHECK: {
+            fm_child_init = (ModeState){0};
+            fm_child_init.update_check.phase = UPD_CHECK_START;
+            st->phase = FM_UPDATE_CHECK_RESULT;
+            return STEP_RESULT_PUSH_INIT(GAME_MODE_UPDATE_CHECK, &fm_child_init);
+        }
+
+        case FM_UPDATE_CHECK_RESULT: {
+            /* Nothing to branch on -- a successful update relaunches the
+             * whole process, so this phase only ever runs for the
+             * no-update/cancelled/error outcomes. Just rebuild the slot
+             * list, exactly like FM_SUBMENU_RESULT's B-pressed path does. */
+            close_focus_window();
+            st->phase = FM_SELECT;
             continue;
         }
 

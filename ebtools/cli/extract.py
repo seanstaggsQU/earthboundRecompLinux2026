@@ -317,6 +317,7 @@ def extract(
         export_btl_entry_bg_json,
         export_btl_entry_ptr_table_json,
         export_consolation_items_json,
+        export_dont_care_names_json,
         export_eb_string_json,
         export_enemy_battle_groups_json,
         export_enemy_placement_groups_json,
@@ -579,6 +580,12 @@ def extract(
     if guardian_bin.exists():
         export_guardian_text_json(
             guardian_bin.read_bytes(), doc.textTable, asset_output_dir / "locale" / "ending" / "guardian_text.json"
+        )
+        simple_count += 1
+    dont_care_bin = us_dir / "data" / "dont_care_names.bin"
+    if dont_care_bin.exists():
+        export_dont_care_names_json(
+            dont_care_bin.read_bytes(), doc.textTable, asset_output_dir / "locale" / "data" / "dont_care_names.json"
         )
         simple_count += 1
     for bin_rel, json_rel in _misc_exports:

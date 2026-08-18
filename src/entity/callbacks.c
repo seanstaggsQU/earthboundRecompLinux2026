@@ -790,7 +790,7 @@ void render_all_priority_sprites(void) {
      * transition render (oam_restore_displayed) without leaving ghost sprites in
      * slots that were used last frame but not this one. */
     for (int i = 0; i < 128; i++) {
-        ppu.oam[i].y = EB_VIEWPORT_HEIGHT;
+        ppu.oam[i].y = PPU_OAM_Y_HIDDEN;
         ppu.oam_full_y[i] = EB_VIEWPORT_HEIGHT;
     }
 

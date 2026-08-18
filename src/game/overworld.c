@@ -122,8 +122,25 @@ void overworld_setup_vram(void) {
     ppu_clear_effects();
     ppu.bg_viewport_fill[0] = BG_VIEWPORT_CENTER;
     ppu.bg_viewport_fill[1] = BG_VIEWPORT_CENTER;
+    /* sprite_x_offset/sprite_y_offset stay 0: overworld entity/OAM positions
+     * are already computed camera-relative (EB_VIEWPORT_CENTER_X/Y math in
+     * map_loader.c/callroutine*.c), so they're already correct across the
+     * full canvas -- a nonzero sprite_y_offset would double-shift every
+     * entity and would incorrectly cull entities in the wide-FOV zoom's
+     * extra revealed area (render_obj_scanline's off-native-range cull is
+     * gated on sprite_y_offset != 0).
+     *
+     * bg_win_y_offset (a separate field, see its comment in ppu.h) DOES need
+     * EB_VIEWPORT_PAD_TOP here: it's what aligns the non-filling text/window
+     * BG3 layer -- which draws in fixed screen-space, not camera-relative --
+     * with the vertically-centered native slice the default (non-zoomed)
+     * display crops to (platform_video_end_frame(), sdl2_video.c). Without
+     * this, dialogue/menu windows render top-aligned to the full 256-tall
+     * canvas and lose their top ~16px whenever the crop shows only the
+     * centered 224-tall default view. */
     ppu.sprite_x_offset = 0;
     ppu.sprite_y_offset = 0;
+    ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP;
 }
 
 /* ---- OVERWORLD_INITIALIZE (asm/overworld/initialize.asm) ---- */
@@ -1381,13 +1398,18 @@ void oam_clear(void) {
         sprite_priority[i].offset = 0;
     ert.oam_write_index = 0;
 
-    /* Park sprites off-screen. EB_VIEWPORT_HEIGHT (240) is used instead of
-     * SNES_HEIGHT (224) so sprites are hidden in both 224px and 240px modes.
-     * Back up the displayed Y first (see oam_restore_displayed). */
+    /* Park sprites off-screen. oam_full_y[] gets the real sentinel
+     * (EB_VIEWPORT_HEIGHT, safely representable at int16_t width and always
+     * past the bottom of whatever height is actually being displayed --
+     * native or the overworld's zoomed-out footprint); the narrow 8-bit
+     * oam[].y gets PPU_OAM_Y_HIDDEN instead of EB_VIEWPORT_HEIGHT directly,
+     * since that field can't represent 256+ without wrapping (see
+     * PPU_OAM_Y_HIDDEN's comment in ppu.h). Back up the displayed Y first
+     * (see oam_restore_displayed). */
     for (int i = 0; i < 128; i++) {
         g_oam_y_backup[i] = ppu.oam[i].y;
         g_oam_full_y_backup[i] = ppu.oam_full_y[i];
-        ppu.oam[i].y = EB_VIEWPORT_HEIGHT;
+        ppu.oam[i].y = PPU_OAM_Y_HIDDEN;
         ppu.oam_full_y[i] = EB_VIEWPORT_HEIGHT;
     }
 }

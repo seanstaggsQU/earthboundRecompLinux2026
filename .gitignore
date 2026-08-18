@@ -1,6 +1,8 @@
 bin
 *.cmd
 *.sfc
+*.smc
+assets.pak
 build/
 src/build*/
 port/**/build*/
@@ -43,3 +45,10 @@ docs/plans/
 *.sav.*
 *.srm
 *.srm.*
+
+# Self-update backend's generated PAT header (port/unix/CMakeLists.txt
+# configure_file()'s output). Already covered by the build-dir patterns
+# above in the normal case; listed explicitly too as defense-in-depth in
+# case CMAKE_CURRENT_BINARY_DIR is ever pointed somewhere those don't
+# match -- this file is the one place a real secret could land on disk.
+updater_secret.h

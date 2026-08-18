@@ -162,6 +162,19 @@ typedef struct {
     uint8_t debug_flag;
     uint8_t debug_mode_number;
 
+    /* Overworld FOV/zoom cycle (R3, this port's own addition -- see
+     * platform_video_set_zoom() and AUX_ZOOM_TOGGLE in game_main.c). One of
+     * the EbZoomMode values (platform.h): EB_ZOOM_OFF (default), EB_ZOOM_OUT,
+     * EB_ZOOM_IN -- R3 cycles forward through them. uint8_t, not the enum
+     * type or bool, to match this struct's other flag fields and keep the
+     * size exactly 1 byte cross-platform (see the ABI _Static_assert
+     * comment in state_dump.c). Always boots/resets to EB_ZOOM_OFF: on a
+     * fresh launch via ow's normal zero-init, and explicitly on every F7
+     * load-state (host_root_boundary() in game_main.c) since this struct is
+     * captured wholesale into savestates and a restored mode wouldn't
+     * otherwise resync the SDL presentation layer's actual crop. */
+    uint8_t zoom_mode;
+
     /* Respawn position (from ram.asm:1214-1217) */
     uint16_t respawn_x;
     uint16_t respawn_y;

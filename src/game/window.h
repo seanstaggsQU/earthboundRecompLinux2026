@@ -66,6 +66,15 @@
 #define WINDOW_FILE_SELECT_FLAVOUR    0x32
 #define WINDOW_NAMING_PROMPT           0x27
 #define WINDOW_SINGLE_CHARACTER_SELECT 0x33
+/* This port's own addition -- not in include/constants/windows.asm, which
+ * ends at WINDOW::DEBUG_MENU ($34) + a WINDOW::MAX ($35) bounds sentinel.
+ * Picked $36 (one past MAX) so this can't collide with any real ROM window
+ * ID, nor be confused with the ROM's own MAX sentinel value. */
+#define WINDOW_SETTINGS_MENU          0x36
+/* Self-update screen ("Check for Updates" row on file-select) -- this
+ * port's own addition, one past WINDOW_SETTINGS_MENU for the same reason
+ * that one is one past the ROM's own WINDOW::MAX sentinel. */
+#define WINDOW_UPDATE_CHECK           0x37
 
 /* Menu option - matches menu_option from structs.asm (45 bytes in asm) */
 #define MENU_LABEL_SIZE 26  /* asm: 25-byte label at offset 19, +1 for null */

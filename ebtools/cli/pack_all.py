@@ -508,6 +508,7 @@ def pack_all(
 
     # EB-text packers (need textTable for encode)
     from ebtools.parsers.simple_tables import (
+        pack_dont_care_names,
         pack_eb_string,
         pack_guardian_text,
         pack_psi_names,
@@ -566,6 +567,13 @@ def pack_all(
         pack_guardian_text(guardian_json, text_table, out)
         packed += 1
         print("  Packed guardian text")
+    dont_care_json = assets_dir / "locale" / "data" / "dont_care_names.json"
+    if dont_care_json.exists():
+        out = output_dir / "US" / "data" / "dont_care_names.bin"
+        out.parent.mkdir(parents=True, exist_ok=True)
+        pack_dont_care_names(dont_care_json, text_table, out)
+        packed += 1
+        print("  Packed don't-care names")
 
     # --- Dialogue files (MUST run before config packers so addr_remap is available) ---
     addr_remap: dict[int, int] = {}  # original SNES addr → new compiled SNES addr
@@ -598,6 +606,7 @@ def pack_all(
     # Patch both halves and emit the combined binary.
     _c3_json = assets_dir / "locale" / "events" / "bank_c3_scripts.json"
     _c3_early_bin = bin_dir / "US" / "events" / "bank_c3_early_scripts.bin"
+    _c3_combined_bin = bin_dir / "US" / "events" / "bank_c3_scripts_combined.bin"
     if _c3_json.exists():
         _pack_event_script_combined(
             _c3_json,
@@ -605,6 +614,26 @@ def pack_all(
             output_dir / "US" / "events" / "bank_c3_scripts_combined.bin",
             addr_remap,
         )
+        packed += 1
+    elif _c3_combined_bin.exists():
+        # No editable JSON for bank C3 (nothing currently migrates one) --
+        # remap the raw ROM-extracted combined blob directly, same
+        # treatment door_data.bin gets below. Without this, bank C3's
+        # embedded text pointers (CALLROUTINE MOVEMENT_DISPLAY_TEXT /
+        # MOVEMENT_QUEUE_INTERACTION operands -- see
+        # _remap_event_script_text_addrs) stay as legacy SNES addresses,
+        # which resolve_text_addr() can't resolve against the new unified
+        # dialogue.bin layout. That silently drops any event that displays
+        # text via bank C3 script bytecode (e.g. the door-triggered
+        # "Pokey knocks" cutscene at the very start of the game -- it
+        # reads as a no-op door with nothing visibly wrong, since the
+        # failure is a swallowed LOG_WARN deep in the text-display path).
+        _c3_data = bytearray(_c3_combined_bin.read_bytes())
+        _c3_patched = _remap_event_script_text_addrs(_c3_data, addr_remap)
+        _c3_out = output_dir / "US" / "events" / "bank_c3_scripts_combined.bin"
+        _c3_out.parent.mkdir(parents=True, exist_ok=True)
+        _c3_out.write_bytes(bytes(_c3_data))
+        print(f"  Packed bank_c3_scripts_combined.bin ({_c3_patched} text addresses remapped, no JSON override)")
         packed += 1
     _c4_json = assets_dir / "locale" / "events" / "bank_c4_scripts.json"
     if _c4_json.exists():

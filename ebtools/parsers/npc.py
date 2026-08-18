@@ -138,7 +138,21 @@ def pack_npcs(
         buf.extend(struct.pack("<I", ptr))
         # Secondary data (bytes 13-16)
         if npc.type == "OBJECT" and npc.secondary_pointer:
-            buf.extend(struct.pack("<I", int(npc.secondary_pointer, 16)))
+            # OBJECT-type NPCs use secondary_pointer as a second text address
+            # (the "use item on this NPC" response -- see
+            # get_npc_config_text_pointer2() in the C port's map_loader.c).
+            # It needs the same addr_remap treatment as text_pointer above;
+            # missing this left it as a raw legacy SNES address that
+            # resolve_text_addr() can't resolve against the unified
+            # dialogue.bin layout -- the same silent-failure class as the
+            # bank_c3/door_data fixes elsewhere in this pipeline. Confirmed
+            # via the "Key to the shack" item (NPC id 147): its secondary
+            # text (MSG_GOODS2_TRAVEL_AGENCY_KEY_UNLOCK) never resolved, so
+            # using the key at the shack door silently did nothing.
+            sec_ptr = int(npc.secondary_pointer, 16)
+            if addr_remap and sec_ptr in addr_remap:
+                sec_ptr = addr_remap[sec_ptr]
+            buf.extend(struct.pack("<I", sec_ptr))
         else:
             for b in npc.secondary_bytes:
                 buf.append(b)

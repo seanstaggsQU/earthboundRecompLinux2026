@@ -1,0 +1,11 @@
+sha256.c / sha256.h are from Brad Conte's crypto-algorithms
+(https://github.com/B-Con/crypto-algorithms), fetched from the `master`
+branch. The upstream repository has no separate LICENSE file; its README
+states the following (quoted verbatim):
+
+    This code is released into the public domain free of any restrictions.
+    The author requests acknowledgement if the code is used, but does not
+    require it. This code is provided free of any liability and without
+    any quality claims by the author.
+
+Acknowledgement: written by Brad Conte (brad@bradconte.com).

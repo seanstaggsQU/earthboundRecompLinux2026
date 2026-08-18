@@ -283,6 +283,16 @@ static void flyover_init_screen_body(void) {
     /* SET_BG3_VRAM_LOCATION(NORMAL, TEXT_LAYER_TILEMAP=0x7C00, TEXT_LAYER_TILES=0x6000) */
     set_bg3_vram_location(0, VRAM_TEXT_LAYER_TILEMAP, VRAM_TEXT_LAYER_TILES);
 
+    /* Widescreen viewport-fill: this is the same fixed VRAM_TEXT_LAYER_TILEMAP
+     * address the window system always writes to (window.c), so like every
+     * other BG3-as-text-layer setup in this codebase it must CENTER, not
+     * wrap/duplicate across the wide viewport -- see the load_battle_bg()
+     * comment in battle_ui.c for the full explanation of this bug class.
+     * Never set here before, so this screen (location-name flyover text,
+     * e.g. "Twoson" scrolling in when entering a new town) inherited
+     * whatever the previous scene left bg_viewport_fill[2] as. */
+    ppu.bg_viewport_fill[2] = BG_VIEWPORT_CENTER;
+
     /* Clear all tile data: COPY_TO_VRAM1P ert.buffer(=0), TEXT_LAYER_TILES, $3800 bytes */
     memset(&ppu.vram[VRAM_TEXT_LAYER_TILES * 2], 0, 0x3800);
 

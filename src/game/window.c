@@ -36,7 +36,14 @@
 #define WINDOW_X_NUDGE_ ((SNES_WIDTH - EB_VIEWPORT_WIDTH) / 2 / 8)
 #define WINDOW_X_NUDGE (WINDOW_X_NUDGE_ > 0 ? WINDOW_X_NUDGE_ : 0)
 static const uint16_t window_configs[][4] = {
-    [0x00] = {  1 + WINDOW_X_NUDGE,  1, 13,  8 },  /* Command menu (Talk to, Goods, PSI, ...) */
+    /* Command menu (Talk to, Goods, PSI, Equip, Check, Status). Height is 10,
+     * not the original ROM's 8: this port adds a 7th "Save" item (see
+     * build_command_menu() in text.c) as a 4th row. sm_handle_input()'s
+     * cursor-search bound is (height-2)/2 rows, so 8 tiles caps navigation
+     * at 3 rows (0-2); 10 tiles allows the 4th row (y=3) to be reachable.
+     * Deliberate deviation from WINDOW_CONFIGURATION_TABLE -- not a porting
+     * guess, a new feature. */
+    [0x00] = {  1 + WINDOW_X_NUDGE,  1, 13, 12 },  /* Command menu (Talk to, Goods, PSI, ..., Save, Config, Quit) */
     [0x01] = { 12,  1, 19,  8 },  /* Out-of-battle text / PSI ability list */
     [0x02] = {  7,  1, 24, 16 },  /* Main inventory window */
     [0x03] = {  1 + WINDOW_X_NUDGE,  1,  6, 10 },  /* Inventory menu */
@@ -55,7 +62,17 @@ static const uint16_t window_configs[][4] = {
     [0x10] = {  4,  1,  8,  8 },  /* Battle PSI category */
     [0x11] = { 12,  1, 12,  4 },  /* Battle PSI name */
     [0x12] = {  1 + WINDOW_X_NUDGE,  1, 14,  6 },  /* Jeff's Battle menu */
-    [0x13] = {  1,  2, 30,  8 },  /* File Select */
+    /* File Select. Height is 10, not the original ROM's 8: this port
+     * conditionally adds a "Check for Updates" 4th row (fm_file_select_
+     * build(), file_select.c) below the 3 save slots when a self-update
+     * backend is available. sm_handle_input()'s cursor-search bound is
+     * (height-2)/2 rows, so 8 tiles caps navigation at 3 rows (0-2) --
+     * same reasoning as the Command Menu's own 8->10/12 height bumps this
+     * session, applied here for the same reason. Harmless on builds where
+     * the 4th row is never added (an unreachable extra row of blank
+     * space, not a visible gap -- the window's own content never grows
+     * to fill it). */
+    [0x13] = {  1,  2, 30, 10 },  /* File Select */
     [0x14] = {  5,  9, 22,  4 },  /* Overworld Menu */
     [0x15] = { 10, 16, 12,  8 },  /* Copy Menu (2 choices) */
     [0x16] = { 10, 16, 12,  6 },  /* Copy Menu (1 choice) */
@@ -89,6 +106,22 @@ static const uint16_t window_configs[][4] = {
     [0x32] = { 14, 11, 15, 16 },  /* Flavour selection */
     [0x33] = { 22,  8,  9,  4 },  /* Single character select */
     [0x34] = {  7,  9, 18, 18 },  /* Debug menu (US only) */
+    /* Settings menu -- this port's own addition (WINDOW_SETTINGS_MENU,
+     * window.h), not from WINDOW_CONFIGURATION_TABLE. Same rect as 0x01
+     * (Text standard) -- a screen position already proven not to collide
+     * with the command menu it's opened from (0x00 occupies roughly
+     * x=1..14, y=1..11; this starts at x=12 like the text window always
+     * has). Height 8 = 3 content rows, room to grow past the single
+     * Sprint Speed row for future settings. */
+    [WINDOW_SETTINGS_MENU] = { 12, 1, 19, 8 },
+    /* Self-update screen -- this port's own addition (WINDOW_UPDATE_CHECK,
+     * window.h). Opened as a child over the file-select main window (0x13,
+     * {1,2,30,8}) the same way file-select's own Text Speed (0x18) and
+     * Music Mode (0x19) cascades already sit lower on screen rather than
+     * avoiding the parent window's rect entirely -- proven fine visually
+     * since only one window is ever the active input focus at a time.
+     * Wide enough (24 tiles) to fit a release-version line without wrapping. */
+    [WINDOW_UPDATE_CHECK] = { 4, 13, 24, 10 },
 };
 #define WINDOW_CONFIG_COUNT (sizeof(window_configs) / sizeof(window_configs[0]))
 

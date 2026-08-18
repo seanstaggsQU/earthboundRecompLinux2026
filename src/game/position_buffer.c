@@ -21,6 +21,7 @@
 #include "include/binary.h"
 #include "game/game_state.h"
 #include "game/overworld.h"
+#include "game/settings.h"
 #include "game/map_loader.h"
 #include "entity/entity.h"
 #include "entity/sprite.h"
@@ -814,6 +815,19 @@ static const int32_t movement_speeds_diag[NUM_WALKING_STYLES] = {
 #define DEEP_WATER_SPEED     0x0000547A  /* 0.33x */
 #define SKIP_SANDWICH_SPEED  0x00018000  /* 1.5x */
 
+/* Sprint speed multipliers — this port's own addition, not from the ROM
+ * (16.16 fixed-point, same format as the modifiers above). Applied while
+ * holding PAD_Y (mapped to the West/Square controller button in
+ * sdl2_input.c, otherwise unused in normal gameplay -- see platform.h), at
+ * the level chosen in Settings (game/settings.h, engine_sprint_speed).
+ * Indexed by SprintSpeedSetting; SPRINT_SPEED_OFF's entry is never read
+ * (that case skips the multiply entirely, see adjust_position() below). */
+static const int32_t sprint_speed_multipliers[SPRINT_SPEED_COUNT] = {
+    [SPRINT_SPEED_OFF]    = 0x00010000, /* 1.0x -- unused, sprint disabled */
+    [SPRINT_SPEED_MEDIUM] = 0x00018000, /* 1.5x = +50% */
+    [SPRINT_SPEED_STINKY] = 0x00020000, /* 2.0x = +100% */
+};
+
 /* Surface flags masks (from include/enums.asm SURFACE_FLAGS) */
 #define SURFACE_SHALLOW_WATER 0x08
 #define SURFACE_DEEP_WATER    0x0C  /* SHALLOW_WATER | CAUSES_SUNSTROKE */
@@ -1013,27 +1027,41 @@ static int32_t adjust_position(int16_t direction, uint16_t surface_flags,
     int32_t speed = speeds[ws * NUM_DIRECTIONS + direction];
 
     uint16_t water = surface_flags & 0x0C;
+    int32_t delta;
 
     if (water == SURFACE_SHALLOW_WATER) {
         /* Shallow water: speed * 0.5 (assembly lines 22-55) */
-        int32_t delta = (int32_t)(((int64_t)speed * SHALLOW_WATER_SPEED) >> 16);
-        return pos + delta;
+        delta = (int32_t)(((int64_t)speed * SHALLOW_WATER_SPEED) >> 16);
     } else if (water == SURFACE_DEEP_WATER) {
         /* Deep water: speed * 0.33 (assembly lines 56-89) */
-        int32_t delta = (int32_t)(((int64_t)speed * DEEP_WATER_SPEED) >> 16);
-        return pos + delta;
+        delta = (int32_t)(((int64_t)speed * DEEP_WATER_SPEED) >> 16);
     } else if (ow.demo_frames_left) {
         /* Demo mode: raw speed, no modifiers (assembly lines 91-112) */
-        return pos + speed;
+        delta = speed;
     } else if ((game_state.party_status & 0xFF) == 3 && ws == 0) {
         /* Skip sandwich active + NORMAL walking style: speed * 1.5
          * (assembly @UNKNOWN8, lines 113-153) */
-        int32_t delta = (int32_t)(((int64_t)speed * SKIP_SANDWICH_SPEED) >> 16);
-        return pos + delta;
+        delta = (int32_t)(((int64_t)speed * SKIP_SANDWICH_SPEED) >> 16);
     } else {
         /* Normal case: raw speed (assembly @UNKNOWN13, lines 154-173) */
-        return pos + speed;
+        delta = speed;
     }
+
+    /* Sprint -- this port's own addition, not in the original ROM (see
+     * sprint_speed_multipliers above). Only boosts ordinary on-foot walking
+     * (not bicycle/ladder/stairs/etc., which already have their own speeds
+     * in the table above, and not water or demo/attract mode). Stacks with
+     * the skip-sandwich boost above since both are just multipliers on
+     * whatever delta was already computed. The Off setting skips the
+     * multiply outright, so holding the button does nothing at all rather
+     * than a 1.0x no-op multiply. */
+    if (ws == WALKING_STYLE_NORMAL && !water && !ow.demo_frames_left &&
+        engine_sprint_speed != SPRINT_SPEED_OFF &&
+        (core.pad1_held & PAD_Y)) {
+        delta = (int32_t)(((int64_t)delta * sprint_speed_multipliers[engine_sprint_speed]) >> 16);
+    }
+
+    return pos + delta;
 }
 
 /*

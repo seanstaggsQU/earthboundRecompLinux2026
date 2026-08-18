@@ -77,6 +77,7 @@ void logo_screen_load(uint16_t logo_id) {
      * still wraps to fill the top/bottom gutters. Horizontal centering is
      * automatic via the FILL fill_pad (see render_bg_scanline). */
     ppu.sprite_y_offset = EB_VIEWPORT_PAD_TOP;
+    ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP;
 
     /* Asset IDs for each logo.
      * Nintendo gfx/arr are locale-specific (US/ or JP/) — locale aliases

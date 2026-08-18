@@ -5,6 +5,7 @@
 #ifdef EB_ENABLE_AUDIO
 
 #include <SDL.h>
+#include <stdio.h>
 #include <string.h>
 
 #define AUDIO_SAMPLE_RATE 32000
@@ -20,6 +21,10 @@ static SDL_mutex *audio_mutex;
    a non-multiple of SAMPLES_PER_FRAME, leftover samples are buffered here. */
 static int16_t overflow_buf[SAMPLES_PER_FRAME * 2];  /* stereo */
 static int overflow_count = 0;
+
+/* Optional MSU1 PCM player (msu_audio.c) -- mixed on top of the SPC700/DSP
+ * output below. A no-op when no pack was loaded via --msu-dir/--msu-name. */
+void platform_audio_msu_mix(int16_t *out, int frames, int out_rate);
 
 static void audio_callback(void *userdata, Uint8 *stream, int len) {
     (void)userdata;
@@ -66,6 +71,12 @@ static void audio_callback(void *userdata, Uint8 *stream, int len) {
             filled += remaining;
         }
     }
+
+    /* Mix in any actively-streaming MSU1 track on top of the SPC700/DSP
+     * output (which is sound-effects-only when MSU covers the current
+     * music track -- see the platform_audio_msu_play() call in
+     * game/audio.c's change_music()). */
+    platform_audio_msu_mix(out, total_samples, AUDIO_SAMPLE_RATE);
 }
 
 bool platform_audio_init(void) {

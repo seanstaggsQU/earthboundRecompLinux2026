@@ -673,6 +673,18 @@ void load_enemy_battle_sprites(void) {
     ppu.bg_hofs[2] = 0;
     ppu.bg_vofs[2] = 0;
 
+    /* Battle's BG3 is always the fixed 32-tile text/window layer -- like the
+     * overworld's BG3 (see set_bg3_vram_location in overworld.c), never a
+     * filling layer. Nothing else in the battle-entry path resets
+     * bg_viewport_fill[2], so it otherwise inherits whatever the *previous*
+     * scene left it as. Regular random encounters happen to enter from a
+     * state where it's already CENTER, but scripted battle entries (e.g.
+     * the game's very first, forced Starman encounter, entered straight
+     * from a cutscene) can inherit a stale FILL, which wraps the text/HP-PP
+     * window tilemap across the wider viewport and visibly duplicates it at
+     * the edges instead of leaving blank gutters. */
+    ppu.bg_viewport_fill[2] = BG_VIEWPORT_CENTER;
+
     /* SET_OAM_SIZE($61): size mode 3 (16x16/32x32), name base 1 */
     ppu.obsel = 0x61;
 
@@ -726,11 +738,12 @@ void apply_letterbox_to_ppu(void);
  *   letterbox_style: 0=none, 1=large, 2=medium, 3=small; bit 2 = 4bpp layer 2
  */
 void load_battle_bg(uint16_t layer1_id, uint16_t layer2_id, uint16_t letterbox_style) {
-    /* BG1/BG2 (battle backgrounds) should fill the viewport with wrapping.
-     * Sprite Y offset centers SNES-coordinate sprites vertically. */
-    ppu.bg_viewport_fill[0] = BG_VIEWPORT_FILL;
-    ppu.bg_viewport_fill[1] = BG_VIEWPORT_FILL;
+    /* Sprite Y offset centers SNES-coordinate sprites vertically. The
+     * per-BG viewport-fill assignment below depends on bitdepth (read a few
+     * lines down), so it's set there instead of unconditionally here --
+     * see the comment at that assignment for why. */
     ppu.sprite_y_offset = EB_VIEWPORT_PAD_TOP;
+    ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP;
 
     /* Clear screen effect globals (assembly lines 24-29) */
     bt.red_flash_duration = 0;
@@ -775,6 +788,40 @@ void load_battle_bg(uint16_t layer1_id, uint16_t layer2_id, uint16_t letterbox_s
     uint8_t gfx_index = bg_data_table[config_offset + 0];
     uint8_t pal_index = bg_data_table[config_offset + 1];
     uint8_t bitdepth = bg_data_table[config_offset + 2];
+
+    /* Which physical BG index is "the text/window layer" (fixed at
+     * VRAM_TEXT_LAYER_TILEMAP == $7C00, see window.c -- the window system
+     * always writes there regardless of which BG is currently mapped to
+     * it) depends on bitdepth, decided by the branches below:
+     *
+     *   4bpp (mode 9, "if (bitdepth == 4)" further down): BG3 (index 2) is
+     *   pointed at $7C00 by load_enemy_battle_sprites() -- BG1/BG2 hold the
+     *   actual background art (layer1 -> BG2, optional layer2 -> BG1/BG4
+     *   depending on style) -> FILL. BG3 is text -> CENTER.
+     *
+     *   2bpp (mode 1, the "else" branch further down): BG1 (index 0) gets
+     *   repointed at $7C00 instead -> CENTER. BG3 becomes the actual
+     *   layer1 art (target_layer=3) and BG4 optional layer2 art
+     *   (target_layer=4) -> FILL. BG2 isn't used for art in this path but
+     *   FILL is a harmless default for an unused/blank layer.
+     *
+     * Getting this backwards for either case wraps a FILL-mode text layer
+     * across the wide viewport (visibly duplicating the window at the
+     * edges -- the Frank/first-Starman-encounter bug) or wrongly centers a
+     * CENTER-mode background art layer (black gutters instead of filling
+     * the screen). Every battle passes through here every time it loads
+     * its background, so this needs to be right for both paths on every
+     * entry, not just set once as a same-for-all-battles default. */
+    if (bitdepth == 4) {
+        ppu.bg_viewport_fill[0] = BG_VIEWPORT_FILL;
+        ppu.bg_viewport_fill[1] = BG_VIEWPORT_FILL;
+        ppu.bg_viewport_fill[2] = BG_VIEWPORT_CENTER;
+    } else {
+        ppu.bg_viewport_fill[0] = BG_VIEWPORT_CENTER;
+        ppu.bg_viewport_fill[1] = BG_VIEWPORT_FILL;
+        ppu.bg_viewport_fill[2] = BG_VIEWPORT_FILL;
+        ppu.bg_viewport_fill[3] = BG_VIEWPORT_FILL;
+    }
 
     /* Load and decompress graphics directly to ppu.vram (assembly lines 71-99) */
     const uint8_t *gfx_comp = ASSET_DATA(ASSET_BATTLE_BGS_GRAPHICS(gfx_index));

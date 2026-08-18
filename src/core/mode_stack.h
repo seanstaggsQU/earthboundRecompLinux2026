@@ -4,6 +4,7 @@
 #include "core/types.h"
 #include "game/display_text.h"  /* ScriptReader (embedded in DisplayTextState) */
 #include "game/overworld.h"     /* OwDamageState (embedded in OverworldState) */
+#include "platform/platform.h"  /* EbUpdateProgress (embedded in UpdateCheckState) */
 
 /* ---------------------------------------------------------------------------
  * Explicit mode stack (savestate-anywhere migration, phase 2).
@@ -104,6 +105,11 @@ typedef enum {
     GAME_MODE_WAIT_FRAMES,         /* render N frames (mode form of wait_frames_with_updates) */
     GAME_MODE_ENDING,              /* end-of-game cast scene + staff credits (play_cast_scene/play_credits) */
     GAME_MODE_WINDOW_BORDER_ANIM,  /* CC_1C_08 window border flash (animate_window_border[_with_hppp]) */
+    GAME_MODE_SETTINGS_MENU,       /* pause-menu Settings screen -- this port's own addition,
+                                     * not in the original ROM (mode_step_settings_menu, text.c) */
+    GAME_MODE_UPDATE_CHECK,        /* file-select "Check for Updates" screen -- this port's own
+                                     * addition, not in the original ROM (mode_step_update_check,
+                                     * src/intro/update_screen.c) */
     GAME_MODE_COUNT,
 } GameMode;
 
@@ -441,6 +447,57 @@ typedef struct {
     uint8_t  result_ready;  /* 1 = `result` holds an inline early-exit value */
     uint16_t result;        /* inline early-exit selection result */
 } StatusMenuState;
+
+/* GAME_MODE_SETTINGS_MENU -- this port's own addition, not a port of any ROM
+ * routine (there is no settings screen in the original game). Reached from
+ * the command menu's "Config" item (build_command_menu(), text.c). A single
+ * selectable row per engine preference; confirming a row cycles its value
+ * and rebuilds the menu in place (same build/dispatch/rebuild loop shape as
+ * mode_step_debug_menu in game_main.c), so more rows can be added later
+ * (e.g. the paused auto-save/auto-equip QOL ideas) without a new pattern. */
+typedef enum {
+    SET_BUILD = 0,   /* (re)build the window + rows, push SELECTION_MENU(1) */
+    SET_RESULT,      /* dispatch the chosen row (cycle it) or exit on cancel */
+    SET_CLEANUP,     /* close the window, push ENTITY_FADE_WAIT */
+    SET_DONE,        /* POP 0 */
+} SettingsMenuPhase;
+
+typedef struct {
+    uint8_t  phase;         /* SettingsMenuPhase */
+    uint8_t  result_ready;  /* 1 = `result` holds an inline early-exit value */
+    uint16_t result;        /* inline early-exit selection result */
+} SettingsMenuState;
+
+/* GAME_MODE_UPDATE_CHECK -- this port's own addition, not a port of any ROM
+ * routine (there is no update screen in the original game). Reached from
+ * file-select's "Check for Updates" row (fm_file_select_build(), file_
+ * select.c), which is itself only shown when platform_update_supported()
+ * is true (a desktop build compiled with a release feed configured -- see
+ * platform.h). Same build/dispatch/rebuild shape as SettingsMenuState
+ * above, but the actual network check/download/verify/install work all
+ * happens off-thread in the platform backend (platform_update_*, never
+ * blocking); this phase machine just starts that work and polls it once a
+ * frame via platform_update_poll(). UPD_DOWNLOADING covers verify+install
+ * internally -- those aren't separate UI phases since they happen inside
+ * the same background thread the download itself runs on. */
+typedef enum {
+    UPD_CHECK_START = 0,   /* build the window, call platform_update_check_start() once */
+    UPD_CHECKING,           /* poll-only: waiting for status to advance past EB_UPDATE_CHECKING */
+    UPD_RESULT,              /* got a status: show it, and if available, offer a Yes/No confirm */
+    UPD_CONFIRM_RESULT,      /* dispatch the Yes/No selection_menu result */
+    UPD_DOWNLOAD_START,      /* rebuild the window, call platform_update_download_start() once */
+    UPD_DOWNLOADING,         /* poll-only: waiting for status to leave EB_UPDATE_DOWNLOADING (progress_percent updates each frame) */
+    UPD_MESSAGE,             /* terminal message (up to date / unsupported / error) shown until a button is pressed */
+    UPD_CLEANUP,             /* close the window, push ENTITY_FADE_WAIT */
+    UPD_DONE,                /* POP 0 */
+} UpdateCheckPhase;
+
+typedef struct {
+    uint8_t  phase;          /* UpdateCheckPhase */
+    uint8_t  result_ready;   /* 1 = `result` holds an inline early-exit value */
+    uint16_t result;         /* inline early-exit selection result */
+    EbUpdateProgress progress; /* last value read from platform_update_poll() */
+} UpdateCheckState;
 
 /* GAME_MODE_HPPP_DISPLAY phases. Port of open_hppp_display()
  * (asm/text/open_hppp_display.asm): the B/Select overworld HP/PP + money
@@ -1991,6 +2048,8 @@ typedef enum {
     FM_NG_FLV_RESULT,
     FM_NG_NAMING,       /* new-game: push GAME_MODE_NEW_GAME_NAMING */
     FM_NG_NAMING_RESULT,/* naming popped: started (pop 1) or backed out (re-enter flavour) */
+    FM_UPDATE_CHECK,        /* "Check for Updates" row chosen: push GAME_MODE_UPDATE_CHECK */
+    FM_UPDATE_CHECK_RESULT, /* update screen popped (no update / cancelled / error) -> back to FM_SELECT */
 } FileMenuPhase;
 
 typedef struct {
@@ -2495,6 +2554,8 @@ union ModeState {
     PauseMenuState        pause_menu;
     EquipMenuState        equip_menu;
     StatusMenuState       status_menu;
+    SettingsMenuState     settings_menu;
+    UpdateCheckState      update_check;
     HpppDisplayState      hppp_display;
     PsiMenuState          psi_menu;
     UseItemState          use_item;
@@ -2804,6 +2865,18 @@ StepResult mode_step_equip_menu(ModeState *st);
  * callbacks live). Init with ModeState.status_menu (phase = SU_SELECT); entered
  * via STEP_PUSH from the pause menu. Always pops 0. */
 StepResult mode_step_status_menu(ModeState *st);
+
+/* GAME_MODE_SETTINGS_MENU step (defined in text.c) -- this port's own
+ * addition, not a ROM routine. Init with ModeState.settings_menu
+ * (phase = SET_BUILD); entered via STEP_PUSH from the pause menu. Always
+ * pops 0. */
+StepResult mode_step_settings_menu(ModeState *st);
+
+/* GAME_MODE_UPDATE_CHECK step (defined in src/intro/update_screen.c) --
+ * this port's own addition, not a ROM routine. Init with
+ * ModeState.update_check (phase = UPD_CHECKING); entered via STEP_PUSH
+ * from file-select's "Check for Updates" row. Always pops 0. */
+StepResult mode_step_update_check(ModeState *st);
 
 /* GAME_MODE_HPPP_DISPLAY step (defined in text.c). Init with
  * ModeState.hppp_display (phase = HD_ENTER) before

@@ -636,6 +636,27 @@ static void game_over_screen_setup(void) {
     ppu.bg_sc[2] = (uint8_t)(VRAM_GAME_OVER_L2_TILEMAP >> 8);
     ppu.bg_nba[1] = (ppu.bg_nba[1] & 0xF0) | (uint8_t)(VRAM_GAME_OVER_L2_TILES >> 12);
 
+    /* Widescreen viewport-fill: this screen never set these, so it inherited
+     * whatever the battle/overworld scene beforehand left them as (the same
+     * "inherits stale state" bug class as the Starman/Frank battle-menu fix
+     * in battle_ui.c's load_battle_bg()). BG1 (VRAM_GAME_OVER_L1_TILEMAP,
+     * $5800) is the game-over character art -- but its tilemap is decompressed
+     * from a 2048-byte asset (E1D5E8.arr.lzhal, see below), i.e. 1024 tile
+     * entries, i.e. a NORMAL-size 32x32 tilemap (256x256px). It isn't wide
+     * enough to genuinely FILL a widescreen/zoomed canvas: BG_VIEWPORT_FILL
+     * tile-wraps at that native 256px width regardless of canvas size,
+     * which re-shows a duplicate slice of the character art in the extra
+     * revealed columns once the canvas is wider than roughly
+     * EB_VIEWPORT_PAD_LEFT + 256. CLAMP (render at native width centered,
+     * edge-extend the border pixels instead of wrapping) is the correct
+     * mode here -- same technique already used for the title screen logo
+     * (title_screen.c) for the identical "art doesn't tile" reason. BG3
+     * (VRAM_GAME_OVER_L2_TILEMAP, $7C00) is the text/window layer (same
+     * fixed VRAM_TEXT_LAYER_TILEMAP address the window system always writes
+     * to, see window.c) -> stays CENTER so it doesn't wrap either. */
+    ppu.bg_viewport_fill[0] = BG_VIEWPORT_CLAMP;
+    ppu.bg_viewport_fill[2] = BG_VIEWPORT_CENTER;
+
     /* Decompress game-over graphics (BINARY E1CFAF.gfx.lzhal) directly to VRAM.
      * The asset contains two 32KB images: normal (offset 0) and
      * Paula-leader variant (offset $8000).
@@ -888,10 +909,31 @@ StepResult mode_step_game_over(ModeState *mst) {
 
         case GO_NC_REINIT:
             /* Stop audio effects (WRITE_APU_PORT1 2); TM_MIRROR = $17; invalidate
-             * map/music caches; wipe palettes on next map load. */
+             * map/music caches; wipe palettes on next map load.
+             *
+             * Bug fix: this only invalidated ow.loaded_map_tile_combo, missing
+             * the other two caches reload_map() (battle.c) -- the existing
+             * canonical "restore the overworld map after a VRAM-clobbering
+             * screen" function -- always invalidates together: ow.loaded_map_palette
+             * and, critically, ml.loaded_tileset_combo via
+             * invalidate_loaded_tileset_combo(). load_map_at_sector() only
+             * reloads tileset GRAPHICS into VRAM (word $0000) when
+             * ml.loaded_tileset_combo differs from the sector's tileset --
+             * respawning in the same sector you died in (the common case)
+             * left that check believing the tileset was already loaded, so
+             * it skipped the reload even though the game-over screen had
+             * just decompressed its own character art over that exact VRAM
+             * address (game_over_screen_setup(), VRAM_GAME_OVER_L1_TILES ==
+             * $0000). Net effect: the tilemap arrangement reloads correctly,
+             * but points at stale/wrong tile graphics -- a mostly-black map
+             * with only OBJ-layer sprites (loaded through an unrelated path)
+             * visible, until something else forces a full reload (e.g.
+             * opening and closing the town map). */
             write_apu_port1(2);
             ppu.tm = 0x17;
+            ow.loaded_map_palette       = -1;
             ow.loaded_map_tile_combo    = -1;
+            invalidate_loaded_tileset_combo();
             ml.current_map_music_track  = (uint16_t)-1;
             audio_invalidate_music_cache();
             dr.wipe_palettes_on_map_load = 1;

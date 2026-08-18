@@ -410,6 +410,35 @@ def pack_music_cmd(
     print(f"Packed music dataset table to {output_path}")
 
 
+@pack_app.command(name="assets")
+def pack_assets_cmd(
+    manifest: Annotated[Path, Parameter(help="Path to assets.manifest")],
+    bin_dir: Annotated[Path, Parameter(help="Path to extracted ROM assets (e.g. asm/bin/)")],
+    output_pak: Annotated[Path, Parameter(help="Output path for the packed assets.pak file")],
+    *,
+    custom_dir: Annotated[Path, Parameter(alias="--custom-dir")] = Path("src/custom_assets"),
+    exclude: Annotated[list[str] | None, Parameter(help="Glob pattern(s) of asset paths to exclude")] = None,
+    locale: Annotated[str, Parameter(help="Build locale (US or JP)")] = "US",
+) -> None:
+    """Pack extracted ROM assets into a single assets.pak for runtime loading.
+
+    Produces the same asset ordering/IDs as
+    `embed-registry --runtime` for the same (manifest, exclude, locale,
+    custom_dir), so a pack built here matches an EB_RUNTIME_ASSETS binary
+    built from the equivalent committed metadata.
+    """
+    from ebtools.cli.embed import pack as pack_assets
+
+    if not manifest.exists():
+        print(f"Error: {manifest} not found", file=sys.stderr)
+        sys.exit(1)
+    if not bin_dir.is_dir():
+        print(f"Error: {bin_dir} is not a directory", file=sys.stderr)
+        sys.exit(1)
+
+    pack_assets(manifest, bin_dir, output_pak, custom_dir=custom_dir, exclude=exclude, locale=locale)
+
+
 @pack_app.command(name="arrangements-bundled")
 def pack_arrangements_bundled_cmd(
     input_dir: Annotated[Path, Parameter(help="Directory containing .arr.lzhal files")],

@@ -159,7 +159,7 @@ _Static_assert(sizeof(ml)                   == 16970, "ABI: ml");
  * stays fixed-size and portable across viewport dimensions (see the savestate boundary
  * comment in snes/ppu.h). The prefix is viewport-independent, so its size is a plain
  * constant again; a stray pointer/size_t/short-enum in the prefix still trips this. */
-_Static_assert(offsetof(PPUState, wh0_table) == 67166, "ABI: ppu");
+_Static_assert(offsetof(PPUState, wh0_table) == 67168, "ABI: ppu");
 /* The six per-scanline tables must be EXACTLY the tail of PPUState — nothing serialized
  * may follow them, or it would be silently dropped from the save. This pins that: prefix
  * + the six EB_VIEWPORT_HEIGHT-sized uint8_t tables == the whole struct. Any field added

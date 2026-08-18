@@ -91,6 +91,7 @@ void battle_bg_init(void) {
     ppu.bg_viewport_fill[0] = BG_VIEWPORT_CENTER;
     ppu.bg_viewport_fill[1] = BG_VIEWPORT_CENTER;
     ppu.sprite_y_offset = 0;
+    ppu.bg_win_y_offset = 0;
     bg_palette_count = 0;
     memset(&loaded_bg_data_layer1, 0, sizeof(loaded_bg_data_layer1));
     memset(&loaded_bg_data_layer2, 0, sizeof(loaded_bg_data_layer2));

@@ -835,6 +835,69 @@ def pack_psi_suffixes(json_path: Path, text_table: TextTable, output_path: Path)
 
 
 # ---------------------------------------------------------------------------
+# "Don't Care" name table: 7 categories x 7 examples x 6 bytes, null-padded
+# EB text. Cycled through by the naming-screen keyboard's "Don't Care"
+# option (file_select.c: get_dont_care_name()). Category order matches
+# naming order: Ness, Paula, Jeff, Poo, pet, favourite food, favourite
+# thing -- see ng_name_targets in file_select.c.
+#
+# Max usable length is shorter than the 6-byte storage for the four
+# character-name categories (5, not 6 -- file_select.c's
+# ng_name_targets[].max_len): the game truncates at that length when a
+# cycled name is selected, so pack_dont_care_names() validates against it
+# up front rather than silently baking in a name that gets cut short.
+# ---------------------------------------------------------------------------
+
+DONT_CARE_ENTRY_SIZE = 6
+DONT_CARE_PER_CATEGORY = 7
+# (json_key, max_usable_length) in on-disk/naming order.
+DONT_CARE_CATEGORIES = [
+    ("ness", 5),
+    ("paula", 5),
+    ("jeff", 5),
+    ("poo", 5),
+    ("pet", 6),
+    ("food", 6),
+    ("thing", 6),
+]
+
+
+def export_dont_care_names_json(data: bytes, text_table: TextTable, output_path: Path) -> None:
+    names: dict[str, list[str]] = {}
+    offset = 0
+    for key, _max_len in DONT_CARE_CATEGORIES:
+        entries = []
+        for _ in range(DONT_CARE_PER_CATEGORY):
+            entry = data[offset : offset + DONT_CARE_ENTRY_SIZE]
+            entries.append(_decode_eb_string(entry, text_table))
+            offset += DONT_CARE_ENTRY_SIZE
+        names[key] = entries
+    _write_json(output_path, names)
+
+
+def pack_dont_care_names(json_path: Path, text_table: TextTable, output_path: Path) -> None:
+    names = _read_json(json_path)
+    buf = bytearray()
+    for key, max_len in DONT_CARE_CATEGORIES:
+        entries = names.get(key, [])
+        if len(entries) != DONT_CARE_PER_CATEGORY:
+            raise ValueError(
+                f"dont_care_names.json: category '{key}' has {len(entries)} entries, "
+                f"expected {DONT_CARE_PER_CATEGORY}"
+            )
+        for name in entries:
+            if len(name) > max_len:
+                raise ValueError(
+                    f"dont_care_names.json: '{name}' in category '{key}' is {len(name)} "
+                    f"chars, but the naming screen only uses the first {max_len} of this "
+                    f"category -- it would be silently truncated in-game. Shorten it."
+                )
+            buf.extend(_encode_eb_string(name, text_table, DONT_CARE_ENTRY_SIZE))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(bytes(buf))
+
+
+# ---------------------------------------------------------------------------
 # Single EB-text strings (phone_call_text, status_equip_window_text_7/14)
 # ---------------------------------------------------------------------------
 

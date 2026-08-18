@@ -3,6 +3,7 @@
 #ifdef EB_ENABLE_AUDIO
 
 #include "game/overworld.h"
+#include "game/settings.h"
 #include "platform/platform.h"
 #include "data/assets.h"
 #include "include/binary.h"
@@ -181,6 +182,10 @@ void change_music(uint16_t track_id) {
 
     audio_state.current_music_track = track_id;
 
+    /* Stop any previously-streaming MSU track unconditionally -- covers the
+     * "switching to track 0 / silence" early-return below too. */
+    platform_audio_msu_stop();
+
     if (track_id == 0 || track_id > dataset_table_count) {
         audio_unlock();
         return;
@@ -230,6 +235,19 @@ void change_music(uint16_t track_id) {
         }
     }
 
+    /* If High Quality Audio is on (Config menu, settings.h) and an MSU1
+     * pack is loaded and covers this track, let it stream the music instead
+     * of the SPC700 sequence -- sound effects still play normally (the
+     * pack/engine setup above already ran, so SFX sample data is loaded),
+     * we just don't also trigger the music sequence. platform_audio_msu_stop()
+     * already ran unconditionally above, so turning this off mid-track (or
+     * having no pack configured at all) correctly falls through to the
+     * normal SPC700 play command below. */
+    if (engine_hq_audio == HQ_AUDIO_ON && platform_audio_msu_play(track_id)) {
+        audio_unlock();
+        return;
+    }
+
     /* Send play command: write track number to port 0.
        The SPC700 engine reads port 0 and starts playing. */
     apu->inPorts[0] = (uint8_t)track_id;
@@ -262,6 +280,7 @@ void stop_music(void) {
     audio_lock();
     apu->inPorts[0] = 0x00;
     audio_state.current_music_track = 0xFFFF;
+    platform_audio_msu_stop();
     audio_unlock();
 }
 

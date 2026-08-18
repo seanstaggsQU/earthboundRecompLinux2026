@@ -33,6 +33,10 @@
 extern bool platform_headless;    /* --headless: no window, no frame timing */
 extern bool platform_skip_intro;  /* --skip-intro: skip to overworld for debugging */
 extern int platform_max_frames;   /* --frames N: quit after N frames (0=unlimited) */
+/* --windowed: open a small resizable window instead of auto-fullscreening at
+ * the detected display resolution. SDL/unix-only (embedded ports have no
+ * concept of a resizable desktop window); other backends never read this. */
+extern bool platform_force_windowed;
 
 /*
  * Video — scanline-based rendering
@@ -61,6 +65,22 @@ void platform_video_send_scanline(int y, const pixel_t *pixels);
 pixel_t *platform_video_get_framebuffer(void);
 void platform_video_end_frame(void);
 void platform_video_set_vsync(bool enabled);
+/* Overworld FOV/zoom cycle (R3, see game_main.c's host_process_frame()).
+ * The desktop build always renders the full EB_VIEWPORT_WIDTH x HEIGHT
+ * canvas internally (see port/unix/CMakeLists.txt); this only changes how
+ * much of it gets presented -- it's purely a presentation-layer crop, never
+ * a change to game/camera/entity logic, which always runs as if the full
+ * canvas were showing regardless of mode. EB_ZOOM_OFF (default) shows the
+ * same EB_DEFAULT_WIDTH x SNES_HEIGHT footprint every scene already used
+ * before this toggle existed; EB_ZOOM_OUT reveals more of the canvas
+ * (adapting to the display's aspect ratio -- see sdl2_video.c); EB_ZOOM_IN
+ * crops tighter than the default footprint instead, magnifying the view. */
+typedef enum {
+    EB_ZOOM_OFF = 0,
+    EB_ZOOM_OUT = 1,
+    EB_ZOOM_IN  = 2,
+} EbZoomMode;
+void platform_video_set_zoom(EbZoomMode mode);
 void platform_render_frame(scanline_stamp_cb_t fps_overlay_cb);
 
 /*
@@ -86,6 +106,7 @@ void platform_render_frame(scanline_stamp_cb_t fps_overlay_cb);
 #define AUX_DEBUG_DUMP   (1 << 0)   /* F1: dump PPU state */
 #define AUX_VRAM_DUMP    (1 << 1)   /* F2: dump VRAM as image */
 #define AUX_FPS_TOGGLE   (1 << 2)   /* F3: toggle FPS overlay */
+#define AUX_ZOOM_TOGGLE  (1 << 3)   /* R3: cycle the overworld FOV/zoom mode (see game_main.c) */
 #define AUX_FAST_FORWARD (1 << 4)   /* Tab: toggle 4x speed */
 #define AUX_DEBUG_TOGGLE (1 << 5)   /* `: toggle debug mode */
 #define AUX_SAVESTATE    (1 << 6)   /* F6: request a torn-safe savestate capture */
@@ -114,6 +135,25 @@ void platform_audio_lock(void);                       /* acquire audio mutex (pa
 void platform_audio_unlock(void);
 
 /*
+ * MSU1 audio — optional, off unless a pack is loaded
+ *
+ * MSU1 is a hardware trick real SNES romhacks use to stream CD-quality PCM
+ * music from an SD card/flash cart, replacing the SPC700's chiptune output
+ * per-track. This port has no such hardware constraint, but community MSU1
+ * packs (PCM files named <pack>-N.pcm, N = the same music track ID this
+ * port already uses) are a real, existing asset format worth being able to
+ * play. change_music() calls platform_audio_msu_play() before sending the
+ * SPC700 the play-track command; if a pack is loaded and covers this
+ * track, the platform streams that PCM instead and the caller skips the
+ * SPC700 command (sound effects still go through the SPC700/DSP
+ * emulation as normal -- only the music sequence trigger is skipped, so
+ * this doesn't need any per-channel muting inside the emulated APU).
+ * No-op (always returns false) when no pack is loaded, e.g. on ports that
+ * never call platform_audio_msu_load(). */
+bool platform_audio_msu_play(uint16_t track_id);  /* true if this track is covered by the loaded pack */
+void platform_audio_msu_stop(void);               /* stop any currently-streaming MSU track */
+
+/*
  * Save data — persistent storage
  *
  * The game calls platform_save_read/write with byte offsets and sizes
@@ -130,6 +170,25 @@ void platform_audio_unlock(void);
 bool platform_save_init(void);
 size_t platform_save_read(void *dst, size_t offset, size_t size);
 bool platform_save_write(const void *src, size_t offset, size_t size);
+
+/*
+ * Engine settings — small persistent C-port preferences (this port's own
+ * addition; NOT part of the original ROM's SRAM save format, and
+ * deliberately kept separate from platform_save_* above, which mirrors the
+ * real cartridge's 7680-byte battery SRAM byte-for-byte). Things like the
+ * sprint-speed toggle live here instead: they're an engine/device
+ * preference that should survive independent of which save slot/file is
+ * active, not game save data.
+ *
+ * Whole-blob read/write (no offset) since the settings struct is tiny --
+ * see game/settings.h for its shape. platform_settings_read() returns the
+ * number of bytes actually read (0 = no settings file yet, e.g. first run).
+ * On desktop this is a small file; embedded targets get a safe no-op stub
+ * (src/platform/settings_backend_stub.c) until a real backend exists,
+ * exactly like platform_savestate_* above.
+ */
+size_t platform_settings_read(void *dst, size_t size);
+bool platform_settings_write(const void *src, size_t size);
 
 /*
  * Savestate storage — large suspend/resume snapshots (build-order item #5).
@@ -187,6 +246,56 @@ void  *platform_savestate_scratch(size_t *out_bytes);
 /* Debug dumps (desktop: write files to debug/; embedded: no-op) */
 void platform_debug_dump_ppu(const pixel_t *framebuffer);
 void platform_debug_dump_vram_image(void);
+
+/*
+ * Self-update — desktop (port/unix) builds only, and only when built with a
+ * private release feed configured (EB_UPDATER_REPO/EB_UPDATER_TOKEN CMake
+ * cache vars; both empty = feature entirely absent from the binary). NOT
+ * part of the universal cross-port contract the way video/input/audio are
+ * — see docs/porting-guide.md's "No File I/O" precedent, which treats
+ * persistent-storage backends the same way (real on desktop, safe no-op
+ * stub elsewhere: src/platform/updater_backend_stub.c mirrors
+ * src/platform/settings_backend_stub.c's pattern exactly). Callers never
+ * need '#ifdef EB_EMBEDDED' at the call site — platform_update_supported()
+ * just reports false and every other call becomes a no-op.
+ *
+ * Fully non-blocking, by design: the mode-stack game loop steps one frame
+ * at a time with no blocking calls anywhere, so a synchronous HTTP request
+ * here would freeze rendering. _check_start() and _download_start() spawn a
+ * background thread and return immediately; the caller (src/intro/
+ * update_screen.c) calls _poll() once per frame to read current status —
+ * it never blocks, even mid-download.
+ */
+typedef enum {
+    EB_UPDATE_IDLE = 0,
+    EB_UPDATE_CHECKING,      /* background thread is contacting the release feed */
+    EB_UPDATE_UP_TO_DATE,    /* checked: EB_VERSION_STRING already matches the latest release tag */
+    EB_UPDATE_AVAILABLE,     /* checked: latest_version names a newer release than this build */
+    EB_UPDATE_DOWNLOADING,   /* download + checksum verify + install all happen on the thread; progress_percent updates */
+    EB_UPDATE_DONE,          /* installed and verified; a relaunch has already been requested */
+    EB_UPDATE_ERROR,         /* any failure at any stage; the running binary was never touched -- see error_message */
+    EB_UPDATE_UNSUPPORTED,   /* no backend for this build (embedded target, or feed not configured at build time) */
+} EbUpdateStatus;
+
+typedef struct {
+    EbUpdateStatus status;
+    char latest_version[32];   /* valid once status >= EB_UPDATE_AVAILABLE; git-describe-length tags, not free text */
+    int  progress_percent;     /* valid during EB_UPDATE_DOWNLOADING, 0-100 */
+    /* Deliberately short: this struct is embedded by value in ModeState
+     * (mode_stack.h's UpdateCheckState), a union shared by every mode-stack
+     * level (MODE_STACK_MAX=24) -- no other member there comes close to a
+     * 256-byte string, and a generously-sized error buffer here would bloat
+     * every single level's storage (and the savestate ABI) just to cover a
+     * message this port's own small WINDOW_UPDATE_CHECK (24 tiles wide)
+     * couldn't display in full anyway. Backends must produce a short,
+     * pre-truncated message, not rely on this buffer to hold one. */
+    char error_message[64];    /* valid when status == EB_UPDATE_ERROR */
+} EbUpdateProgress;
+
+bool platform_update_supported(void);        /* true only if this build has a real backend configured */
+void platform_update_check_start(void);      /* non-blocking; kicks off a background version check */
+void platform_update_download_start(void);   /* non-blocking; only valid once poll() reports EB_UPDATE_AVAILABLE */
+void platform_update_poll(EbUpdateProgress *out); /* call once per frame; never blocks */
 
 /*
  * Timer — frame pacing

@@ -1673,8 +1673,11 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
             memset(line_out, 0, EB_VIEWPORT_WIDTH * sizeof(pixel_t));
         PROF_END(clear, prof_clear);
 
-        /* SNES-space scanline for scenes using explicit viewport fill. */
-        int snes_scanline = scanline - ppu.sprite_y_offset;
+        /* SNES-space scanline for scenes using explicit viewport fill.
+         * bg_win_y_offset, not sprite_y_offset -- see the field comment in
+         * ppu.h for why the two must stay decoupled (overworld entities vs.
+         * its non-filling text/window BG layer). */
+        int snes_scanline = scanline - ppu.bg_win_y_offset;
 
         /* Base TM/TS for this scanline (before window masking) */
         uint8_t base_tm, base_ts;
@@ -1810,7 +1813,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
             } else if (wide_mode) {
                 /* Non-filling layer in wide mode: render SNES_WIDTH into
                  * temp buffers, then merge visible portion into main. */
-                if (ppu.sprite_y_offset &&
+                if (ppu.bg_win_y_offset &&
                     (snes_scanline < 0 || snes_scanline >= SNES_HEIGHT) &&
                     ppu.bg_viewport_fill[bg] != BG_VIEWPORT_CLAMP)
                     goto bg_mosaic_done;

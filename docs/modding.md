@@ -113,6 +113,19 @@ The 171 `.ebm` audio packs have no tooling for inspection or modification. Even 
 - Integration with existing SPC700 music tools (e.g., EBMusEd format support)
 - SFX table editing
 
+**Partial mitigation — MSU1 track replacement (port/unix only):** the SPC700
+data itself is still opaque, but `--msu-dir PATH [--msu-name NAME]` (default
+`NAME=earthbound`) lets the port play an existing community MSU1 PCM pack in
+place of the chiptune music, per track, with sound effects unaffected. Files
+are `<dir>/<name>-<track_id>.pcm`, where `track_id` is the same music track
+ID this port already uses (`change_music()`/`music_tracks.json`) — the
+standard MSU1 convention, since that's the same ID a real MSU1 romhack
+patch would intercept. PCM format: 4-byte magic `"MSU1"`, 4-byte LE loop
+point (in stereo sample frames), then raw interleaved S16LE stereo @
+44100 Hz. Untracked tracks fall through to normal SPC700 playback, so a
+pack can cover as few or as many tracks as it wants. See
+`port/unix/platform/msu_audio.c`.
+
 ### 8. Pack Commands Are Fragmented
 
 **Impact: Low — minor workflow friction.**
