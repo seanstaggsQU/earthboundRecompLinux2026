@@ -11,12 +11,28 @@
  * non-blocking — see platform.h) since the mode stack steps one
  * non-blocking frame at a time and a real HTTP call here would freeze
  * rendering. This file just starts that work and polls it once a frame.
- */
+ *
+ * clear_instant_printing() note: window_tick_prepare() (display_text.c,
+ * the per-frame renderer every window depends on) unconditionally skips
+ * rendering entirely while dt.instant_printing is set. print_menu_items()
+ * sets that flag but never clears it -- callers that follow it with a
+ * GAME_MODE_SELECTION_MENU push (the usual combo, e.g. this file's own
+ * EB_UPDATE_AVAILABLE branch) get it cleared as a side effect of that
+ * mode's own setup. Any window here that DOESN'T push a selection menu
+ * afterward (the plain message screens, "Downloading...", the download
+ * error message) has to clear it explicitly or nothing ever renders again
+ * for the rest of the mode -- confirmed live: the whole check/download
+ * flow ran correctly end-to-end (verified via temporary stderr logging)
+ * right up through the print_string() calls, but nothing appeared on
+ * screen, because instant_printing was left set from file-select's own
+ * print_menu_items() call (building the save-slot list) before the player
+ * ever reached this mode. */
 #include "core/mode_stack.h"
 #include "platform/platform.h"
 #include "game/window.h"
 #include "game/text.h"
 #include "game/audio.h"
+#include "game/display_text.h"
 #include "core/memory.h"
 #include "include/pad.h"
 #include <stdio.h>
@@ -53,26 +69,17 @@ StepResult mode_step_update_check(ModeState *ms) {
 
     switch ((UpdateCheckPhase)st->phase) {
     case UPD_CHECK_START: {
-        fprintf(stderr, "[updater] UPD_CHECK_START entered\n");
-        WindowInfo *w = create_window(WINDOW_UPDATE_CHECK);
-        fprintf(stderr, "[updater] create_window(WINDOW_UPDATE_CHECK) = %p, focus=%d\n",
-                (void *)w, win.current_focus_window);
+        create_window(WINDOW_UPDATE_CHECK);
+        clear_instant_printing();
         set_focus_text_cursor(0, 0);
         print_string("Checking for updates...");
         platform_update_check_start();
-        fprintf(stderr, "[updater] platform_update_check_start() returned, supported=%d\n",
-                platform_update_supported());
         st->phase = UPD_CHECKING;
         return STEP_RESULT_CONTINUE();
     }
 
     case UPD_CHECKING: {
         platform_update_poll(&st->progress);
-        static int poll_log_count = 0;
-        if (poll_log_count < 20) {
-            fprintf(stderr, "[updater] UPD_CHECKING poll #%d status=%d\n", poll_log_count, st->progress.status);
-            poll_log_count++;
-        }
         if (st->progress.status == EB_UPDATE_CHECKING)
             return STEP_RESULT_CONTINUE(); /* still waiting on the background thread */
         st->phase = UPD_RESULT;
@@ -80,8 +87,6 @@ StepResult mode_step_update_check(ModeState *ms) {
     }
 
     case UPD_RESULT: {
-        fprintf(stderr, "[updater] UPD_RESULT entered, status=%d, latest_version=\"%s\", focus_before_close=%d\n",
-                st->progress.status, st->progress.latest_version, win.current_focus_window);
         if (st->progress.status == EB_UPDATE_AVAILABLE) {
             /* WINDOW_UPDATE_CHECK is height 10 -- sm_handle_input()'s
              * cursor-search bound is (height-2)/2 rows, so only text_y
@@ -90,6 +95,7 @@ StepResult mode_step_update_check(ModeState *ms) {
              * row below is laid out within that range. */
             close_focus_window();
             create_window(WINDOW_UPDATE_CHECK);
+            clear_instant_printing();
             set_focus_text_cursor(0, 0);
             print_string("Update available:");
             set_focus_text_cursor(0, 1);
@@ -103,22 +109,19 @@ StepResult mode_step_update_check(ModeState *ms) {
 
         /* Every other outcome (up to date / unsupported / error) is a
          * one-shot message, not a confirm — print it once here, then just
-         * wait for a button in UPD_MESSAGE. */
+         * wait for a button in UPD_MESSAGE. No SELECTION_MENU push follows,
+         * so clear_instant_printing() here is required (see file header). */
         close_focus_window();
-        fprintf(stderr, "[updater] after close_focus_window, focus=%d\n", win.current_focus_window);
-        WindowInfo *w2 = create_window(WINDOW_UPDATE_CHECK);
-        fprintf(stderr, "[updater] create_window (msg branch) = %p, focus=%d\n", (void *)w2, win.current_focus_window);
+        create_window(WINDOW_UPDATE_CHECK);
+        clear_instant_printing();
         set_focus_text_cursor(0, 0);
         switch (st->progress.status) {
         case EB_UPDATE_UP_TO_DATE: {
-            fprintf(stderr, "[updater] printing up-to-date message\n");
             print_string("You're on the latest");
             set_focus_text_cursor(0, 1);
             char buf[64];
             snprintf(buf, sizeof(buf), "version: %s", st->progress.latest_version);
-            fprintf(stderr, "[updater] printing: \"%s\"\n", buf);
             print_string(buf);
-            fprintf(stderr, "[updater] print_string calls done\n");
             break;
         }
         case EB_UPDATE_UNSUPPORTED:
@@ -153,6 +156,7 @@ StepResult mode_step_update_check(ModeState *ms) {
     case UPD_DOWNLOAD_START: {
         close_focus_window();
         create_window(WINDOW_UPDATE_CHECK);
+        clear_instant_printing();
         set_focus_text_cursor(0, 0);
         print_string("Downloading update...");
         platform_update_download_start();
@@ -187,6 +191,7 @@ StepResult mode_step_update_check(ModeState *ms) {
          * later from file-select. */
         close_focus_window();
         create_window(WINDOW_UPDATE_CHECK);
+        clear_instant_printing();
         set_focus_text_cursor(0, 0);
         print_string("Update failed:");
         set_focus_text_cursor(0, 1);
