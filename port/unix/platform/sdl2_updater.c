@@ -698,9 +698,11 @@ static bool download_and_verify(const char *asset_url, const char *dest_path,
     return true;
 }
 
+#if defined(__APPLE__) || defined(_WIN32)
 /* Fetches the current release's asset API url for `asset_name` (used for
  * the paired shared library, whose url isn't cached from the AVAILABLE
- * check the way the main binary's is -- see file header). */
+ * check the way the main binary's is -- see file header). Linux has no
+ * paired-library asset at all, so this whole helper is unused there. */
 static bool fetch_asset_url_by_name(const char *asset_name, char *out_url, size_t out_url_size) {
     char url[256];
     snprintf(url, sizeof(url), "https://api.github.com/repos/%s/releases/latest", EB_UPDATER_REPO_STRING);
@@ -728,6 +730,7 @@ static bool fetch_asset_url_by_name(const char *asset_name, char *out_url, size_
     free(body.data);
     return found;
 }
+#endif /* __APPLE__ || _WIN32 */
 
 #ifdef _WIN32
 /* Writes and launches the detached helper that finishes the install after
