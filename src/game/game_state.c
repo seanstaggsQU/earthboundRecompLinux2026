@@ -1,14 +1,17 @@
 #include "game/game_state.h"
 #include "game/battle.h"
+#include "game/inventory.h"
 #include "core/memory.h"
 #include "data/assets.h"
 #include "entity/entity.h"
 #include "platform/platform.h"
+#include <stdio.h>
 #include <string.h>
 
 GameState game_state;
 CharStruct party_characters[TOTAL_PARTY_COUNT];
 uint8_t event_flags[EVENT_FLAG_COUNT / 8];
+uint8_t key_items_pool[KEY_ITEMS_POOL_SIZE];
 uint8_t fastest_hppp_meter_speed;
 uint8_t current_save_slot;
 
@@ -16,6 +19,7 @@ void game_state_init(void) {
     memset(&game_state, 0, sizeof(game_state));
     memset(party_characters, 0, sizeof(party_characters));
     memset(event_flags, 0, sizeof(event_flags));
+    memset(key_items_pool, 0, sizeof(key_items_pool));
 
     /* Defaults */
     game_state.text_speed = 2; /* medium */
@@ -424,6 +428,7 @@ bool save_game(int slot) {
     memcpy(&block->game_state, &game_state, sizeof(GameState));
     memcpy(block->party_characters, party_characters, sizeof(party_characters));
     memcpy(block->event_flags, event_flags, sizeof(block->event_flags));
+    memcpy(block->key_items_pool, key_items_pool, sizeof(key_items_pool));
 
     /* Stamp the on-cartridge block signature so real EarthBound's
      * CHECK_BLOCK_SIGNATURE accepts the slot instead of erasing it. The checksums
@@ -474,9 +479,37 @@ bool load_game(int slot) {
     memcpy(&game_state, &block->game_state, sizeof(GameState));
     memcpy(party_characters, block->party_characters, sizeof(party_characters));
     memcpy(event_flags, block->event_flags, sizeof(event_flags));
+    memcpy(key_items_pool, block->key_items_pool, sizeof(key_items_pool));
 
     /* Port of load_game_slot.asm lines 92-93: game_state.timer → TIMER */
     core.play_timer = game_state.timer;
+
+    /* Key Items migration sweep (not part of the original ROM/assembly --
+     * added for the Key Items pool feature). A save written before that
+     * feature existed still has its key items sitting in the relevant
+     * character's regular items[] slots (key_items_pool just loaded as
+     * all-zero, since those bytes used to be unused padding). Move any
+     * key-item-typed entries found there into the pool now, freeing their
+     * inventory slots. Runs unconditionally on every load and is
+     * idempotent -- an already-migrated save has no key items left in any
+     * items[] to find, so this is a no-op for it. Uses
+     * remove_item_from_inventory() (not a hand-rolled shift) so equipment
+     * indices for that character's other items stay correct. */
+    for (uint16_t char_id = 1; char_id <= TOTAL_PARTY_COUNT; char_id++) {
+        CharStruct *ch = &party_characters[char_id - 1];
+        for (uint16_t slot = 0; slot < ITEM_INVENTORY_SIZE; ) {
+            uint8_t item_id = ch->items[slot];
+            if (item_id != 0 && is_key_item_type(item_id)) {
+                key_items_give(item_id);
+                remove_item_from_inventory(char_id, slot + 1); /* 1-based slot */
+                /* Slot has been refilled by the shift-left compaction (or
+                 * cleared to 0 if this was the last item) -- re-check the
+                 * same index rather than advancing. */
+                continue;
+            }
+            slot++;
+        }
+    }
 
     return true;
 }
@@ -500,4 +533,113 @@ bool erase_save(int slot) {
     }
 
     return write_sram_version_word();
+}
+
+/* See the doc comment on the declaration in game_state.h. */
+bool key_items_selftest(void) {
+    bool ok = true;
+    const uint16_t TEST_ITEM = 202; /* Town map (ITEM_TYPE_KEY_ITEM) -- also
+                                      * exercises the exact item town_map.c's
+                                      * show_town_map_prepare() checks for. */
+    const uint16_t JEFF = 3;        /* char_id 3 = Jeff (1-indexed) */
+
+    game_state_init();
+
+    /* --- 1. Simulate a pre-feature save: write the key item directly into
+     * Jeff's regular inventory, bypassing every choke point (exactly what
+     * an old save's raw bytes look like -- key_items_pool stays empty,
+     * matching what those bytes read as before this field existed). */
+    party_characters[JEFF - 1].items[0] = (uint8_t)TEST_ITEM;
+
+    if (!save_game(0)) {
+        fprintf(stderr, "key_items_selftest: save_game(pre-migration state) failed\n");
+        return false;
+    }
+
+    /* --- 2. Load it back. The migration sweep in load_game() should move
+     * the item into the pool and clear Jeff's slot. --- */
+    game_state_init(); /* wipe live state so load_game() must reconstruct it */
+    if (!load_game(0)) {
+        fprintf(stderr, "key_items_selftest: load_game(pre-migration state) failed\n");
+        return false;
+    }
+
+    if (party_characters[JEFF - 1].items[0] != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- item still in Jeff's items[0] "
+                        "after load (migration sweep didn't run/clear it)\n");
+        ok = false;
+    }
+    if (key_items_find(TEST_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- item not found in "
+                        "key_items_pool after migration\n");
+        ok = false;
+    }
+
+    /* --- 3. The pool itself must survive its own save/load round-trip
+     * (not just the one-time migration path). --- */
+    if (!save_game(0)) {
+        fprintf(stderr, "key_items_selftest: save_game(post-migration state) failed\n");
+        return false;
+    }
+    game_state_init();
+    if (!load_game(0)) {
+        fprintf(stderr, "key_items_selftest: load_game(post-migration state) failed\n");
+        return false;
+    }
+    if (key_items_find(TEST_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- item lost across a normal "
+                        "save/load round-trip of the pool\n");
+        ok = false;
+    }
+
+    /* --- 4. Core acceptance criterion: bench the character who originally
+     * "had" the item (remove Jeff from the controlled party) and confirm
+     * find_item_in_inventory2()/CHAR_ID_ANY still finds it -- this is the
+     * exact bug class the ShrineFox EarthBound Mod Menu has (their key
+     * items are still tied to whichever character holds them, so lookups
+     * that only scan the currently-controlled party miss it). Our pool has
+     * no such dependency. */
+    uint8_t saved_count = game_state.player_controlled_party_count;
+    uint8_t saved_members[6];
+    memcpy(saved_members, game_state.party_members, sizeof(saved_members));
+
+    game_state.player_controlled_party_count = 3;
+    game_state.party_members[0] = 1; /* Ness */
+    game_state.party_members[1] = 2; /* Paula */
+    game_state.party_members[2] = 4; /* Poo -- Jeff (3) deliberately excluded */
+
+    if (find_item_in_inventory2(CHAR_ID_ANY, TEST_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- key item became unfindable "
+                        "after benching the character who originally received it "
+                        "(this is the ShrineFox-mod bug class)\n");
+        ok = false;
+    }
+
+    game_state.player_controlled_party_count = saved_count;
+    memcpy(game_state.party_members, saved_members, sizeof(saved_members));
+
+    /* --- 5. Direct CRUD round-trip on a second item. --- */
+    const uint16_t TEST_ITEM_2 = 176; /* Bicycle (ITEM_TYPE_KEY_AREA) */
+    if (key_items_give(TEST_ITEM_2) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- key_items_give() failed on an "
+                        "empty-enough pool\n");
+        ok = false;
+    }
+    if (key_items_find(TEST_ITEM_2) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- key_items_find() didn't find "
+                        "an item just given\n");
+        ok = false;
+    }
+    if (key_items_remove(TEST_ITEM_2) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- key_items_remove() didn't "
+                        "remove an item known to be present\n");
+        ok = false;
+    }
+    if (key_items_find(TEST_ITEM_2) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- key_items_find() still finds "
+                        "an item after key_items_remove()\n");
+        ok = false;
+    }
+
+    return ok;
 }

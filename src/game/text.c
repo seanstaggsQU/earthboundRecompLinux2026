@@ -713,9 +713,16 @@ static void build_command_menu(void) {
 
     /* Command labels loaded from ROM (CMD_WINDOW_TEXT, 6 × 10 bytes EB-encoded padded) */
     const uint8_t *cmd_data = ASSET_DATA(ASSET_US_DATA_COMMAND_WINDOW_TEXT_BIN);
-    /* Grid positions from DEBUG_MENU_ELEMENT_SPACING_DATA */
-    static const uint8_t cmd_x[6] = { 0, 6, 0, 6, 0, 6 };
-    static const uint8_t cmd_y[6] = { 0, 0, 1, 1, 2, 2 };
+    /* Grid positions -- a deliberate deviation from DEBUG_MENU_ELEMENT_SPACING_DATA
+     * (ROM layout), not a porting guess, to make room for "Keys" (Key Items
+     * pool feature) alongside Goods. Full 10-item layout (left col / right col):
+     *   Talk to / Check
+     *   Goods   / Keys
+     *   PSI     / Equip
+     *   Status  / Config
+     *   Save    / Quit    */
+    static const uint8_t cmd_x[6] = { 0, 0, 0, 6, 6, 0 };
+    static const uint8_t cmd_y[6] = { 0, 1, 2, 2, 0, 3 };
 
     for (int i = 0; i < 6; i++) {
         uint16_t userdata = i + 1; /* 1=TALK_TO .. 6=STATUS */
@@ -757,7 +764,7 @@ static void build_command_menu(void) {
     /* "Save", "Config", and "Quit" -- this port's own 7th/8th/9th items, not
      * part of the ROM's 6-entry CMD_WINDOW_TEXT table. userdata 7/8/9 are
      * handled in mode_step_pause_menu() (PM_MAIN_RESULT, text.c). */
-    add_menu_item("Save", 7, 0, 3);
+    add_menu_item("Save", 7, 0, 4);
     {
         WindowInfo *w = get_window(win.current_focus_window);
         if (w && w->menu_count > 0)
@@ -769,7 +776,21 @@ static void build_command_menu(void) {
         if (w && w->menu_count > 0)
             w->menu_items[w->menu_count - 1].sound_effect = 27;  /* SFX::MENU_OPEN_CLOSE */
     }
-    add_menu_item("Quit", 9, 0, 4);
+    add_menu_item("Quit", 9, 6, 4);
+    {
+        WindowInfo *w = get_window(win.current_focus_window);
+        if (w && w->menu_count > 0)
+            w->menu_items[w->menu_count - 1].sound_effect = 27;  /* SFX::MENU_OPEN_CLOSE */
+    }
+
+    /* "Keys" -- this port's own 10th item (Key Items pool feature, not part
+     * of the original ROM/assembly). Placed at (6,1), next to "Goods".
+     * Label is "Keys", not "Key Items" -- the full label (10 chars)
+     * previously overflowed the x=6 column and wrapped, corrupting the
+     * "Goods" item's rendering (found live). "Config" (6 chars) is the
+     * longest label confirmed to fit in that column; "Keys" (4 chars)
+     * matches "Quit"/"Save"'s length. */
+    add_menu_item("Keys", 10, 6, 1);
     {
         WindowInfo *w = get_window(win.current_focus_window);
         if (w && w->menu_count > 0)
@@ -2765,6 +2786,17 @@ StepResult mode_step_pause_menu(ModeState *ms) {
                 print_menu_items();
                 play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
                 return pm_push_selection(st, PM_QUIT_CONFIRM_RESULT, 1);
+
+            /* --- Key Items (this port's own addition, Key Items pool
+             * feature, not part of the original ROM/assembly) --- */
+            case 10:
+                /* View/Help only, no side effects to unwind afterward --
+                 * same shape as Status (case 6): push and return straight
+                 * to PM_MAIN, no separate resume phase needed. */
+                pm_child_init = (ModeState){0};
+                pm_child_init.key_items_menu.phase = KIM_ENTER;
+                st->phase = PM_MAIN;
+                return STEP_RESULT_PUSH_INIT(GAME_MODE_KEY_ITEMS_MENU, &pm_child_init);
 
             /* Cancel (B/Select) or unknown → cleanup */
             default:

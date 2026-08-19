@@ -1624,7 +1624,17 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
         memset(party_characters[c].items, ITEM_NONE, sizeof(party_characters[c].items));
         for (int j = 0; j < 10; j++) {
             uint8_t item = entry[10 + j];
-            if (item != 0) party_characters[c].items[j] = item;
+            if (item == 0) continue;
+            /* Key items (Key Items pool feature, not in the original
+             * assembly) never occupy a character's regular inventory --
+             * route them to the global pool instead. Vanilla starting
+             * items aren't key items today, but don't assume that holds
+             * for modded/rebalanced data. */
+            if (is_key_item_type(item)) {
+                key_items_give(item);
+            } else {
+                party_characters[c].items[j] = item;
+            }
         }
     }
 

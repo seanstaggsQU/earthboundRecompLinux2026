@@ -110,6 +110,9 @@ typedef enum {
     GAME_MODE_UPDATE_CHECK,        /* file-select "Check for Updates" screen -- this port's own
                                      * addition, not in the original ROM (mode_step_update_check,
                                      * src/intro/update_screen.c) */
+    GAME_MODE_KEY_ITEMS_MENU,      /* pause-menu Key Items pool browser -- this port's own
+                                     * addition, not in the original ROM (mode_step_key_items_menu,
+                                     * display_text_menus.c) */
     GAME_MODE_COUNT,
 } GameMode;
 
@@ -666,6 +669,23 @@ typedef enum {
 typedef struct {
     uint8_t phase;  /* EscargoMenuPhase */
 } EscargoMenuState;
+
+/* GAME_MODE_KEY_ITEMS_MENU phases -- Key Items pool feature, not part of
+ * the original ROM/assembly. Modeled directly on GAME_MODE_ESCARGO_MENU
+ * above: KIM_ENTER builds a window over key_items_pool[] (game_state.h)
+ * and STEP_PUSHes SELECTION_MENU; cleanup runs in KIM_RESULT after it pops.
+ * An empty pool skips the push and pops 0 after the same cleanup. Pushed
+ * from the pause menu's "Key Items" command (PM_MAIN_RESULT case 10,
+ * text.c). View/Help only -- no sub-action menu, no side effects to unwind.
+ * Pops the 1-based selection index, or 0 if cancelled/empty. */
+typedef enum {
+    KIM_ENTER = 0,  /* build the key items menu; push SELECTION_MENU */
+    KIM_RESULT,     /* cleanup, POP the selection index */
+} KeyItemsMenuPhase;
+
+typedef struct {
+    uint8_t phase;  /* KeyItemsMenuPhase */
+} KeyItemsMenuState;
 
 /* GAME_MODE_TELEPHONE_MENU phases. Port of open_telephone_menu() +
  * display_telephone_contact_text() (asm/text/menu/open_telephone_menu.asm,
@@ -2560,6 +2580,7 @@ union ModeState {
     StatusMenuState       status_menu;
     SettingsMenuState     settings_menu;
     UpdateCheckState      update_check;
+    KeyItemsMenuState     key_items_menu;
     HpppDisplayState      hppp_display;
     PsiMenuState          psi_menu;
     UseItemState          use_item;
@@ -2913,6 +2934,13 @@ StepResult mode_step_store_menu(ModeState *st);
  * ModeState.escargo_menu (phase = EEM_ENTER); entered via STEP_PUSH from CC 1A
  * 0x07. Pops the 1-based selection index, or 0 if cancelled/empty. */
 StepResult mode_step_escargo_menu(ModeState *st);
+
+/* GAME_MODE_KEY_ITEMS_MENU step (defined in display_text_menus.c) -- Key
+ * Items pool feature, this port's own addition, not a ROM routine. Init
+ * with ModeState.key_items_menu (phase = KIM_ENTER); entered via STEP_PUSH
+ * from the pause menu's "Key Items" command (PM_MAIN_RESULT case 10,
+ * text.c). Pops the 1-based selection index, or 0 if cancelled/empty. */
+StepResult mode_step_key_items_menu(ModeState *st);
 
 /* GAME_MODE_TELEPHONE_MENU step (defined in display_text_menus.c). Init with
  * ModeState.telephone_menu (phase = TPH_ENTER, show_text); entered via STEP_PUSH

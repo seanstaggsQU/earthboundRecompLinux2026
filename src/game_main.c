@@ -1031,8 +1031,14 @@ StepResult mode_step_debug_goods(ModeState *mst) {
         set_argument_memory(s->saved_argument_memory);
 
         /* Cancelled (0) or no inventory room -> back to browsing (the blocking
-         * form's `break` out of the inner loop, which redrew the same item). */
-        if (char_id == 0 || find_inventory_space2(char_id) == 0) {
+         * form's `break` out of the inner loop, which redrew the same item).
+         * Key items (Key Items pool feature, not part of the original ROM)
+         * don't consume a character's regular inventory slots at all, so
+         * the slot-space check doesn't apply to them -- skip it or a
+         * character with a full 14-slot inventory would wrongly be denied
+         * a key item that has nowhere to conflict with. */
+        if (char_id == 0 ||
+            (!is_key_item_type(s->item_id) && find_inventory_space2(char_id) == 0)) {
             s->phase = DG_DRAW;
             return STEP_RESULT_CONTINUE();
         }

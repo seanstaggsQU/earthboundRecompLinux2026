@@ -195,6 +195,34 @@ uint16_t find_item_in_inventory(uint16_t char_id, uint16_t item_id);
  * Returns character's ID (1-indexed) if found, 0 if not. */
 uint16_t find_item_in_inventory2(uint16_t char_id, uint16_t item_id);
 
+/* --- Key Items pool functions ---
+ * Not part of the original ROM/assembly -- new infrastructure for the Key
+ * Items pool feature (see game_state.h's KEY_ITEMS_POOL_SIZE/key_items_pool
+ * doc comment). Quest items (ITEM_TYPE_KEY_ITEM/KEY_AREA/KEY_SOMEONE) are
+ * intercepted out of the normal give/find/take choke points (see
+ * give_item_to_character, find_item_in_inventory2, take_item_from_character)
+ * and routed here instead, so they never occupy a character's regular
+ * items[] inventory slots and are never subject to party-composition-based
+ * lookups. Modeled directly on the Escargo Express storage functions below
+ * (packed array, linear scan, shift-left on removal). */
+
+/* IS_KEY_ITEM_TYPE: not a ROM/assembly port -- classifies an item by its
+ * ITEM_TYPE_MASK category. Returns true for KEY_ITEM/KEY_AREA/KEY_SOMEONE. */
+bool is_key_item_type(uint16_t item_id);
+
+/* KEY_ITEMS_GIVE: stores item_id in the first empty pool slot.
+ * Returns item_id on success, 0 if the pool is full. */
+uint16_t key_items_give(uint16_t item_id);
+
+/* KEY_ITEMS_FIND: searches the pool for item_id.
+ * Returns item_id (truthy) if present, 0 if not. */
+uint16_t key_items_find(uint16_t item_id);
+
+/* KEY_ITEMS_REMOVE: finds and removes item_id from the pool, compacting
+ * (shift-left) to keep it packed toward index 0.
+ * Returns the removed item_id, or 0 if not found. */
+uint16_t key_items_remove(uint16_t item_id);
+
 /* --- Escargo Express functions --- */
 
 /* ESCARGO_EXPRESS_STORE: Port of asm/misc/escargo_express_store.asm.

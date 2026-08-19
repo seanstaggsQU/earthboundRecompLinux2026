@@ -55,7 +55,7 @@
  * docs/plans/savestate-unified-loop.md. */
 #define STATE_DUMP_MAGIC       0x44534245u  /* "EBSD" little-endian */
 #define STATE_DUMP_HEADER_SIZE 20           /* magic+version+frame+seq+crc32+payload_len */
-#define STATE_DUMP_VERSION 11 /* v6: raw-pointer purge (item #3A) changed PSI/oval/
+#define STATE_DUMP_VERSION 12 /* v6: raw-pointer purge (item #3A) changed PSI/oval/
                                * overworld-deferred layouts. v7: ABI hardening (item
                                * #3B) — PPUState.bg_viewport_fill enum→uint8_t shrank
                                * the PPU section; the format is now 32/64-bit identical.
@@ -69,7 +69,10 @@
                                * format portable across viewport dimensions.
                                * v11: the payload (sections + terminator) is now a single
                                * tamp-compressed stream; the header's crc32/payload_len
-                               * describe the COMPRESSED bytes. Header stays uncompressed. */
+                               * describe the COMPRESSED bytes. Header stays uncompressed.
+                               * v12: added SECTION_KEY_ITEMS_POOL (Key Items pool feature,
+                               * not part of the original ROM/assembly) — a new top-level
+                               * global, key_items_pool[KEY_ITEMS_POOL_SIZE]. */
 
 /* Section IDs */
 enum {
@@ -120,6 +123,9 @@ enum {
     SECTION_ITEM_TRANSFORM       = 0x0028,
     SECTION_BATTLE_BG            = 0x0029,
     SECTION_FRAME_CALLBACK       = 0x002A,
+    /* Key Items pool feature (not part of the original ROM/assembly) — a
+     * new top-level global, see game_state.h's key_items_pool doc comment. */
+    SECTION_KEY_ITEMS_POOL       = 0x002B,
     SECTION_TERMINATOR       = 0xFFFF,
 };
 
@@ -148,6 +154,7 @@ _Static_assert(sizeof(core)                 == 32,    "ABI: core");
 _Static_assert(sizeof(game_state)           == 473,   "ABI: game_state");
 _Static_assert(sizeof(party_characters)     == 570,   "ABI: party_characters");
 _Static_assert(sizeof(event_flags)          == 128,   "ABI: event_flags");
+_Static_assert(sizeof(key_items_pool)       == KEY_ITEMS_POOL_SIZE, "ABI: key_items_pool");
 _Static_assert(sizeof(ow)                   == 392,   "ABI: ow");
 _Static_assert(sizeof(bt)                   == 3780,  "ABI: bt");
 _Static_assert(sizeof(dt)                   == 152,   "ABI: dt");
@@ -238,6 +245,7 @@ static int build_section_table(StateSection *t) {
     ADD(SECTION_GAME_STATE,       &game_state,          sizeof(game_state));
     ADD(SECTION_PARTY_CHARACTERS, party_characters,     sizeof(party_characters));
     ADD(SECTION_EVENT_FLAGS,      event_flags,          sizeof(event_flags));
+    ADD(SECTION_KEY_ITEMS_POOL,   key_items_pool,       sizeof(key_items_pool));
     ADD(SECTION_OVERWORLD,        &ow,                  sizeof(ow));
     ADD(SECTION_BATTLE,           &bt,                  sizeof(bt));
     ADD(SECTION_DISPLAY_TEXT,     &dt,                  sizeof(dt));

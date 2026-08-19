@@ -136,6 +136,11 @@ static const uint16_t window_configs[][4] = {
      * row sits at text_y=2 (row 0 is the "Really quit?" message, row 1 left
      * blank for spacing) -- height 6 would cap navigation at rows 0-1 only. */
     [WINDOW_QUIT_CONFIRM] = { 14, 14, 16, 8 },
+    /* Key Items pool browser -- this port's own addition (WINDOW_KEY_ITEMS,
+     * window.h), Key Items pool feature. Same rect as WINDOW_INVENTORY
+     * (0x02) / WINDOW_ESCARGO_EXPRESS_ITEM (0x0D) -- never open at the same
+     * time as either, so no collision. */
+    [WINDOW_KEY_ITEMS] = { 7, 1, 24, 16 },
 };
 #define WINDOW_CONFIG_COUNT (sizeof(window_configs) / sizeof(window_configs[0]))
 

@@ -196,6 +196,7 @@ int main(int argc, char *argv[]) {
     SDL_SetMainReady(); /* pairs with SDL_MAIN_HANDLED above */
     const char *verify_rom_path = NULL;
     bool savestate_selftest = false;
+    bool keyitems_selftest = false;
     bool load_state_at_boot = false; /* --load-state: resume from savestate.bin.0/.1 in CWD instead of a fresh boot */
     int dump_flags_frame = -1; /* --dump-flags N: print a hardcoded event-flag debug list on frame N */
     int dump_frame = -1; /* --dump-frame N: write screenshot.bmp (final windowed output) on frame N, then continue */
@@ -219,6 +220,13 @@ int main(int argc, char *argv[]) {
             /* Run the savestate save->load->save round-trip self-test and exit.
              * Implies headless so it neither opens a window nor plays the game. */
             savestate_selftest = true;
+            platform_headless = true;
+        } else if (strcmp(argv[i], "--selftest-keyitems") == 0) {
+            /* Key Items pool feature: migration + round-trip + the
+             * ShrineFox-mod-bug-class regression check. Uses save_game()/
+             * load_game() (slot 0) via the .srm path, so run with a scratch
+             * --save FILE. Implies headless. */
+            keyitems_selftest = true;
             platform_headless = true;
         } else if (strcmp(argv[i], "--headless") == 0) {
             platform_headless = true;
@@ -260,7 +268,7 @@ int main(int argc, char *argv[]) {
 #ifdef EB_RUNTIME_ASSETS
                             " [--assets FILE]"
 #endif
-                            " [--selftest-savestate]\n",
+                            " [--selftest-savestate] [--selftest-keyitems]\n",
                     argv[0]);
             return 1;
         }
@@ -379,6 +387,12 @@ int main(int argc, char *argv[]) {
         bool ok_ap = state_dump_asset_pointer_test();
         fprintf(stderr, "savestate asset-pointer self-test: %s\n", ok_ap ? "PASS" : "FAIL");
         exit((ok && ok_pert && ok_cs && ok_ap) ? 0 : 1);
+    }
+
+    if (keyitems_selftest) {
+        bool ok_ki = key_items_selftest();
+        fprintf(stderr, "key items pool self-test: %s\n", ok_ki ? "PASS" : "FAIL");
+        exit(ok_ki ? 0 : 1);
     }
 
     /* Initialize audio (loads audio packs from embedded assets) */

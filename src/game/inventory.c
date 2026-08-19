@@ -822,6 +822,12 @@ uint16_t give_item_to_specific_character(uint16_t char_id, uint16_t item_id) {
     if (char_idx >= TOTAL_PARTY_COUNT)
         FATAL("give_item_to_specific_character: invalid char_id=%u\n", char_id);
 
+    /* Key items route to the global pool instead of this character's
+     * regular inventory -- see the Key Items pool section above. */
+    if (is_key_item_type(item_id)) {
+        return key_items_give(item_id) ? char_id : 0;
+    }
+
     /* Search for empty slot: assembly loops counter 0..13 (14 slots) */
     for (uint16_t slot = 0; slot < ITEM_INVENTORY_SIZE; slot++) {
         if (party_characters[char_idx].items[slot] != 0)
@@ -854,6 +860,16 @@ uint16_t give_item_to_specific_character(uint16_t char_id, uint16_t item_id) {
  *
  * Assembly: FAR function. First param A=char_id, second param X=item_id. */
 uint16_t give_item_to_character(uint16_t char_id, uint16_t item_id) {
+    /* Key items route to the global pool regardless of char_id (specific or
+     * CHAR_ID_ANY) -- handled once here, before the CHAR_ID_ANY loop below,
+     * so that loop can't call key_items_give() once per party member and
+     * insert the same item repeatedly. give_item_to_specific_character()
+     * has its own equivalent redirect for any caller that reaches it
+     * directly instead of through here. */
+    if (is_key_item_type(item_id)) {
+        return key_items_give(item_id) ? char_id : 0;
+    }
+
     if (char_id != 0xFF) {
         /* Single character mode */
         return give_item_to_specific_character(char_id, item_id);
@@ -1130,6 +1146,12 @@ void swap_item_into_equipment(uint16_t source_char_id, uint16_t item_slot,
 uint16_t take_item_from_specific_character(uint16_t char_id, uint16_t item_id) {
     uint16_t char_idx = char_id - 1;
 
+    /* Key items are removed from the global pool, not this character's
+     * items[] (they were never placed there in the first place). */
+    if (is_key_item_type(item_id)) {
+        return key_items_remove(item_id) ? char_id : 0;
+    }
+
     for (uint16_t slot = 0; slot < ITEM_INVENTORY_SIZE; slot++) {
         if (party_characters[char_idx].items[slot] == (uint8_t)item_id) {
             /* Found the item — remove it (slot+1 for 1-based, char_idx+1 for char_id) */
@@ -1191,6 +1213,13 @@ uint16_t find_item_in_inventory(uint16_t char_id, uint16_t item_id) {
     uint16_t char_idx = char_id - 1;
     if (char_idx >= TOTAL_PARTY_COUNT) return 0; /* invalid → not found */
 
+    /* Key items live in the global pool, not any character's items[] --
+     * report present/absent the same regardless of which character is
+     * asked, since the pool has no per-character association. */
+    if (is_key_item_type(item_id)) {
+        return key_items_find(item_id) ? char_id : 0;
+    }
+
     for (uint16_t slot = 0; slot < ITEM_INVENTORY_SIZE; slot++) {
         if (party_characters[char_idx].items[slot] == (uint8_t)item_id) {
             return char_idx + 1; /* return char_id (1-based) */
@@ -1210,6 +1239,16 @@ uint16_t find_item_in_inventory(uint16_t char_id, uint16_t item_id) {
  * for each, returns party_members[i] (char_id) on first hit.
  * When specific: calls FIND_ITEM_IN_INVENTORY directly, returns as-is. */
 uint16_t find_item_in_inventory2(uint16_t char_id, uint16_t item_id) {
+    /* Key items: check the global pool once, regardless of char_id (specific
+     * or CHAR_ID_ANY) -- this is the actual fix for the ShrineFox-mod-style
+     * bug (lookups there only scan the currently-controlled party via
+     * CHAR_ID_ANY, so benching the character "holding" a key item makes it
+     * disappear from checks). The pool has no such dependency: a key item
+     * given while Jeff was in the party is still found after he's benched. */
+    if (is_key_item_type(item_id)) {
+        return key_items_find(item_id) ? char_id : 0;
+    }
+
     if (char_id != 0xFF) {
         return find_item_in_inventory(char_id, item_id);
     }
@@ -1234,6 +1273,15 @@ uint16_t find_item_in_inventory2(uint16_t char_id, uint16_t item_id) {
  *
  * Assembly: FAR function. First param A=char_id, second param X=item_id. */
 uint16_t take_item_from_character(uint16_t char_id, uint16_t item_id) {
+    /* Key items: remove from the global pool once, regardless of char_id
+     * (specific or CHAR_ID_ANY) -- handled here so the CHAR_ID_ANY loop
+     * below doesn't call key_items_remove() once per party member (harmless
+     * since it's idempotent after the first hit, but wasted work and an
+     * ambiguous return value otherwise). */
+    if (is_key_item_type(item_id)) {
+        return key_items_remove(item_id) ? char_id : 0;
+    }
+
     if (char_id != 0xFF) {
         /* Single character mode */
         return take_item_from_specific_character(char_id, item_id);
@@ -1250,6 +1298,64 @@ uint16_t take_item_from_character(uint16_t char_id, uint16_t item_id) {
     }
 
     return 0; /* item not found in any party member */
+}
+
+/* --- Key Items pool functions ---
+ * Not part of the original ROM/assembly. See the doc comment on
+ * key_items_pool/KEY_ITEMS_POOL_SIZE in game_state.h and on this section in
+ * inventory.h for the full rationale. Shaped exactly like the Escargo
+ * Express functions immediately below (packed array, linear scan,
+ * shift-left on removal). */
+
+bool is_key_item_type(uint16_t item_id) {
+    const ItemConfig *entry = get_item_entry(item_id);
+    if (!entry) return false;
+    uint8_t t = entry->type & ITEM_TYPE_MASK;
+    return t == ITEM_TYPE_KEY_ITEM || t == ITEM_TYPE_KEY_AREA || t == ITEM_TYPE_KEY_SOMEONE;
+}
+
+uint16_t key_items_give(uint16_t item_id) {
+    for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+        if (key_items_pool[i] == 0) {
+            key_items_pool[i] = (uint8_t)item_id;
+            return item_id;
+        }
+    }
+    return 0; /* pool full */
+}
+
+uint16_t key_items_find(uint16_t item_id) {
+    for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+        if (key_items_pool[i] == (uint8_t)item_id) {
+            return item_id;
+        }
+    }
+    return 0; /* not found */
+}
+
+uint16_t key_items_remove(uint16_t item_id) {
+    int idx = -1;
+    for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+        if (key_items_pool[i] == (uint8_t)item_id) {
+            idx = i;
+            break;
+        }
+    }
+    if (idx < 0) return 0; /* not found */
+
+    /* Shift remaining items left to fill the gap, mirroring
+     * remove_escargo_express_item()'s compaction below. */
+    int i = idx;
+    for (;;) {
+        if (i >= KEY_ITEMS_POOL_SIZE - 1) break;
+        uint8_t next = key_items_pool[i + 1];
+        if (next == 0) break;
+        key_items_pool[i] = next;
+        i++;
+    }
+    key_items_pool[i] = 0;
+
+    return item_id;
 }
 
 /* --- Escargo Express functions --- */

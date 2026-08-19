@@ -155,6 +155,17 @@ enum CharacterMode {
 /* Total party count (4 PCs + 2 NPCs) */
 #define TOTAL_PARTY_COUNT 6
 
+/* Key Items pool — a global storage array for quest/key items
+ * (ITEM_TYPE_KEY_ITEM/KEY_AREA/KEY_SOMEONE, see inventory.h), separate from
+ * any character's regular 14-slot items[] inventory. Deliberately has NO
+ * association with any character or with player_controlled_party_count/
+ * party_members[] — that's what makes it immune to the "key item vanishes
+ * when you bench the character holding it" bug a fan mod (ShrineFox's
+ * EarthBound Mod Menu) has, where lookups only scan the currently
+ * controlled party. 44 key items exist in the current item table; 48
+ * leaves a little headroom. See key_items_give/find/remove in inventory.h. */
+#define KEY_ITEMS_POOL_SIZE 48
+
 /* Save block - 1280 bytes, matches save_block from structs.asm */
 PACKED_STRUCT
 typedef struct {
@@ -162,7 +173,15 @@ typedef struct {
     GameState  game_state;                    /* 32: 473 bytes */
     CharStruct party_characters[TOTAL_PARTY_COUNT]; /* 505: 570 bytes */
     uint8_t    event_flags[EVENT_FLAG_COUNT / 8];   /* 1075: 128 bytes */
-    uint8_t    padding[1280 - 32 - 473 - 95*6 - 128]; /* remaining padding */
+    /* key_items_pool carved out of what used to be unused padding (was 77
+     * bytes) -- this keeps SaveBlock's total size and the checksum
+     * algorithm's byte range unchanged, so a save written before this field
+     * existed still passes its checksum: those bytes were already being
+     * written/checksummed as zeroed padding, they just have a name now.
+     * See load_game()'s migration sweep for how pre-existing saves get
+     * their key items moved here automatically. */
+    uint8_t    key_items_pool[KEY_ITEMS_POOL_SIZE]; /* 1203: 48 bytes */
+    uint8_t    padding[1280 - 32 - 473 - 95*6 - 128 - KEY_ITEMS_POOL_SIZE]; /* remaining padding */
 } SaveBlock;
 END_PACKED_STRUCT
 ASSERT_STRUCT_SIZE(SaveBlock, 1280);
@@ -174,6 +193,7 @@ ASSERT_STRUCT_SIZE(SaveBlock, 1280);
 extern GameState game_state;
 extern CharStruct party_characters[TOTAL_PARTY_COUNT];
 extern uint8_t event_flags[EVENT_FLAG_COUNT / 8];
+extern uint8_t key_items_pool[KEY_ITEMS_POOL_SIZE];
 
 /* Initialize game state to defaults */
 void game_state_init(void);
@@ -265,5 +285,18 @@ extern uint8_t current_save_slot; /* 1-indexed: 1, 2, or 3. Port of CURRENT_SAVE
 bool save_game(int slot);
 bool load_game(int slot);
 bool erase_save(int slot);
+
+/* Key Items pool self-test (Key Items pool feature, not a ROM routine):
+ * simulates a pre-feature save (a key item still sitting in a character's
+ * items[] slot, pool empty), round-trips it through save_game()/load_game(),
+ * and confirms the migration sweep moves it into key_items_pool and clears
+ * the items[] slot -- then confirms the pool survives its own save/load
+ * round-trip, and that find_item_in_inventory2() still finds a pooled key
+ * item after the character who originally "had" it is removed from the
+ * active party (the specific bug class this feature avoids vs. the
+ * ShrineFox EarthBound Mod Menu's key-item handling). Desktop-only
+ * diagnostic (the `--selftest-keyitems` flag). Returns true iff every
+ * check passes; uses save slot 0, so run with a scratch --save path. */
+bool key_items_selftest(void);
 
 #endif /* GAME_STATE_H */

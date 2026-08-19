@@ -1093,6 +1093,72 @@ StepResult mode_step_escargo_menu(ModeState *ms) {
     return STEP_RESULT_POP(result);
 }
 
+/* GAME_MODE_KEY_ITEMS_MENU step -- Key Items pool browser. Key Items pool
+ * feature, not a port of any ROM routine; modeled directly on
+ * mode_step_escargo_menu() immediately above (same two-phase shape, same
+ * empty-list early-out), browsing key_items_pool[] (game_state.h) instead
+ * of game_state.escargo_express_items[]. View/Help only -- selecting an
+ * entry just re-runs the loop (no sub-action menu; SELECTION_MENU's own
+ * highlight-and-confirm already shows the item, nothing further to do on
+ * selection besides returning to the browser or the pause menu). */
+StepResult mode_step_key_items_menu(ModeState *ms) {
+    KeyItemsMenuState *st = &ms->key_items_menu;
+    uint16_t result = 0;
+
+    switch ((KeyItemsMenuPhase)st->phase) {
+
+    case KIM_ENTER: {
+        save_window_text_attributes();
+        create_window(WINDOW_KEY_ITEMS);
+        set_window_title(WINDOW_KEY_ITEMS, "Key Items", -1);
+
+        /* Loop over the pool, same sequential-1-based-userdata pattern as
+         * Escargo Express (the array is kept packed toward index 0 by
+         * key_items_remove()'s shift-left compaction, so a zero entry
+         * means "nothing past this point," but scan the whole array
+         * defensively rather than assume no gaps can ever occur). */
+        int seq = 1;
+        for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+            uint8_t item_id = key_items_pool[i];
+            if (item_id == 0) continue;
+
+            const ItemConfig *item_entry = get_item_entry(item_id);
+            if (!item_entry) continue;
+
+            char name_buf[ITEM_NAME_LEN + 1];
+            eb_to_ascii_buf(item_entry->name, ITEM_NAME_LEN, name_buf);
+
+            add_menu_item_no_position(name_buf, (uint16_t)seq++);
+        }
+
+        open_window_and_print_menu(2, 0);
+
+        WindowInfo *w = get_window(win.current_focus_window);
+        if (w && w->menu_count != 0) {
+            static ModeState sel_init;
+            sel_init = (ModeState){0};
+            sel_init.selection_menu.phase        = SM_SETUP;
+            sel_init.selection_menu.allow_cancel = 1;
+            st->phase = KIM_RESULT;
+            return STEP_RESULT_PUSH_INIT(GAME_MODE_SELECTION_MENU, &sel_init);
+        }
+        /* Empty pool: result 0, fall through to the shared cleanup. */
+        break;
+    }
+
+    case KIM_RESULT:
+    default:
+        result = (uint16_t)mode_child_result();
+        break;
+    }
+
+    close_window(WINDOW_KEY_ITEMS);
+    dt.force_left_text_alignment = 0;
+    restore_window_text_attributes();
+
+    return STEP_RESULT_POP(result);
+}
+
 
 /*
  * OPEN_TELEPHONE_MENU — Port of asm/text/menu/open_telephone_menu.asm (85 lines).
