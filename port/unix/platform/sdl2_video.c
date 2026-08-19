@@ -417,7 +417,20 @@ static void apply_light_shafts(pixel_t *pixels, int pitch) {
  * effect needed to be smaller/more subtle overall, not just smoother. */
 #define DOF_FOCUS_BAND_FRACTION 0.75  /* central 75% of height stays fully
                                         * sharp (was 0.55 -- "needs to be
-                                        * smaller") */
+                                        * smaller"). NOTE: this is compared
+                                        * directly against `dist` below,
+                                        * which is already normalized to
+                                        * 0..1 across the center-to-edge
+                                        * half of the screen -- do NOT halve
+                                        * it again (a `/ 2.0` crept in here
+                                        * once and silently shrank the sharp
+                                        * band to ~37.5% of the height
+                                        * instead of the 75% this comment
+                                        * promises; found via a synthetic
+                                        * per-row blend dump, not visually
+                                        * obvious since the blur stayed
+                                        * symmetric, just far more of the
+                                        * screen than intended). */
 #define DOF_BLUR_RADIUS  2             /* fixed blur kernel radius -- only
                                         * the blend amount ramps, not this */
 #define DOF_MAX_BLEND    0.55f         /* even at the extreme edge, blend at
@@ -449,7 +462,9 @@ static void apply_dof(pixel_t *pixels, int pitch) {
 
     double center = (h - 1) / 2.0;
     double half_h = h / 2.0;
-    double band_half = DOF_FOCUS_BAND_FRACTION / 2.0;
+    /* Threshold against `dist` directly -- see DOF_FOCUS_BAND_FRACTION's
+     * doc comment above for why this must NOT be halved again. */
+    double sharp_threshold = DOF_FOCUS_BAND_FRACTION;
 
     /* Per-row blend factor (0 = sharp band, untouched; >0 = taper toward
      * the blurred pixel) and which source rows a blurred row's vertical
@@ -460,10 +475,10 @@ static void apply_dof(pixel_t *pixels, int pitch) {
      * fully known before the horizontal pass runs. */
     for (int y = 0; y < h; y++) {
         double dist = fabs(y - center) / half_h; /* 0 at center, 1 at edge */
-        if (dist <= band_half) {
+        if (dist <= sharp_threshold) {
             dof_blend_row[y] = 0.0f; /* sharp band -- untouched */
         } else {
-            double t = (dist - band_half) / (1.0 - band_half);
+            double t = (dist - sharp_threshold) / (1.0 - sharp_threshold);
             if (t > 1.0) t = 1.0;
             t = t * t * (3.0 - 2.0 * t); /* smoothstep: eased in AND out --
                                            * this is what actually removes
