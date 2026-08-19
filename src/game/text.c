@@ -2325,8 +2325,11 @@ StepResult mode_step_use_item(ModeState *ms) {
              * DETERMINE_TARGETTING result when can_use is true (assembly lines 247-262). */
             st->target_id = (uint8_t)st->char_id;
 
-            /* Assembly lines 29-37: get item from inventory */
-            st->item_id = get_character_item(st->char_id, st->item_slot) & 0xFF;
+            /* Assembly lines 29-37: get item from inventory. Key Items pool
+             * feature: a pool item has no character/slot to read from --
+             * the parent already set item_id directly. */
+            if (!st->from_key_items_pool)
+                st->item_id = get_character_item(st->char_id, st->item_slot) & 0xFF;
 
             /* Assembly lines 38-50: look up item config entry. A missing entry
              * skips straight to the action-window setup with can_use=0 (the
@@ -2459,10 +2462,16 @@ StepResult mode_step_use_item(ModeState *ms) {
             if (st->target_id == 0)
                 return STEP_RESULT_POP(0);  /* Targeting cancelled (lines 264-265) */
 
-            /* Assembly lines 266-274: consume item if CONSUMED_ON_USE flag set */
+            /* Assembly lines 266-274: consume item if CONSUMED_ON_USE flag set.
+             * Key Items pool feature: remove from the pool, not a
+             * character's items[] (it was never there). */
             const ItemConfig *item_entry = get_item_entry(st->item_id);
-            if (item_entry && (item_entry->flags & ITEM_FLAG_CONSUMED))
-                remove_item_from_inventory(st->char_id, st->item_slot);
+            if (item_entry && (item_entry->flags & ITEM_FLAG_CONSUMED)) {
+                if (st->from_key_items_pool)
+                    key_items_remove(st->item_id);
+                else
+                    remove_item_from_inventory(st->char_id, st->item_slot);
+            }
 
             st->phase = UI_SETUP;
             continue;

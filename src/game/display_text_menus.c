@@ -1093,18 +1093,36 @@ StepResult mode_step_escargo_menu(ModeState *ms) {
     return STEP_RESULT_POP(result);
 }
 
+/* Maps a 1-based sequence number (as displayed/selected in the Key Items
+ * browser) back to the pool item_id at that position, using the exact same
+ * skip-zeros walk as the display loop in mode_step_key_items_menu() so the
+ * two can never disagree. Returns 0 if seq is out of range (shouldn't
+ * happen -- SELECTION_MENU only ever returns a userdata that was actually
+ * added -- but a search over the whole array is guarded anyway). */
+static uint16_t key_items_pool_seq_to_item(uint16_t seq) {
+    int cur = 0;
+    for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+        uint8_t item_id = key_items_pool[i];
+        if (item_id == 0) continue;
+        if (!get_item_entry(item_id)) continue;
+        cur++;
+        if (cur == seq) return item_id;
+    }
+    return 0;
+}
+
 /* GAME_MODE_KEY_ITEMS_MENU step -- Key Items pool browser. Key Items pool
- * feature, not a port of any ROM routine; modeled directly on
- * mode_step_escargo_menu() immediately above (same two-phase shape, same
- * empty-list early-out), browsing key_items_pool[] (game_state.h) instead
- * of game_state.escargo_express_items[]. View/Help only -- selecting an
- * entry just re-runs the loop (no sub-action menu; SELECTION_MENU's own
- * highlight-and-confirm already shows the item, nothing further to do on
- * selection besides returning to the browser or the pause menu). */
+ * feature, not a port of any ROM routine; the list-building half is
+ * modeled on mode_step_escargo_menu() immediately above (same window/menu
+ * shape, same empty-list early-out), browsing key_items_pool[]
+ * (game_state.h) instead of game_state.escargo_express_items[]. Selecting
+ * an item runs GAME_MODE_USE_ITEM on it (see KeyItemsMenuPhase's doc
+ * comment, mode_stack.h, for why view-only wasn't enough -- key items like
+ * "Key to the Cabin" need a real Use to do anything). */
 StepResult mode_step_key_items_menu(ModeState *ms) {
     KeyItemsMenuState *st = &ms->key_items_menu;
-    uint16_t result = 0;
 
+    for (;;) {
     switch ((KeyItemsMenuPhase)st->phase) {
 
     case KIM_ENTER: {
@@ -1116,7 +1134,8 @@ StepResult mode_step_key_items_menu(ModeState *ms) {
          * Escargo Express (the array is kept packed toward index 0 by
          * key_items_remove()'s shift-left compaction, so a zero entry
          * means "nothing past this point," but scan the whole array
-         * defensively rather than assume no gaps can ever occur). */
+         * defensively rather than assume no gaps can ever occur). Must
+         * match key_items_pool_seq_to_item()'s walk exactly. */
         int seq = 1;
         for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
             uint8_t item_id = key_items_pool[i];
@@ -1139,24 +1158,61 @@ StepResult mode_step_key_items_menu(ModeState *ms) {
             sel_init = (ModeState){0};
             sel_init.selection_menu.phase        = SM_SETUP;
             sel_init.selection_menu.allow_cancel = 1;
-            st->phase = KIM_RESULT;
+            st->phase = KIM_ITEM_RESULT;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_SELECTION_MENU, &sel_init);
         }
-        /* Empty pool: result 0, fall through to the shared cleanup. */
-        break;
+        /* Empty pool: nothing to select, exit immediately. */
+        close_window(WINDOW_KEY_ITEMS);
+        dt.force_left_text_alignment = 0;
+        restore_window_text_attributes();
+        return STEP_RESULT_POP(0);
     }
 
-    case KIM_RESULT:
+    case KIM_ITEM_RESULT: {
+        uint16_t seq = (uint16_t)mode_child_result();
+        if (seq == 0) {
+            /* Cancelled: exit. */
+            close_window(WINDOW_KEY_ITEMS);
+            dt.force_left_text_alignment = 0;
+            restore_window_text_attributes();
+            return STEP_RESULT_POP(0);
+        }
+
+        uint16_t item_id = key_items_pool_seq_to_item(seq);
+        if (item_id == 0) {
+            /* Shouldn't happen (see key_items_pool_seq_to_item()'s doc
+             * comment) -- fall back to just rebuilding the list rather
+             * than pushing USE_ITEM with a bogus item_id. */
+            st->phase = KIM_ENTER;
+            continue;
+        }
+
+        /* Current leader "uses" the item -- there's no natural per-item
+         * "owner" for a pool item the way there is for a Goods-menu item
+         * in a specific character's slot, and the leader is who's actually
+         * on-screen interacting. See UseItemState.from_key_items_pool's
+         * doc comment (mode_stack.h) for how mode_step_use_item() adapts
+         * for a pool-sourced item (no character/slot to read from or
+         * remove from). */
+        static ModeState use_init;
+        use_init = (ModeState){0};
+        use_init.use_item.phase             = UI_ENTER;
+        use_init.use_item.char_id           = game_state.party_members[0];
+        use_init.use_item.item_id           = item_id;
+        use_init.use_item.from_key_items_pool = 1;
+        st->phase = KIM_USE_RESUME;
+        return STEP_RESULT_PUSH_INIT(GAME_MODE_USE_ITEM, &use_init);
+    }
+
+    case KIM_USE_RESUME:
     default:
-        result = (uint16_t)mode_child_result();
-        break;
+        /* USE_ITEM popped (used, shown a message, or targeting cancelled
+         * -- all the same from here: just rebuild the list, since Use may
+         * have consumed the item either way). */
+        st->phase = KIM_ENTER;
+        continue;
     }
-
-    close_window(WINDOW_KEY_ITEMS);
-    dt.force_left_text_alignment = 0;
-    restore_window_text_attributes();
-
-    return STEP_RESULT_POP(result);
+    }
 }
 
 

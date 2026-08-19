@@ -616,6 +616,16 @@ typedef struct {
     uint16_t item_id;        /* item being used */
     uint16_t effect_id;      /* item's battle-action table index */
     uint32_t desc_text_addr; /* @LOCAL08: description/failure text (0 = fallback) */
+    /* Key Items pool feature, not part of the original ROM/assembly: when
+     * set (input, set by the parent), item_id is used as-is instead of
+     * being read via get_character_item(char_id, item_slot) -- a pool item
+     * has no character/slot of its own -- and the consume-on-use removal
+     * in UI_TARGET_RESULT calls key_items_remove(item_id) instead of
+     * remove_item_from_inventory(char_id, item_slot). char_id is still set
+     * by the parent (the current leader) since the rest of this shared
+     * pipeline (targeting, attacker name/stats, script working_memory)
+     * genuinely needs a character; item_slot is unused in this mode. */
+    uint8_t  from_key_items_pool;
 } UseItemState;
 
 /* GAME_MODE_TELEPORT_MENU phases. Port of open_teleport_destination_menu()
@@ -671,16 +681,24 @@ typedef struct {
 } EscargoMenuState;
 
 /* GAME_MODE_KEY_ITEMS_MENU phases -- Key Items pool feature, not part of
- * the original ROM/assembly. Modeled directly on GAME_MODE_ESCARGO_MENU
- * above: KIM_ENTER builds a window over key_items_pool[] (game_state.h)
- * and STEP_PUSHes SELECTION_MENU; cleanup runs in KIM_RESULT after it pops.
- * An empty pool skips the push and pops 0 after the same cleanup. Pushed
- * from the pause menu's "Key Items" command (PM_MAIN_RESULT case 10,
- * text.c). View/Help only -- no sub-action menu, no side effects to unwind.
- * Pops the 1-based selection index, or 0 if cancelled/empty. */
+ * the original ROM/assembly. Modeled on GAME_MODE_ESCARGO_MENU above for
+ * the list-building shape (KIM_ENTER builds a window over key_items_pool[]
+ * (game_state.h) and STEP_PUSHes SELECTION_MENU; an empty pool skips the
+ * push and pops 0 immediately), but selecting an item actually USES it
+ * (initially shipped as view-only, which turned out to make every key item
+ * non-functional -- e.g. "Key to the Cabin" needs a real Use to unlock
+ * anything, found live). KIM_ITEM_RESULT maps the 1-based selection back
+ * to an item_id and STEP_PUSHes GAME_MODE_USE_ITEM (from_key_items_pool=1,
+ * char_id = current leader); KIM_USE_RESUME rebuilds the list afterward
+ * (KIM_ENTER again) since Use may have consumed the item, whether it was
+ * cancelled, shown a message, or genuinely used. Pushed from the pause
+ * menu's "Keys" command (PM_MAIN_RESULT case 10, text.c). Always pops 0
+ * (nothing meaningful for the pause menu to do with a result here, unlike
+ * Escargo Express's index-based deliver flow). */
 typedef enum {
-    KIM_ENTER = 0,  /* build the key items menu; push SELECTION_MENU */
-    KIM_RESULT,     /* cleanup, POP the selection index */
+    KIM_ENTER = 0,    /* build the key items menu; push SELECTION_MENU */
+    KIM_ITEM_RESULT,  /* item chosen or cancelled; push USE_ITEM or exit */
+    KIM_USE_RESUME,   /* USE_ITEM popped; rebuild the list (KIM_ENTER) */
 } KeyItemsMenuPhase;
 
 typedef struct {
