@@ -63,6 +63,43 @@ typedef enum {
 
 extern uint8_t engine_alt_controls; /* current value, one of AltControlsSetting */
 
+/* Experimental Visuals: a single toggle covering three subtle screen-space
+ * post-processes, all applied in platform_video_end_frame() (sdl2_video.c)
+ * after the PPU finishes rendering, entirely on the SDL2/desktop side --
+ * desktop-only, there's no equivalent hook on the embedded ports (Pico/
+ * Game&Watch), which just never read this:
+ *
+ *   - Depth of Field / tilt-shift: a very subtle blur that increases toward
+ *     the top/bottom screen edges and stays sharp in a central band,
+ *     approximating the "miniature diorama" look of HD-2D-style games.
+ *     There's no real depth buffer here (the PPU has no concept of scene
+ *     depth beyond BG layer priority) -- this is a screen-space fake keyed
+ *     purely on row position. Also fully suppressed (regardless of this
+ *     setting) during battle, the Town Map, and any time a text/menu
+ *     window is open -- see platform_video_set_dof_suppressed()/
+ *     host_process_frame().
+ *   - Light Shafts: subtle "god ray" streaks radiating from a fixed
+ *     screen-space point (not a real scene light -- the overworld has no
+ *     single light-source position to derive one from). An atmospheric
+ *     flourish, not a lighting simulation.
+ *   - Color Grading: a mild global contrast/saturation/warmth adjustment
+ *     applied to the whole frame as the last post-process step, after
+ *     Light Shafts is already blended in.
+ *
+ * Originally three separate settings (plus a fourth, Bloom, since
+ * removed): combined into one after feedback that a 7-row Config screen
+ * was more granularity than useful, and simply labeled "Experimental
+ * Visuals" since all three are still being tuned. Off by default -- purely
+ * a visual preference, shouldn't change any existing screenshot/
+ * recording's look without the player opting in. */
+typedef enum {
+    EXPERIMENTAL_VISUALS_OFF = 0,
+    EXPERIMENTAL_VISUALS_ON  = 1,
+    EXPERIMENTAL_VISUALS_COUNT,
+} ExperimentalVisualsSetting;
+
+extern uint8_t engine_experimental_visuals; /* current value, one of ExperimentalVisualsSetting */
+
 /* Call once at startup (after platform_save_init(), before the game loop).
  * Loads settings.dat if present and valid; otherwise leaves/sets defaults. */
 void settings_load(void);

@@ -3227,9 +3227,9 @@ StepResult mode_step_pause_menu(ModeState *ms) {
  * mode_step_debug_menu (game_main.c). Cancel (B/Select) closes the screen
  * and returns to the command menu underneath.
  *
- * Three rows exist today (Sprint Speed, High Quality Audio, Alt Controls);
- * more engine preferences can be added as additional userdata cases
- * without changing this shape. */
+ * Four rows exist today (Sprint Speed, High Quality Audio, Alt Controls,
+ * Experimental Visuals); more engine preferences can be added as
+ * additional userdata cases without changing this shape. */
 static const char *sprint_speed_labels[SPRINT_SPEED_COUNT] = {
     [SPRINT_SPEED_OFF]    = "Sprint: Off",
     [SPRINT_SPEED_MEDIUM] = "Sprint: Medium (+50%)",
@@ -3243,6 +3243,10 @@ static const char *alt_controls_labels[ALT_CONTROLS_COUNT] = {
     [ALT_CONTROLS_OFF] = "Alt Controls: Off",
     [ALT_CONTROLS_ON]  = "Alt Controls: On",
 };
+static const char *experimental_visuals_labels[EXPERIMENTAL_VISUALS_COUNT] = {
+    [EXPERIMENTAL_VISUALS_OFF] = "Experimental Visuals: Off",
+    [EXPERIMENTAL_VISUALS_ON]  = "Experimental Visuals: On",
+};
 
 StepResult mode_step_settings_menu(ModeState *ms) {
     SettingsMenuState *st = &ms->settings_menu;
@@ -3253,6 +3257,7 @@ StepResult mode_step_settings_menu(ModeState *ms) {
         add_menu_item(sprint_speed_labels[engine_sprint_speed], 1, 0, 0);
         add_menu_item(hq_audio_labels[engine_hq_audio], 2, 0, 1);
         add_menu_item(alt_controls_labels[engine_alt_controls], 3, 0, 2);
+        add_menu_item(experimental_visuals_labels[engine_experimental_visuals], 4, 0, 3);
         open_window_and_print_menu(1, 0);
         st->phase = SET_RESULT;
         return menu_push_selection(&st->result_ready, &st->result, 1);
@@ -3288,6 +3293,23 @@ StepResult mode_step_settings_menu(ModeState *ms) {
              * (sdl2_input.c) reads engine_alt_controls fresh every poll, no
              * resync/rebuild needed the way HQ Audio's live track needed. */
             engine_alt_controls = (uint8_t)((engine_alt_controls + 1) % ALT_CONTROLS_COUNT);
+            settings_save();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 4) {
+            /* Experimental Visuals row confirmed: cycle Off <-> On. Gates
+             * three post-process effects together (Depth of Field, Light
+             * Shafts, Color Grading -- see settings.h) -- purely rendering
+             * flags read fresh every frame by platform_video_end_frame()
+             * (sdl2_video.c), no resync needed, takes effect on the very
+             * next frame. Depth of Field additionally has its own extra
+             * battle/Town-Map/window-open suppression regardless of this
+             * setting -- see platform_video_set_dof_suppressed()/
+             * host_process_frame(). */
+            engine_experimental_visuals =
+                (uint8_t)((engine_experimental_visuals + 1) % EXPERIMENTAL_VISUALS_COUNT);
             settings_save();
             play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
             st->phase = SET_BUILD;

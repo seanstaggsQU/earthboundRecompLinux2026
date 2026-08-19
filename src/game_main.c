@@ -506,6 +506,47 @@ void host_process_frame(void) {
     if (effective_zoom == EB_ZOOM_IN && any_window_open())
         effective_zoom = EB_ZOOM_OFF;
     platform_video_set_zoom(effective_zoom);
+
+    /* Light Shafts/Color Grading (part of the combined "Experimental
+     * Visuals" Config setting, see settings.h) are never shown on the
+     * title screen or file-select: neither was art-directed with these
+     * effects in mind (the title logo/flash art and the file-select slot
+     * list), and unlike a battle/PSI flash the player only sees for a few
+     * seconds, these are the very first and last things every session
+     * shows -- a wrong-looking permanent effect there would be much more
+     * noticeable than anywhere else these apply. Same whole-stack scan as
+     * the zoom check above, so a child pushed over file-select (e.g. the
+     * self-update screen) stays suppressed too. This is a per-frame
+     * override of platform_video_end_frame()'s render step, not a change
+     * to the player's setting -- it resumes exactly where the player left
+     * it the instant either screen is left. */
+    bool suppress_fx = false;
+    for (int i = 0; i < g_mode_stack.depth; i++) {
+        if (g_mode_stack.mode[i] == GAME_MODE_TITLE_SCREEN ||
+            g_mode_stack.mode[i] == GAME_MODE_FILE_MENU) {
+            suppress_fx = true;
+            break;
+        }
+    }
+    platform_video_set_fx_suppressed(suppress_fx);
+
+    /* Depth of Field additionally suppresses during battle/Town Map (their
+     * own separate full-screen layouts, same reasoning as needs_zoom_reset
+     * above) and any time a text/menu window is open (even DoF's small
+     * blur radius can soften dialogue text right at the screen edges,
+     * where windows are usually positioned) -- on top of, not instead of,
+     * the title/file-select suppression above. */
+    bool suppress_dof = suppress_fx || any_window_open();
+    if (!suppress_dof) {
+        for (int i = 0; i < g_mode_stack.depth; i++) {
+            if (g_mode_stack.mode[i] == GAME_MODE_BATTLE ||
+                g_mode_stack.mode[i] == GAME_MODE_TOWN_MAP) {
+                suppress_dof = true;
+                break;
+            }
+        }
+    }
+    platform_video_set_dof_suppressed(suppress_dof);
     if (aux_new & AUX_FAST_FORWARD) {
         fast_forward_active = !fast_forward_active;
         platform_video_set_vsync(!fast_forward_active);
