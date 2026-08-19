@@ -2674,6 +2674,190 @@ StepResult mode_step_use_item(ModeState *ms) {
     }
 }
 
+/* Maps a 1-based sequence number (as displayed/selected in the Key Items
+ * browser) back to the pool item_id at that position, using the exact same
+ * skip-zeros walk as the display loop in mode_step_key_items_menu() below
+ * so the two can never disagree. Returns 0 if seq is out of range
+ * (shouldn't happen -- SELECTION_MENU only ever returns a userdata that
+ * was actually added -- but a search over the whole array is guarded
+ * anyway). */
+static uint16_t key_items_pool_seq_to_item(uint16_t seq) {
+    int cur = 0;
+    for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+        uint8_t item_id = key_items_pool[i];
+        if (item_id == 0) continue;
+        if (!get_item_entry(item_id)) continue;
+        cur++;
+        if (cur == seq) return item_id;
+    }
+    return 0;
+}
+
+/* GAME_MODE_KEY_ITEMS_MENU step -- Key Items pool browser. Key Items pool
+ * feature, not a port of any ROM routine. List-building (KIM_ENTER) is
+ * modeled on mode_step_escargo_menu() (display_text_menus.c): builds
+ * WINDOW_KEY_ITEMS over key_items_pool[] (game_state.h) and STEP_PUSHes
+ * SELECTION_MENU, empty pool pops 0 immediately. Picking an item
+ * (KIM_ITEM_RESULT) shows a small Use/Help action menu on
+ * WINDOW_INVENTORY_MENU -- the exact shape the Goods menu's own item
+ * action menu uses (PM_ACTION_MENU/PM_ACTION_RESULT above), minus
+ * Give/Drop (key items carry ITEM_FLAG_CANNOT_GIVE and were never meant
+ * to be given away or discarded). Shipped twice without this and both
+ * times looked broken, reported live: first as pure view-only (selecting
+ * did nothing at all), then as auto-Use-with-no-menu (still looked broken
+ * for items whose use-script has no effect unless used in the right
+ * place, e.g. "Key to the Cabin" at the door, with zero feedback either
+ * way) -- an explicit Use/Help choice matching Goods' own UX is what was
+ * actually asked for. */
+StepResult mode_step_key_items_menu(ModeState *ms) {
+    KeyItemsMenuState *st = &ms->key_items_menu;
+
+    for (;;) {
+    switch ((KeyItemsMenuPhase)st->phase) {
+
+    case KIM_ENTER: {
+        save_window_text_attributes();
+        create_window(WINDOW_KEY_ITEMS);
+        set_window_title(WINDOW_KEY_ITEMS, "Key Items", -1);
+
+        /* Must match key_items_pool_seq_to_item()'s walk exactly. */
+        int seq = 1;
+        for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+            uint8_t item_id = key_items_pool[i];
+            if (item_id == 0) continue;
+
+            const ItemConfig *item_entry = get_item_entry(item_id);
+            if (!item_entry) continue;
+
+            char name_buf[ITEM_NAME_LEN + 1];
+            eb_to_ascii_buf(item_entry->name, ITEM_NAME_LEN, name_buf);
+
+            add_menu_item_no_position(name_buf, (uint16_t)seq++);
+        }
+
+        open_window_and_print_menu(2, 0);
+
+        WindowInfo *w = get_window(win.current_focus_window);
+        if (w && w->menu_count != 0) {
+            static ModeState sel_init;
+            sel_init = (ModeState){0};
+            sel_init.selection_menu.phase        = SM_SETUP;
+            sel_init.selection_menu.allow_cancel = 1;
+            st->phase = KIM_ITEM_RESULT;
+            return STEP_RESULT_PUSH_INIT(GAME_MODE_SELECTION_MENU, &sel_init);
+        }
+        /* Empty pool: nothing to select, exit immediately. */
+        close_window(WINDOW_KEY_ITEMS);
+        dt.force_left_text_alignment = 0;
+        restore_window_text_attributes();
+        return STEP_RESULT_POP(0);
+    }
+
+    case KIM_ITEM_RESULT: {
+        uint16_t seq = (uint16_t)mode_child_result();
+        if (seq == 0) {
+            /* Cancelled: exit. */
+            close_window(WINDOW_KEY_ITEMS);
+            dt.force_left_text_alignment = 0;
+            restore_window_text_attributes();
+            return STEP_RESULT_POP(0);
+        }
+
+        uint16_t item_id = key_items_pool_seq_to_item(seq);
+        if (item_id == 0) {
+            /* Shouldn't happen (see key_items_pool_seq_to_item()'s doc
+             * comment) -- rebuild the list rather than show an action menu
+             * for a bogus item. */
+            st->phase = KIM_ENTER;
+            continue;
+        }
+        st->item_id = item_id;
+        st->phase = KIM_ACTION_MENU;
+        continue;
+    }
+
+    case KIM_ACTION_MENU: {
+        /* Same shape as the Goods menu's item_action_labels (text.c,
+         * PM_GOODS_INV_RESULT) -- just Use/Help!, not Give/Drop. */
+        static const char *key_item_action_labels[2] EB_NORELOC = { "Use", "Help!" };
+        create_window(WINDOW_INVENTORY_MENU);
+        set_focus_text_cursor(0, 0);
+        for (int i = 0; i < 2; i++)
+            add_menu_item_no_position(key_item_action_labels[i], (uint16_t)(i + 1));
+        open_window_and_print_menu(1, 0);
+
+        static ModeState sel_init;
+        sel_init = (ModeState){0};
+        sel_init.selection_menu.phase        = SM_SETUP;
+        sel_init.selection_menu.allow_cancel = 1;
+        st->phase = KIM_ACTION_RESULT;
+        return STEP_RESULT_PUSH_INIT(GAME_MODE_SELECTION_MENU, &sel_init);
+    }
+
+    case KIM_ACTION_RESULT: {
+        uint16_t action = (uint16_t)mode_child_result();
+        close_window(WINDOW_INVENTORY_MENU);
+
+        if (action == 0) {
+            /* Cancelled: back to the item list. */
+            st->phase = KIM_ENTER;
+            continue;
+        }
+
+        if (action == 1) {
+            /* Use -- current leader "uses" the item; there's no natural
+             * per-item "owner" for a pool item the way there is for a
+             * Goods-menu item in a specific character's slot, and the
+             * leader is who's actually on-screen interacting. See
+             * UseItemState.from_key_items_pool's doc comment
+             * (mode_stack.h) for how mode_step_use_item() adapts for a
+             * pool-sourced item (no character/slot to read from or
+             * remove from). */
+            static ModeState use_init;
+            use_init = (ModeState){0};
+            use_init.use_item.phase               = UI_ENTER;
+            use_init.use_item.char_id             = game_state.party_members[0];
+            use_init.use_item.item_id             = st->item_id;
+            use_init.use_item.from_key_items_pool = 1;
+            st->phase = KIM_USE_RESUME;
+            return STEP_RESULT_PUSH_INIT(GAME_MODE_USE_ITEM, &use_init);
+        }
+
+        /* Help -- same pattern as Goods' case 4 (@GOODS_ITEM_HELP). */
+        clear_window_text(0);
+        clear_window_text(2);
+        win.restore_menu_backup = 0xFF;
+        create_window(WINDOW_TEXT_STANDARD);
+
+        const ItemConfig *item_entry = get_item_entry(st->item_id);
+        if (item_entry) {
+            uint32_t help_text_addr = item_entry->help_text & 0xFFFFFF;
+            bool pushed;
+            StepResult r = menu_push_text(help_text_addr, &pushed);
+            st->phase = KIM_HELP_RESUME;
+            if (pushed) return r;
+            continue;
+        }
+        st->phase = KIM_HELP_RESUME; /* no entry -> skip the text */
+        continue;
+    }
+
+    case KIM_USE_RESUME:
+        /* USE_ITEM popped (used, shown a message, or targeting cancelled
+         * -- all the same from here: just rebuild the list, since Use may
+         * have consumed the item either way). */
+        st->phase = KIM_ENTER;
+        continue;
+
+    case KIM_HELP_RESUME:
+    default:
+        close_window(WINDOW_TEXT_STANDARD);
+        st->phase = KIM_ENTER;
+        continue;
+    }
+    }
+}
+
 StepResult mode_step_pause_menu(ModeState *ms) {
     PauseMenuState *st = &ms->pause_menu;
 

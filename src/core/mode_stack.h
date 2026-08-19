@@ -681,28 +681,37 @@ typedef struct {
 } EscargoMenuState;
 
 /* GAME_MODE_KEY_ITEMS_MENU phases -- Key Items pool feature, not part of
- * the original ROM/assembly. Modeled on GAME_MODE_ESCARGO_MENU above for
- * the list-building shape (KIM_ENTER builds a window over key_items_pool[]
+ * the original ROM/assembly. Modeled on GAME_MODE_ESCARGO_MENU for the
+ * list-building shape (KIM_ENTER builds a window over key_items_pool[]
  * (game_state.h) and STEP_PUSHes SELECTION_MENU; an empty pool skips the
- * push and pops 0 immediately), but selecting an item actually USES it
- * (initially shipped as view-only, which turned out to make every key item
- * non-functional -- e.g. "Key to the Cabin" needs a real Use to unlock
- * anything, found live). KIM_ITEM_RESULT maps the 1-based selection back
- * to an item_id and STEP_PUSHes GAME_MODE_USE_ITEM (from_key_items_pool=1,
- * char_id = current leader); KIM_USE_RESUME rebuilds the list afterward
- * (KIM_ENTER again) since Use may have consumed the item, whether it was
- * cancelled, shown a message, or genuinely used. Pushed from the pause
- * menu's "Keys" command (PM_MAIN_RESULT case 10, text.c). Always pops 0
- * (nothing meaningful for the pause menu to do with a result here, unlike
- * Escargo Express's index-based deliver flow). */
+ * push and pops 0 immediately) and on the Goods menu's item-action-menu
+ * shape (PM_ACTION_MENU/PM_ACTION_RESULT, text.c) for what happens after
+ * an item is picked -- initially shipped skipping straight to Use with no
+ * submenu at all, which both looked broken (no feedback of any kind for
+ * items whose use-script has no visible effect from a distance, e.g. "Key
+ * to the Cabin" needs to be used AT the door) and didn't match the Goods
+ * menu's own UX, both reported live. KIM_ITEM_RESULT maps the 1-based
+ * selection back to an item_id (stored in item_id below) and shows a
+ * trimmed Use/Help action menu (no Give/Drop -- key items carry
+ * ITEM_FLAG_CANNOT_GIVE and were never meant to be given away or
+ * discarded). KIM_ACTION_RESULT dispatches: Use STEP_PUSHes
+ * GAME_MODE_USE_ITEM (from_key_items_pool=1, char_id = current leader);
+ * Help STEP_PUSHes the item's help text (GAME_MODE_DISPLAY_TEXT). Both
+ * resume phases rebuild the list (KIM_ENTER again) since Use may have
+ * consumed the item. Pushed from the pause menu's "Keys" command
+ * (PM_MAIN_RESULT case 10, text.c). Always pops 0. */
 typedef enum {
-    KIM_ENTER = 0,    /* build the key items menu; push SELECTION_MENU */
-    KIM_ITEM_RESULT,  /* item chosen or cancelled; push USE_ITEM or exit */
-    KIM_USE_RESUME,   /* USE_ITEM popped; rebuild the list (KIM_ENTER) */
+    KIM_ENTER = 0,     /* build the key items menu; push SELECTION_MENU */
+    KIM_ITEM_RESULT,   /* item chosen or cancelled; build Use/Help menu */
+    KIM_ACTION_MENU,   /* print the Use/Help menu; push SELECTION_MENU */
+    KIM_ACTION_RESULT, /* Use -> push USE_ITEM; Help -> push text; cancel -> KIM_ENTER */
+    KIM_USE_RESUME,    /* USE_ITEM popped; rebuild the list (KIM_ENTER) */
+    KIM_HELP_RESUME,   /* help text popped; rebuild the list (KIM_ENTER) */
 } KeyItemsMenuPhase;
 
 typedef struct {
-    uint8_t phase;  /* KeyItemsMenuPhase */
+    uint8_t  phase;    /* KeyItemsMenuPhase */
+    uint16_t item_id;  /* selected item, set in KIM_ITEM_RESULT */
 } KeyItemsMenuState;
 
 /* GAME_MODE_TELEPHONE_MENU phases. Port of open_telephone_menu() +
@@ -2953,11 +2962,12 @@ StepResult mode_step_store_menu(ModeState *st);
  * 0x07. Pops the 1-based selection index, or 0 if cancelled/empty. */
 StepResult mode_step_escargo_menu(ModeState *st);
 
-/* GAME_MODE_KEY_ITEMS_MENU step (defined in display_text_menus.c) -- Key
- * Items pool feature, this port's own addition, not a ROM routine. Init
- * with ModeState.key_items_menu (phase = KIM_ENTER); entered via STEP_PUSH
- * from the pause menu's "Key Items" command (PM_MAIN_RESULT case 10,
- * text.c). Pops the 1-based selection index, or 0 if cancelled/empty. */
+/* GAME_MODE_KEY_ITEMS_MENU step (defined in text.c, alongside
+ * mode_step_use_item() and the Goods menu's action-menu code it shares) --
+ * Key Items pool feature, this port's own addition, not a ROM routine.
+ * Init with ModeState.key_items_menu (phase = KIM_ENTER); entered via
+ * STEP_PUSH from the pause menu's "Keys" command (PM_MAIN_RESULT case 10,
+ * text.c). Always pops 0. */
 StepResult mode_step_key_items_menu(ModeState *st);
 
 /* GAME_MODE_TELEPHONE_MENU step (defined in display_text_menus.c). Init with
