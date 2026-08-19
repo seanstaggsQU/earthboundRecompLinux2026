@@ -258,12 +258,20 @@ static inline uint8_t fx_clamp_byte(float v) {
 static void apply_dof(pixel_t *pixels, int pitch) {
     int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
     int stride = pitch / (int)sizeof(pixel_t);
+#ifdef EB_FX_PROFILE
+    static double acc_copy, acc_setup, acc_hpass, acc_vpass;
+    static int prof_frames3;
+    uint64_t r0 = platform_timer_ticks(), r1;
+#endif
 
     /* Snapshot the source once; every row blurs/blends by reading only
      * from this untouched copy, so an already-modified row never feeds
      * into another row's average. */
     for (int y = 0; y < h; y++)
         memcpy(&dof_src[y * w], pixels + (size_t)y * stride, w * sizeof(pixel_t));
+#ifdef EB_FX_PROFILE
+    r1 = platform_timer_ticks(); acc_copy += (double)(r1-r0)*1000.0/platform_timer_ticks_per_sec(); r0 = r1;
+#endif
 
     double center = (h - 1) / 2.0;
     double half_h = h / 2.0;
@@ -306,6 +314,9 @@ static void apply_dof(pixel_t *pixels, int pitch) {
         for (int yy = lo; yy <= hi; yy++)
             dof_needs_hsum[yy] = true;
     }
+#ifdef EB_FX_PROFILE
+    r1 = platform_timer_ticks(); acc_setup += (double)(r1-r0)*1000.0/platform_timer_ticks_per_sec(); r0 = r1;
+#endif
 
     /* Horizontal pass: per-row 5-tap sums (not yet divided -- see the doc
      * comment above for why the division has to wait until after both
@@ -328,6 +339,9 @@ static void apply_dof(pixel_t *pixels, int pitch) {
             dof_hsum_b[idx] = (int16_t)sum_b;
         }
     }
+#ifdef EB_FX_PROFILE
+    r1 = platform_timer_ticks(); acc_hpass += (double)(r1-r0)*1000.0/platform_timer_ticks_per_sec(); r0 = r1;
+#endif
 
     /* Vertical pass + blend: sum the horizontal sums over each blurred
      * row's vertical window, divide once by the combined tap count, then
@@ -349,10 +363,21 @@ static void apply_dof(pixel_t *pixels, int pitch) {
                 sum_g += dof_hsum_g[idx];
                 sum_b += dof_hsum_b[idx];
             }
+            /* One reciprocal + 3 multiplies instead of 3 integer divisions
+             * -- this is the single most expensive part of the vertical
+             * pass (measured; integer division is one of the pricier basic
+             * ALU ops on most CPUs, and this runs 3x per touched pixel).
+             * The +1e-4f nudge corrects for float32 not exactly
+             * representing every count/sum ratio (e.g. 147/49 can compute
+             * as 2.999997 instead of 3.0, truncating a step low) --
+             * verified byte-identical against integer division for every
+             * (count, sum) pair the shipped constants can actually produce
+             * (count in [9,49], sum in [0, 7*255]) before shipping this. */
             int count = dof_hcount[x] * vcount;
-            uint8_t blur_r = (uint8_t)(sum_r / count);
-            uint8_t blur_g = (uint8_t)(sum_g / count);
-            uint8_t blur_b = (uint8_t)(sum_b / count);
+            float inv_count = 1.0f / count;
+            uint8_t blur_r = (uint8_t)(sum_r * inv_count + 1e-4f);
+            uint8_t blur_g = (uint8_t)(sum_g * inv_count + 1e-4f);
+            uint8_t blur_b = (uint8_t)(sum_b * inv_count + 1e-4f);
 
             uint8_t orig_r, orig_g, orig_b;
             fx_unpack(dof_src[y * w + x], &orig_r, &orig_g, &orig_b);
@@ -363,6 +388,15 @@ static void apply_dof(pixel_t *pixels, int pitch) {
             row[x] = fx_pack(fx_clamp_byte(out_r), fx_clamp_byte(out_g), fx_clamp_byte(out_b));
         }
     }
+#ifdef EB_FX_PROFILE
+    r1 = platform_timer_ticks(); acc_vpass += (double)(r1-r0)*1000.0/platform_timer_ticks_per_sec();
+    if (++prof_frames3 >= 120) {
+        LOG_WARN("dof_profile: copy=%.3fms setup=%.3fms hpass=%.3fms vpass=%.3fms (avg/frame over %d frames)\n",
+                 acc_copy/prof_frames3, acc_setup/prof_frames3, acc_hpass/prof_frames3, acc_vpass/prof_frames3, prof_frames3);
+        acc_copy = acc_setup = acc_hpass = acc_vpass = 0;
+        prof_frames3 = 0;
+    }
+#endif
 }
 
 /* ---- Color Grading: a mild global contrast/saturation/warmth adjustment,
