@@ -128,7 +128,9 @@ static FxRGB   fx_blur_tmp[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
 static FxRGB   shaft_bright[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
 static pixel_t dof_src[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
 /* apply_dof()'s horizontal-sum intermediate -- see that function's doc
- * comment. int16_t is plenty (max possible sum is 5 taps * 255 = 1275). */
+ * comment. int16_t is plenty (max possible sum is (2*DOF_BLUR_RADIUS+1)
+ * taps * 255 -- 1785 at the current radius of 3, nowhere near the
+ * 32767 ceiling even if DOF_BLUR_RADIUS grows further later). */
 static int16_t dof_hsum_r[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
 static int16_t dof_hsum_g[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
 static int16_t dof_hsum_b[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
@@ -434,25 +436,39 @@ static void apply_light_shafts(pixel_t *pixels, int pitch) {
  * contradicting math. If this ever needs retuning, treat 0.375 as the
  * current baseline "how much of the height stays sharp", not 0.75. */
 #define DOF_FOCUS_BAND_FRACTION 0.375
-#define DOF_BLUR_RADIUS  2             /* fixed blur kernel radius -- only
-                                        * the blend amount ramps, not this */
-#define DOF_MAX_BLEND    0.55f         /* even at the extreme edge, blend at
-                                        * most 55% toward the blurred pixel
-                                        * (was effectively up to 100%) */
+#define DOF_BLUR_RADIUS  3             /* fixed blur kernel radius -- only
+                                        * the blend amount ramps, not this
+                                        * (was 2 -- bumped for a moderate
+                                        * strength increase after the
+                                        * effect turned out to be barely
+                                        * visible in practice at the old
+                                        * radius/blend combo, even though
+                                        * the band-size math was correct) */
+#define DOF_MAX_BLEND    0.8f          /* even at the extreme edge, blend at
+                                        * most 80% toward the blurred pixel
+                                        * (was 0.55, before that "up to
+                                        * 100%" -- 0.55 read as too subtle
+                                        * to actually notice; 0.8 is a
+                                        * moderate step up, not back to
+                                        * the original unclamped look) */
 
-/* Separable rewrite (was a direct 5x5-per-pixel box average): the blur's
- * boundary clipping is rectangular and axis-independent -- how many taps
- * land in-bounds along X depends only on the column, and along Y only on
- * the row, never on both together -- so a horizontal sum pass followed by
- * a vertical sum pass, dividing once at the very end by (hcount[x] *
+/* Separable rewrite (was a direct (2*DOF_BLUR_RADIUS+1)-square-per-pixel
+ * box average, i.e. 25 taps/pixel back when DOF_BLUR_RADIUS was 2): the
+ * blur's boundary clipping is rectangular and axis-independent -- how many
+ * taps land in-bounds along X depends only on the column, and along Y only
+ * on the row, never on both together -- so a horizontal sum pass followed
+ * by a vertical sum pass, dividing once at the very end by (hcount[x] *
  * vcount(y)), produces the exact same integer sums (and therefore the
- * exact same truncated-division result) as the original single 25-tap
- * pass per pixel; verified byte-identical against the original over 262M
- * random pixels at full resolution before this replaced it. The win: the
- * horizontal pass only has to run once per source row a blurred row's
- * vertical window can reach (tracked via dof_needs_hsum[]), not once per
- * *blurred* row's full 5x5 footprint -- 5 taps/pixel each pass instead of
- * 25, for rows that need it. */
+ * exact same truncated-division result) as the original single pass per
+ * pixel; verified byte-identical against the original over 262M random
+ * pixels at full resolution before this replaced it (at the radius in
+ * effect then -- re-verified after DOF_BLUR_RADIUS later changed, same
+ * technique applies at any radius since the separability argument doesn't
+ * depend on the specific radius). The win: the horizontal pass only has to
+ * run once per source row a blurred row's vertical window can reach
+ * (tracked via dof_needs_hsum[]), not once per *blurred* row's full square
+ * footprint -- (2*DOF_BLUR_RADIUS+1) taps/pixel each pass instead of
+ * (2*DOF_BLUR_RADIUS+1)^2, for rows that need it. */
 static void apply_dof(pixel_t *pixels, int pitch) {
     int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
     int stride = pitch / (int)sizeof(pixel_t);
