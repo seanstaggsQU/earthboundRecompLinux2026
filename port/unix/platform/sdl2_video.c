@@ -1,5 +1,6 @@
 #include "platform/platform.h"
 #include "game/settings.h"
+#include "core/log.h"
 #include <SDL.h>
 #include <math.h>
 #include <stdio.h>
@@ -122,10 +123,12 @@ typedef struct { uint8_t r, g, b; } FxRGB;
 
 /* Scratch buffers sized to the compile-time-fixed viewport -- this file is
  * desktop-only, so unlike the shared game-lib code there's no embedded
- * target to keep these off of. */
-static FxRGB   fx_bright[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
-static FxRGB   fx_blur_tmp[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
-static FxRGB   shaft_bright[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
+ * target to keep these off of.
+ *
+ * fx_bright/fx_blur_tmp/shaft_bright (Light Shafts' bright-extract + pre-
+ * blur scratch) are declared further down, sized to the downsampled grid
+ * instead of the full viewport -- see the doc comment above
+ * apply_light_shafts() for why. */
 static pixel_t dof_src[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
 /* apply_dof()'s horizontal-sum intermediate -- see that function's doc
  * comment. int16_t is plenty (max possible sum is (2*DOF_BLUR_RADIUS+1)
@@ -183,24 +186,42 @@ static inline uint8_t fx_clamp_byte(float v) {
 
 /* Extract-bright pass, feeding Light Shafts: luma-thresholded, real color
  * kept above threshold so colored highlights (not just white ones) streak
- * in their own color rather than washing out to white. Writes into `out`
- * (caller-provided, same dimensions as `pixels`). Threshold raised (see
- * FX_BRIGHT_THRESHOLD) to be more selective about what counts as a light
- * source, per feedback that Light Shafts read as too washed-out/broad. */
+ * in their own color rather than washing out to white. Threshold raised
+ * (see FX_BRIGHT_THRESHOLD) to be more selective about what counts as a
+ * light source, per feedback that Light Shafts read as too washed-out/broad.
+ *
+ * Point-samples the source at each downsampled cell's center instead of
+ * visiting every one of EB_VIEWPORT_WIDTH x HEIGHT source pixels -- this
+ * was the one full-resolution step left in a pipeline that otherwise
+ * downsamples everything else (see apply_light_shafts()'s doc comment):
+ * measured at ~27ms/frame before this fix (this pass plus the two full-res
+ * fx_blur_axis() calls that used to follow it), against ~1.5-2ms for the
+ * downsampled ray-march this was already supposedly optimized down to --
+ * i.e. the "expensive" part everyone assumed was the ray-march was actually
+ * >90% this. Same reasoning the ray-march and the final upsample already
+ * rely on applies here too: the effect is soft/diffuse and selective about
+ * what counts as a source (FX_BRIGHT_THRESHOLD), so missing a bright pixel
+ * that doesn't land on a sample center is the same kind of already-accepted
+ * tradeoff, not a new one. Writes into `out`, sized rw x rh. */
 #define FX_BRIGHT_THRESHOLD 210  /* 0-255; only quite bright pixels contribute
                                    * (was 190 when shared with the now-
                                    * removed Bloom, which wanted a lower bar) */
 
-static void extract_bright(const pixel_t *pixels, int pitch, FxRGB *out) {
-    int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
+static void extract_bright_downsampled(const pixel_t *pixels, int pitch,
+                                        int w, int h, int downsample,
+                                        FxRGB *out, int rw, int rh) {
     int stride = pitch / (int)sizeof(pixel_t);
-    for (int y = 0; y < h; y++) {
-        const pixel_t *row = pixels + (size_t)y * stride;
-        for (int x = 0; x < w; x++) {
+    for (int ry = 0; ry < rh; ry++) {
+        int sy = ry * downsample + downsample / 2;
+        if (sy >= h) sy = h - 1;
+        const pixel_t *row = pixels + (size_t)sy * stride;
+        for (int rx = 0; rx < rw; rx++) {
+            int sx = rx * downsample + downsample / 2;
+            if (sx >= w) sx = w - 1;
             uint8_t r, g, b;
-            fx_unpack(row[x], &r, &g, &b);
+            fx_unpack(row[sx], &r, &g, &b);
             int luma = (r * 77 + g * 150 + b * 29) >> 8; /* standard luma weights */
-            FxRGB *o = &out[y * w + x];
+            FxRGB *o = &out[ry * rw + rx];
             if (luma >= FX_BRIGHT_THRESHOLD) {
                 o->r = r; o->g = g; o->b = b;
             } else {
@@ -281,6 +302,17 @@ static void fx_blur_axis(const FxRGB *src, FxRGB *dst, int w, int h,
  * the real framebuffer. The downsampled result is visually
  * indistinguishable for an effect this soft/diffuse to begin with.
  *
+ * The bright-extraction + pre-blur feeding the ray march (extract_bright_
+ * downsampled(), fx_blur_axis() x2 below) run on that SAME downsampled
+ * grid, not the full viewport -- this was the one full-resolution step
+ * still left when that reasoning was first applied to the ray march alone;
+ * measured at ~27ms/frame on its own before this fix, versus ~1.5-2ms for
+ * the ray march it was sitting in front of. LIGHT_SHAFT_PREBLUR_RADIUS is
+ * accordingly now in downsampled-grid pixels, not full-res ones -- 1 grid
+ * pixel at DOWNSAMPLE=4 covers roughly the same ground a radius-2 full-res
+ * blur did before, so the "tight, not wide" look this was tuned for
+ * carries over rather than turning into a much wider blur.
+ *
  * Bilinear, not nearest-neighbor, sampling shaft_bright inside the ray
  * march: reported (correctly) as looking like "compressed JPEG" blocking
  * in an earlier version that used nearest-neighbor rounding at only 8
@@ -292,11 +324,19 @@ static void fx_blur_axis(const FxRGB *src, FxRGB *dst, int w, int h,
  * continuous gradient with no discrete cells to see -- verified via a
  * standalone test (no long flat/repeated-value runs along a sampled ray)
  * before shipping. */
-#define LIGHT_SHAFT_PREBLUR_RADIUS 2  /* was 3 -- a tighter source blob reads
-                                        * as a more defined ray, less haze */
-#define LIGHT_SHAFT_DOWNSAMPLE 4  /* ray-march at 1/4 resolution each axis
-                                    * (1/16 the pixels), then upsample --
-                                    * see the long comment above */
+#define LIGHT_SHAFT_DOWNSAMPLE 4  /* ray-march (and now bright-extract +
+                                    * pre-blur too) at 1/4 resolution each
+                                    * axis (1/16 the pixels), then upsample
+                                    * -- see the long comment above */
+#define LIGHT_SHAFT_PREBLUR_RADIUS 1  /* in DOWNSAMPLED-grid pixels -- see
+                                        * above. Was 2 in full-res pixels
+                                        * (~= 0.5 grid pixels at DOWNSAMPLE=4;
+                                        * rounded up to 1 rather than down to
+                                        * 0 so a single bright source pixel
+                                        * still reliably survives the ray
+                                        * march's sparse steps, same reason
+                                        * this blur exists at all -- see
+                                        * above) */
 #define LIGHT_SHAFT_SAMPLES   24
 #define LIGHT_SHAFT_DECAY     0.78f  /* was 0.85 -- faster falloff, a
                                        * shorter/tighter streak instead of a
@@ -308,6 +348,13 @@ static void fx_blur_axis(const FxRGB *src, FxRGB *dst, int w, int h,
 #define LIGHT_SHAFT_RESULT_W (EB_VIEWPORT_WIDTH  / LIGHT_SHAFT_DOWNSAMPLE)
 #define LIGHT_SHAFT_RESULT_H (EB_VIEWPORT_HEIGHT / LIGHT_SHAFT_DOWNSAMPLE)
 static FxRGB shaft_result[LIGHT_SHAFT_RESULT_W * LIGHT_SHAFT_RESULT_H];
+/* Bright-extract + pre-blur scratch, sized to the SAME downsampled grid as
+ * shaft_result -- see the doc comment above LIGHT_SHAFT_DOWNSAMPLE for why
+ * these aren't full-viewport-sized despite feeding a bilinear sample of
+ * the framebuffer. */
+static FxRGB fx_bright[LIGHT_SHAFT_RESULT_W * LIGHT_SHAFT_RESULT_H];
+static FxRGB fx_blur_tmp[LIGHT_SHAFT_RESULT_W * LIGHT_SHAFT_RESULT_H];
+static FxRGB shaft_bright[LIGHT_SHAFT_RESULT_W * LIGHT_SHAFT_RESULT_H];
 
 static inline void shaft_sample_bilinear(const FxRGB *buf, int w, int h,
                                           float x, float y,
@@ -334,28 +381,43 @@ static void apply_light_shafts(pixel_t *pixels, int pitch) {
     int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
     int stride = pitch / (int)sizeof(pixel_t);
     int rw = LIGHT_SHAFT_RESULT_W, rh = LIGHT_SHAFT_RESULT_H;
-    float origin_x = w / 2.0f;
-    float origin_y = 0.0f;
+    /* Origin and ray march both now live entirely in downsampled-grid
+     * coordinates -- origin_rx/ry is just origin_x/y scaled down by
+     * LIGHT_SHAFT_DOWNSAMPLE, same top-center point as before. */
+    float origin_rx = rw / 2.0f;
+    float origin_ry = 0.0f;
 
-    extract_bright(pixels, pitch, fx_bright);
-    fx_blur_axis(fx_bright, fx_blur_tmp, w, h, LIGHT_SHAFT_PREBLUR_RADIUS, true);
-    fx_blur_axis(fx_blur_tmp, shaft_bright, w, h, LIGHT_SHAFT_PREBLUR_RADIUS, false);
+#ifdef EB_FX_PROFILE
+    static double acc_extract, acc_march, acc_upsample;
+    static int prof_frames2;
+    uint64_t q0 = platform_timer_ticks(), q1;
+#endif
+    extract_bright_downsampled(pixels, pitch, w, h, LIGHT_SHAFT_DOWNSAMPLE, fx_bright, rw, rh);
+    fx_blur_axis(fx_bright, fx_blur_tmp, rw, rh, LIGHT_SHAFT_PREBLUR_RADIUS, true);
+    fx_blur_axis(fx_blur_tmp, shaft_bright, rw, rh, LIGHT_SHAFT_PREBLUR_RADIUS, false);
+#ifdef EB_FX_PROFILE
+    q1 = platform_timer_ticks(); acc_extract += (double)(q1-q0)*1000.0/platform_timer_ticks_per_sec(); q0 = q1;
+#endif
 
-    /* Expensive pass: ray-march, but only on the small low-res grid. */
+    /* Ray-march on the low-res grid -- each step now covers 1/DOWNSAMPLE
+     * as much ground in grid-pixel terms as it used to in full-res-pixel
+     * terms, but since both the current cell and the origin are expressed
+     * in the same grid units, the march still crosses the same PROPORTION
+     * of the total distance to the origin over LIGHT_SHAFT_SAMPLES steps
+     * as before -- same streak shape/reach, just computed on 1/16th the
+     * pixels this loop itself already ran on. */
     for (int ry = 0; ry < rh; ry++) {
-        float y = ry * LIGHT_SHAFT_DOWNSAMPLE + LIGHT_SHAFT_DOWNSAMPLE / 2.0f;
         for (int rx = 0; rx < rw; rx++) {
-            float x = rx * LIGHT_SHAFT_DOWNSAMPLE + LIGHT_SHAFT_DOWNSAMPLE / 2.0f;
-            float step_x = (origin_x - x) / LIGHT_SHAFT_SAMPLES;
-            float step_y = (origin_y - y) / LIGHT_SHAFT_SAMPLES;
-            float sx = x, sy = y;
+            float step_x = (origin_rx - rx) / LIGHT_SHAFT_SAMPLES;
+            float step_y = (origin_ry - ry) / LIGHT_SHAFT_SAMPLES;
+            float sx = (float)rx, sy = (float)ry;
             float accum_r = 0, accum_g = 0, accum_b = 0, total_weight = 0;
             float weight = 1.0f;
             for (int i = 0; i < LIGHT_SHAFT_SAMPLES; i++) {
                 sx += step_x; sy += step_y;
-                if (sx >= 0.0f && sx < w && sy >= 0.0f && sy < h) {
+                if (sx >= 0.0f && sx < rw && sy >= 0.0f && sy < rh) {
                     float sr, sg, sb;
-                    shaft_sample_bilinear(shaft_bright, w, h, sx, sy, &sr, &sg, &sb);
+                    shaft_sample_bilinear(shaft_bright, rw, rh, sx, sy, &sr, &sg, &sb);
                     accum_r += sr * weight;
                     accum_g += sg * weight;
                     accum_b += sb * weight;
@@ -373,6 +435,9 @@ static void apply_light_shafts(pixel_t *pixels, int pitch) {
             }
         }
     }
+#ifdef EB_FX_PROFILE
+    q1 = platform_timer_ticks(); acc_march += (double)(q1-q0)*1000.0/platform_timer_ticks_per_sec(); q0 = q1;
+#endif
 
     /* Cheap pass: one bilinear lookup per real pixel, into the tiny
      * (already cache-resident) low-res result. */
@@ -392,6 +457,15 @@ static void apply_light_shafts(pixel_t *pixels, int pitch) {
             row[x] = fx_pack(r, g, b);
         }
     }
+#ifdef EB_FX_PROFILE
+    q1 = platform_timer_ticks(); acc_upsample += (double)(q1-q0)*1000.0/platform_timer_ticks_per_sec();
+    if (++prof_frames2 >= 120) {
+        LOG_WARN("shafts_profile: extract+blur=%.3fms march=%.3fms upsample=%.3fms (avg/frame over %d frames)\n",
+                 acc_extract/prof_frames2, acc_march/prof_frames2, acc_upsample/prof_frames2, prof_frames2);
+        acc_extract = acc_march = acc_upsample = 0;
+        prof_frames2 = 0;
+    }
+#endif
 }
 
 /* ---- Depth of Field / tilt-shift: a very subtle blur that increases
@@ -881,17 +955,41 @@ void platform_video_end_frame(void) {
          * apply_aa_upscale()'s doc comment for why it skips fx_suppressed/
          * dof_suppressed unlike the other three. */
         bool want_fx = want_experimental && !fx_suppressed;
+#ifdef EB_FX_PROFILE
+        static double acc_dof, acc_shafts, acc_grade, acc_aa;
+        static int prof_frames;
+        uint64_t p0, p1;
+        p0 = platform_timer_ticks();
+#endif
         if (want_experimental && !dof_suppressed)
             apply_dof(locked_pixels, locked_pitch);
+#ifdef EB_FX_PROFILE
+        p1 = platform_timer_ticks(); acc_dof += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
+#endif
         if (want_fx)
             apply_light_shafts(locked_pixels, locked_pitch);
+#ifdef EB_FX_PROFILE
+        p1 = platform_timer_ticks(); acc_shafts += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
+#endif
         if (want_fx)
             apply_color_grade(locked_pixels, locked_pitch);
+#ifdef EB_FX_PROFILE
+        p1 = platform_timer_ticks(); acc_grade += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
+#endif
         if (want_experimental) {
             apply_aa_upscale(locked_pixels, locked_pitch,
                               aa_upscaled, EB_VIEWPORT_WIDTH * AA_SCALE);
             aa_ran = true;
         }
+#ifdef EB_FX_PROFILE
+        p1 = platform_timer_ticks(); acc_aa += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec();
+        if (++prof_frames >= 120) {
+            LOG_WARN("fx_profile: dof=%.3fms shafts=%.3fms grade=%.3fms aa=%.3fms (avg/frame over %d frames)\n",
+                     acc_dof/prof_frames, acc_shafts/prof_frames, acc_grade/prof_frames, acc_aa/prof_frames, prof_frames);
+            acc_dof = acc_shafts = acc_grade = acc_aa = 0;
+            prof_frames = 0;
+        }
+#endif
 
         SDL_UnlockTexture(texture);
         locked_pixels = NULL;
