@@ -34,17 +34,27 @@ typedef struct {
     uint8_t  hq_audio;
     uint8_t  alt_controls;
     uint8_t  experimental_visuals;
+    uint8_t  logging;
 } EngineSettingsBlob;
 
 uint8_t engine_sprint_speed = SPRINT_SPEED_MEDIUM;             /* default until settings_load() runs */
 uint8_t engine_hq_audio = HQ_AUDIO_ON;                         /* default until settings_load() runs */
 uint8_t engine_alt_controls = ALT_CONTROLS_OFF;                /* default until settings_load() runs */
 uint8_t engine_experimental_visuals = EXPERIMENTAL_VISUALS_OFF; /* default until settings_load() runs */
+uint8_t engine_logging = LOGGING_OFF;                          /* default until settings_load() runs */
 
 void settings_load(void) {
     EngineSettingsBlob blob;
     memset(&blob, 0, sizeof(blob));
 
+    /* `logging` was appended after SETTINGS_VERSION 3 shipped -- no version
+     * bump needed for it specifically: growing the struct means an old,
+     * shorter on-disk blob now reads fewer bytes than sizeof(blob), which
+     * already fails the == sizeof(blob) check below and falls through to
+     * defaults, the same protection a version bump would buy. (Contrast
+     * the 2->3 bump in the comment above SETTINGS_VERSION -- that case
+     * reused an *existing* byte's position with a new meaning, which the
+     * size check alone can't catch.) */
     if (platform_settings_read(&blob, sizeof(blob)) == sizeof(blob) &&
         blob.magic == SETTINGS_MAGIC && blob.version == SETTINGS_VERSION &&
         blob.sprint_speed < SPRINT_SPEED_COUNT) {
@@ -53,6 +63,7 @@ void settings_load(void) {
         engine_alt_controls = (blob.alt_controls < ALT_CONTROLS_COUNT) ? blob.alt_controls : ALT_CONTROLS_OFF;
         engine_experimental_visuals = (blob.experimental_visuals < EXPERIMENTAL_VISUALS_COUNT)
             ? blob.experimental_visuals : EXPERIMENTAL_VISUALS_OFF;
+        engine_logging = (blob.logging < LOGGING_COUNT) ? blob.logging : LOGGING_OFF;
     } else {
         /* No settings file, or unreadable/foreign/stale -- fall back to
          * defaults rather than leaving partially-read garbage in place. */
@@ -60,6 +71,7 @@ void settings_load(void) {
         engine_hq_audio = HQ_AUDIO_ON;
         engine_alt_controls = ALT_CONTROLS_OFF;
         engine_experimental_visuals = EXPERIMENTAL_VISUALS_OFF;
+        engine_logging = LOGGING_OFF;
     }
 }
 
@@ -72,5 +84,6 @@ void settings_save(void) {
     blob.hq_audio = engine_hq_audio;
     blob.alt_controls = engine_alt_controls;
     blob.experimental_visuals = engine_experimental_visuals;
+    blob.logging = engine_logging;
     platform_settings_write(&blob, sizeof(blob));
 }

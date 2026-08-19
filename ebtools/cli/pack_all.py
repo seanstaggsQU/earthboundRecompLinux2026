@@ -1104,9 +1104,11 @@ def _pack_items(json_path: Path, output_dir: Path, *, doc, string_table=None, ad
 
 
 def _apply_enemy_name_overrides(json_path: Path, assets_dir: Path, output_dir: Path) -> Path:
-    """Applies src/custom_assets/enemy_name_overrides.json (if present) on top
-    of the ROM-extracted enemies.json, writing a patched copy for the packer
-    to read instead of the original.
+    """Apply src/custom_assets/enemy_name_overrides.json on top of enemies.json.
+
+    Applies the override file (if present) on top of the ROM-extracted
+    enemies.json, writing a patched copy for the packer to read instead of
+    the original.
 
     enemies.json itself lives under the gitignored extraction cache and gets
     silently regenerated from the donor ROM by every `ebtools extract` --- a
@@ -1136,7 +1138,12 @@ def _apply_enemy_name_overrides(json_path: Path, assets_dir: Path, output_dir: P
 
     applied = 0
     for id_str, patch in overrides.items():
-        entry = entries_by_id.get(int(id_str))
+        try:
+            enemy_id = int(id_str)
+        except ValueError:
+            print(f"  WARNING: enemy_name_overrides.json has a non-numeric id {id_str!r}, skipping")
+            continue
+        entry = entries_by_id.get(enemy_id)
         if entry is None:
             print(f"  WARNING: enemy_name_overrides.json references unknown enemy id {id_str}, skipping")
             continue

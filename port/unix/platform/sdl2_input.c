@@ -202,6 +202,7 @@ void platform_input_poll(void) {
             case SDL_SCANCODE_F1:     aux_bit = AUX_DEBUG_DUMP;   break;
             case SDL_SCANCODE_F2:     aux_bit = AUX_VRAM_DUMP;    break;
             case SDL_SCANCODE_F3:     aux_bit = AUX_FPS_TOGGLE;   break;
+            case SDL_SCANCODE_F4:     aux_bit = AUX_LOG_MARK;     break;
             case SDL_SCANCODE_F6:     aux_bit = AUX_SAVESTATE;    break;
             case SDL_SCANCODE_F7:     aux_bit = AUX_LOAD_STATE;   break;
             case SDL_SCANCODE_TAB:    aux_bit = AUX_FAST_FORWARD; break;

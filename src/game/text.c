@@ -3227,8 +3227,8 @@ StepResult mode_step_pause_menu(ModeState *ms) {
  * mode_step_debug_menu (game_main.c). Cancel (B/Select) closes the screen
  * and returns to the command menu underneath.
  *
- * Four rows exist today (Sprint Speed, High Quality Audio, Alt Controls,
- * Experimental Visuals); more engine preferences can be added as
+ * Five rows exist today (Sprint Speed, High Quality Audio, Alt Controls,
+ * Experimental Visuals, Logging); more engine preferences can be added as
  * additional userdata cases without changing this shape. */
 static const char *sprint_speed_labels[SPRINT_SPEED_COUNT] = {
     [SPRINT_SPEED_OFF]    = "Sprint: Off",
@@ -3247,6 +3247,10 @@ static const char *experimental_visuals_labels[EXPERIMENTAL_VISUALS_COUNT] = {
     [EXPERIMENTAL_VISUALS_OFF] = "Experimental Visuals: Off",
     [EXPERIMENTAL_VISUALS_ON]  = "Experimental Visuals: On",
 };
+static const char *logging_labels[LOGGING_COUNT] = {
+    [LOGGING_OFF] = "Logging: Off",
+    [LOGGING_ON]  = "Logging: On",
+};
 
 StepResult mode_step_settings_menu(ModeState *ms) {
     SettingsMenuState *st = &ms->settings_menu;
@@ -3258,6 +3262,7 @@ StepResult mode_step_settings_menu(ModeState *ms) {
         add_menu_item(hq_audio_labels[engine_hq_audio], 2, 0, 1);
         add_menu_item(alt_controls_labels[engine_alt_controls], 3, 0, 2);
         add_menu_item(experimental_visuals_labels[engine_experimental_visuals], 4, 0, 3);
+        add_menu_item(logging_labels[engine_logging], 5, 0, 4);
         open_window_and_print_menu(1, 0);
         st->phase = SET_RESULT;
         return menu_push_selection(&st->result_ready, &st->result, 1);
@@ -3311,6 +3316,22 @@ StepResult mode_step_settings_menu(ModeState *ms) {
             engine_experimental_visuals =
                 (uint8_t)((engine_experimental_visuals + 1) % EXPERIMENTAL_VISUALS_COUNT);
             settings_save();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 5) {
+            /* Logging row confirmed: cycle Off <-> On. Turning it on takes
+             * effect immediately (platform_log_set_enabled(), platform.h);
+             * turning it back off does NOT restore console output this
+             * session (one-way redirect, see that function's doc comment)
+             * -- the setting itself still flips, so a future session won't
+             * resume logging, but this run keeps writing to the file it
+             * already opened. */
+            engine_logging = (uint8_t)((engine_logging + 1) % LOGGING_COUNT);
+            settings_save();
+            if (engine_logging == LOGGING_ON)
+                platform_log_set_enabled(true);
             play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
             st->phase = SET_BUILD;
             return STEP_RESULT_CONTINUE();

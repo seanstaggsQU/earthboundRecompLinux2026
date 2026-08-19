@@ -282,6 +282,24 @@ static void fps_overlay_stamp_scanline(int y, pixel_t *pixels) {
     }
 }
 
+/* Mirrors port/unix/platform/sdl2_video.c's EB_DEFAULT_WIDTH -- the
+ * default (zoom-off) on-screen crop width, 400 not the full
+ * EB_VIEWPORT_WIDTH (512) compiled canvas. Duplicated here rather than
+ * shared via a header since it's a port/unix-only rendering concept this
+ * cross-platform file otherwise has no reason to depend on; keep the two
+ * in sync by hand if that value ever changes.
+ *
+ * Getting this wrong is exactly what shipped in v1.2.2: the overlay's
+ * horizontal position was computed against the full 512px canvas while
+ * only the centered 400px-wide crop is ever actually displayed, so the
+ * text landed in the permanently-letterboxed-off right margin and never
+ * rendered at all -- caught by live testing (screenshotting the title
+ * screen showed nothing at the expected position) and independently by
+ * a code-review pass reasoning about the same crop math. The Y axis
+ * below got this right from the start (SNES_HEIGHT vs.
+ * EB_VIEWPORT_HEIGHT) -- this is the same reasoning applied to X. */
+#define VERSION_OVERLAY_CONTENT_WIDTH 400
+
 /* ---- Version string overlay (title screen / file-select only) ----
  * This port's own addition: stamps the build version ("v1.2.1", "dev",
  * ...) as small dim text near the bottom of the screen -- same scanline-
@@ -289,14 +307,18 @@ static void fps_overlay_stamp_scanline(int y, pixel_t *pixels) {
  * state entirely and works identically over the title screen's raw
  * sprite-driven logo animation and file-select's windowed UI.
  *
- * Positioned inside SNES_HEIGHT's own visible range, not the full
- * EB_VIEWPORT_HEIGHT compiled canvas: platform_video_end_frame()'s
- * default (zoom-off) crop only shows rows
- * (EB_VIEWPORT_HEIGHT-SNES_HEIGHT)/2 .. that+SNES_HEIGHT (see
- * sdl2_video.c) -- anything stamped below that range would render into
- * the letterboxed-off margin and never actually be seen. Right-aligned
- * with a small margin from the bottom-right corner, dim gray so it
- * reads as a watermark rather than UI. */
+ * Positioned inside the default (zoom-off) crop's visible range, not the
+ * full EB_VIEWPORT_WIDTH x EB_VIEWPORT_HEIGHT compiled canvas --
+ * anything stamped outside that crop renders into the letterboxed-off
+ * margin and is never actually seen (see VERSION_OVERLAY_CONTENT_WIDTH
+ * above). This assumes zoom is off, which title screen/file-select
+ * always are in the normal case (nothing on those screens lets the
+ * player change zoom); combined_overlay_stamp_scanline()'s caller skips
+ * installing this callback at all if ow.zoom_mode is somehow non-default
+ * there (e.g. a debug/event-script edge case), rather than this function
+ * trying to track every possible crop size itself. Right-aligned with a
+ * small margin from the bottom-right corner, dim gray so it reads as a
+ * watermark rather than UI. */
 static void version_overlay_stamp_scanline(int y, pixel_t *pixels) {
     const char *ver = platform_get_version_string();
     if (!ver || !ver[0]) return;
@@ -311,7 +333,8 @@ static void version_overlay_stamp_scanline(int y, pixel_t *pixels) {
     int text_w = 0;
     for (const char *s = ver; *s; s++)
         text_w += font_get_width(FONT_ID_TINY, ascii_to_eb_char(*s) - 0x50);
-    int ox = EB_VIEWPORT_WIDTH - text_w - 3;
+    int crop_left = (EB_VIEWPORT_WIDTH - VERSION_OVERLAY_CONTENT_WIDTH) / 2;
+    int ox = crop_left + VERSION_OVERLAY_CONTENT_WIDTH - text_w - 3;
 
     pixel_t color = PIXEL_RGB(0x80, 0x80, 0x80);
     int cx = ox;
@@ -447,7 +470,8 @@ void host_process_frame(void) {
     /* Force render if a debug dump is pending (even during frame skip) */
     bool debug_dump = (aux_new & AUX_DEBUG_DUMP) || debug_auto_dump_requested;
     bool vram_dump = (aux_new & AUX_VRAM_DUMP) != 0;
-    if (debug_dump || vram_dump)
+    bool log_mark = (aux_new & AUX_LOG_MARK) != 0;
+    if (debug_dump || vram_dump || log_mark)
         do_render = true;
 
     /* Capture-safety: never render during a free-run unwind. */
@@ -464,16 +488,26 @@ void host_process_frame(void) {
             if (want_fps)
                 fps_overlay_prepare();
 
-            /* Version overlay: title screen / file-select only -- see
-             * version_overlay_stamp_scanline()'s doc comment. Same
-             * whole-stack scan shape as the zoom-reset/fx-suppression
-             * checks elsewhere in this file. */
+            /* Version overlay: title screen / file-select only, AND only
+             * while zoom is off -- see version_overlay_stamp_scanline()'s
+             * doc comment. The overlay's position math assumes the
+             * default (zoom-off) crop; title/file-select never let the
+             * player change zoom themselves, but ow.zoom_mode is a
+             * persistent setting that in principle could still be
+             * non-default if something else (a debug path, an event
+             * script) reached one of these modes without resetting it
+             * first -- rather than have the overlay itself try to track
+             * every possible crop size, just don't show it that frame.
+             * Same whole-stack scan shape as the zoom-reset/fx-
+             * suppression checks elsewhere in this file. */
             version_overlay_show = false;
-            for (int i = 0; i < g_mode_stack.depth; i++) {
-                if (g_mode_stack.mode[i] == GAME_MODE_TITLE_SCREEN ||
-                    g_mode_stack.mode[i] == GAME_MODE_FILE_MENU) {
-                    version_overlay_show = true;
-                    break;
+            if (ow.zoom_mode == EB_ZOOM_OFF) {
+                for (int i = 0; i < g_mode_stack.depth; i++) {
+                    if (g_mode_stack.mode[i] == GAME_MODE_TITLE_SCREEN ||
+                        g_mode_stack.mode[i] == GAME_MODE_FILE_MENU) {
+                        version_overlay_show = true;
+                        break;
+                    }
                 }
             }
 
@@ -496,6 +530,8 @@ void host_process_frame(void) {
             platform_debug_dump_ppu(fb);
             platform_debug_dump_vram_image();
         }
+        if (fb && log_mark)
+            platform_debug_mark_screenshot(fb);
     } else {
         t2 = t1;
     }

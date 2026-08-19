@@ -117,6 +117,20 @@ void platform_render_frame(scanline_stamp_cb_t fps_overlay_cb);
  * git-describe step exists there yet) -- see updater_backend_stub.c. */
 const char *platform_get_version_string(void);
 
+/* Redirect stdout/stderr to a fixed log file (desktop: "eb_debug.log" next
+ * to the executable, same directory as platform_debug_mark_screenshot()'s
+ * F4 screenshots) so a tester can enable logging from the Config menu's
+ * "Logging" row (see engine_logging, settings.h) and share the resulting
+ * file, without needing to launch from a terminal or know about the
+ * pre-existing "--log-file" command-line flag at all. One-way: turning
+ * logging back off does not restore console output mid-session (matches
+ * "--log-file"'s own behavior, and avoids needing a working dup/dup2
+ * restore path on every target) -- the file just stops being written to
+ * further. Safe to call every frame the setting reads as on; only the
+ * first call in a run actually redirects. Desktop only; embedded targets
+ * no-op (no filesystem path meant for player-visible text output). */
+void platform_log_set_enabled(bool enabled);
+
 /*
  * Input
  *
@@ -145,6 +159,7 @@ const char *platform_get_version_string(void);
 #define AUX_DEBUG_TOGGLE (1 << 5)   /* `: toggle debug mode */
 #define AUX_SAVESTATE    (1 << 6)   /* F6: request a torn-safe savestate capture */
 #define AUX_LOAD_STATE   (1 << 7)   /* F7: restore the last savestate */
+#define AUX_LOG_MARK     (1 << 8)   /* F4: bug-report marker — timestamped log line + screenshot */
 
 bool platform_input_init(void);
 void platform_input_shutdown(void);
@@ -280,6 +295,15 @@ void  *platform_savestate_scratch(size_t *out_bytes);
 /* Debug dumps (desktop: write files to debug/; embedded: no-op) */
 void platform_debug_dump_ppu(const pixel_t *framebuffer);
 void platform_debug_dump_vram_image(void);
+
+/* Bug-report marker (F4, AUX_LOG_MARK): writes a timestamped screenshot next
+ * to the executable (not buried in debug/, so a tester can find and attach
+ * it easily) and logs a matching "MARK <timestamp>" line via LOG_WARN --
+ * which lands in the Logging feature's log file when it's enabled (see
+ * settings.h's engine_logging), giving a tester a way to say "it happened
+ * right here" without describing the bug in words. Desktop only for now;
+ * embedded targets no-op like the other debug dumps above. */
+void platform_debug_mark_screenshot(const pixel_t *framebuffer);
 
 /*
  * Self-update — desktop (port/unix) builds only, and only when built with a

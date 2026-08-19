@@ -107,6 +107,34 @@ static void chdir_to_executable_dir(void) {
 #endif
 }
 
+/* Shared by --log-file and platform_log_set_enabled() (the Config menu's
+ * "Logging" row, see settings.h's engine_logging) -- both just want
+ * stdout+stderr pointed at a file instead of the (possibly nonexistent,
+ * e.g. launched from a desktop icon) console. */
+static bool log_redirected = false; /* guards against a second freopen() clobbering the first target */
+
+static void redirect_output_to_log(const char *path) {
+    if (!freopen(path, "w", stdout) || !freopen(path, "a", stderr)) {
+        fprintf(stderr, "Warning: could not redirect output to %s: %s\n", path, strerror(errno));
+        return;
+    }
+    setvbuf(stdout, NULL, _IOLBF, 0); /* line-buffered: readable if the game hangs/crashes mid-run */
+    setvbuf(stderr, NULL, _IOLBF, 0);
+    log_redirected = true;
+}
+
+/* platform_log_set_enabled() -- see platform.h for the full contract
+ * (desktop-only, one-way, safe to call every frame). Fixed filename/
+ * location (next to the executable, same as platform_debug_mark_screenshot()'s
+ * F4 screenshots) since a Config-menu toggle has no place to type a path,
+ * unlike --log-file. If --log-file already redirected to a different path
+ * this run, log_redirected is already true and this is a no-op -- an
+ * explicit command-line choice wins over the persisted setting. */
+void platform_log_set_enabled(bool enabled) {
+    if (!enabled || log_redirected) return;
+    redirect_output_to_log("eb_debug.log");
+}
+
 /* Cleanup handler registered with atexit() — runs on any exit() call. */
 static void platform_cleanup(void) {
     platform_timer_shutdown();
@@ -243,12 +271,7 @@ int main(int argc, char *argv[]) {
      * crash/error output (including LOG_WARN/FATAL, core/log.h) has nowhere
      * to go. Done as early as possible so it also catches SDL init failures. */
     if (log_file_path) {
-        if (!freopen(log_file_path, "w", stdout) || !freopen(log_file_path, "a", stderr)) {
-            fprintf(stderr, "Warning: could not redirect output to %s: %s\n", log_file_path, strerror(errno));
-        } else {
-            setvbuf(stdout, NULL, _IOLBF, 0); /* line-buffered: readable if the game hangs/crashes mid-run */
-            setvbuf(stderr, NULL, _IOLBF, 0);
-        }
+        redirect_output_to_log(log_file_path);
     }
 
 #ifdef EB_RUNTIME_ASSETS
@@ -318,6 +341,12 @@ int main(int argc, char *argv[]) {
     platform_input_init();
     platform_save_init();
     settings_load();
+    /* Resume logging automatically if a previous session left the Config
+     * menu's "Logging" row on -- a tester shouldn't have to re-enable it
+     * after every relaunch (including the updater's own self-relaunch) to
+     * keep capturing a bug that only shows up after several launches. */
+    if (engine_logging == LOGGING_ON)
+        platform_log_set_enabled(true);
     /* Registered first so it runs LAST (atexit is LIFO): the relaunch
      * execv(), if the updater ever staged one, must happen after
      * platform_cleanup()'s SDL_Quit() below, never before. See

@@ -100,6 +100,25 @@ typedef enum {
 
 extern uint8_t engine_experimental_visuals; /* current value, one of ExperimentalVisualsSetting */
 
+/* Logging: On redirects stdout/stderr to a log file (see
+ * platform_log_set_enabled(), platform.h) so a tester who hits a bug can
+ * enable it from the Config menu, reproduce the problem, and share the
+ * resulting file -- without needing to launch from a terminal or know about
+ * the pre-existing "--log-file" command-line flag (port/unix/main.c) at
+ * all. Off by default: the redirect has no runtime cost either way, but
+ * defaulting it off avoids surprising a player who goes looking for
+ * console output during normal play (e.g. via a bundled terminal). Applied
+ * both on live toggle (text.c's mode_step_settings_menu()) and at startup
+ * in main() if a previous session left it on -- see settings_load()'s call
+ * site. */
+typedef enum {
+    LOGGING_OFF = 0,
+    LOGGING_ON  = 1,
+    LOGGING_COUNT,
+} LoggingSetting;
+
+extern uint8_t engine_logging; /* current value, one of LoggingSetting */
+
 /* Call once at startup (after platform_save_init(), before the game loop).
  * Loads settings.dat if present and valid; otherwise leaves/sets defaults. */
 void settings_load(void);

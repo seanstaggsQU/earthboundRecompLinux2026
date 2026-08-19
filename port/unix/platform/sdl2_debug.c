@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 #ifdef _WIN32
 #include <direct.h>    /* _mkdir */
 #define MKDIR(path) _mkdir(path)
@@ -12,6 +13,7 @@
 
 #include "snes/ppu.h"
 #include "game/window.h"
+#include "core/log.h"
 
 static int debug_dump_counter = 0;
 
@@ -236,4 +238,37 @@ void platform_debug_dump_vram_image(void) {
     snprintf(path, sizeof(path), "debug/vram_2bpp_%03d.bmp", debug_dump_counter - 1);
     write_bmp(path, img2, img_w2, img_h2);
     printf("Debug: wrote %s (2bpp tiles, %dx%d)\n", path, img_w2, img_h2);
+}
+
+/* F4 bug-report marker: single screenshot + a matching timestamped LOG_WARN
+ * line, so a tester can press one key the instant they see something wrong
+ * and hand back a screenshot the reporter can line up against the log.
+ * Deliberately NOT written into debug/ (that directory is the noisy
+ * developer-facing VRAM/CGRAM/register dump from platform_debug_dump_ppu()
+ * above) -- this goes next to the executable, same directory as the
+ * Logging feature's log file, so both are easy for a non-developer to find
+ * and attach to a bug report together. */
+void platform_debug_mark_screenshot(const pixel_t *framebuffer) {
+    time_t now = time(NULL);
+    struct tm tm_buf;
+#ifdef _WIN32
+    localtime_s(&tm_buf, &now);
+#else
+    localtime_r(&now, &tm_buf);
+#endif
+    char timestamp[32];
+    strftime(timestamp, sizeof(timestamp), "%Y%m%d_%H%M%S", &tm_buf);
+
+    char path[256];
+    snprintf(path, sizeof(path), "eb_mark_%s.bmp", timestamp);
+
+    static uint32_t mark_rgb888[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
+    for (int i = 0; i < EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT; i++)
+        mark_rgb888[i] = pixel_to_rgb888(framebuffer[i]);
+    write_bmp(path, mark_rgb888, EB_VIEWPORT_WIDTH, EB_VIEWPORT_HEIGHT);
+
+    /* LOG_WARN (not printf) so this also lands in the Logging feature's
+     * redirected log file when enabled -- see engine_logging in settings.h. */
+    LOG_WARN("==== BUG MARK %s -- screenshot: %s ====\n", timestamp, path);
+    printf("Debug: wrote %s\n", path);
 }
