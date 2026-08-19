@@ -1771,6 +1771,30 @@ bool cc_18_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
 }
 
 
+/* Key Items pool feature, not part of the original ROM/assembly. Several
+ * CC opcodes below inline the exact same raw
+ * party_characters[char_id-1].items[slot-1] access that get_character_item()
+ * (inventory.c) also implements, rather than calling that function -- so
+ * they never picked up its KEY_ITEMS_POOL_USE_SLOT_SENTINEL handling (see
+ * that constant's doc comment for the full rationale). Found live: "Key
+ * to the Cabin"'s mid-script possession re-check (CC 0x19 sub 0x19,
+ * ADD_ITEM_ID_TO_WORK_MEMORY, immediately below) always failed for a
+ * pool-sourced item because of exactly this -- mode_step_use_item()
+ * (text.c) set the sentinel up correctly, but this opcode's own inline
+ * copy of the lookup never checked for it.
+ *
+ * This wrapper preserves each call site's existing bounds-checked
+ * behavior for real (char_id, slot) pairs unchanged, and adds only the
+ * sentinel special-case (delegating to get_character_item(), which
+ * already knows how to answer it) on top. */
+static uint8_t cc_get_character_item(uint16_t char_id, uint16_t slot) {
+    if (slot == KEY_ITEMS_POOL_USE_SLOT_SENTINEL)
+        return (uint8_t)get_character_item(char_id, slot);
+    if (char_id >= 1 && char_id <= TOTAL_PARTY_COUNT && slot >= 1 && slot <= 14)
+        return party_characters[char_id - 1].items[slot - 1];
+    return 0;
+}
+
 /* --- CC 0x19 tree: inventory/character queries ---
  * Byte counts from include/textmacros.asm.
  *
@@ -1953,10 +1977,7 @@ void cc_19_dispatch(ScriptReader *r) {
         uint8_t slot_arg = script_read_byte(r);
         uint16_t char_id = char_arg ? (uint16_t)char_arg : (uint16_t)(get_working_memory() & 0xFFFF);
         uint16_t slot = slot_arg ? (uint16_t)slot_arg : (uint16_t)(get_argument_memory() & 0xFFFF);
-        uint8_t item_id = 0;
-        if (char_id >= 1 && char_id <= TOTAL_PARTY_COUNT && slot >= 1 && slot <= 14) {
-            item_id = party_characters[char_id - 1].items[slot - 1];
-        }
+        uint8_t item_id = cc_get_character_item(char_id, slot);
         set_argument_memory((uint32_t)item_id);
         set_working_memory((uint32_t)char_id);
         break;
@@ -3002,9 +3023,9 @@ void cc_1d_dispatch(ScriptReader *r) {
         uint16_t slot = slot_arg ? (uint16_t)slot_arg : (uint16_t)(get_argument_memory() & 0xFFFF);
         uint16_t base = is_escargo_express_full() ? 2 : 0;
         uint16_t flag_bit = 0;
-        if (char_id >= 1 && char_id <= TOTAL_PARTY_COUNT && slot >= 1 && slot <= 14) {
-            uint8_t item_id = party_characters[char_id - 1].items[slot - 1];
-            const ItemConfig *entry = get_item_entry(item_id);
+        {
+            uint8_t item_id = cc_get_character_item(char_id, slot);
+            const ItemConfig *entry = item_id ? get_item_entry(item_id) : NULL;
             if (entry && (entry->flags & 0x40))
                 flag_bit = 1;
         }
@@ -3094,10 +3115,7 @@ void cc_1d_dispatch(ScriptReader *r) {
         uint8_t slot_arg = script_read_byte(r);
         uint16_t char_id = char_arg ? (uint16_t)char_arg : (uint16_t)(get_working_memory() & 0xFFFF);
         uint16_t slot = slot_arg ? (uint16_t)slot_arg : (uint16_t)(get_argument_memory() & 0xFFFF);
-        uint8_t item_id = 0;
-        if (char_id >= 1 && char_id <= TOTAL_PARTY_COUNT && slot >= 1 && slot <= 14) {
-            item_id = party_characters[char_id - 1].items[slot - 1];
-        }
+        uint8_t item_id = cc_get_character_item(char_id, slot);
         uint16_t result = check_item_usable_by(char_id, item_id);
         set_working_memory((uint32_t)result);
         break;
