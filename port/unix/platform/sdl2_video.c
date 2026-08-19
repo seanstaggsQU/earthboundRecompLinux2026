@@ -75,6 +75,21 @@ static EbZoomMode zoom_mode = EB_ZOOM_OFF;
 static bool fx_suppressed = false;
 static bool dof_suppressed = false;
 
+/* DoF's own faded-in/out intensity (0..1), separate from the hard
+ * fx_suppressed/dof_suppressed booleans above. Those flip instantly (battle
+ * entry, opening a window, Town Map, ...); reported as an "abrupt stop" --
+ * the blur was fully present one frame and completely gone the next, a hard
+ * cut rather than a taper, however smoothly the blend already ramps across
+ * screen rows (see apply_dof()'s own doc comment for that, separate axis).
+ * Eased every frame in platform_video_end_frame() toward 1.0 when DoF
+ * should be showing, 0.0 when suppressed, at DOF_FADE_STEP per frame (a
+ * ~20-frame/~0.33s linear ramp at 60fps) -- apply_dof() is now called
+ * whenever this is above zero, not just when the hard gate is true, so the
+ * fade-out tail actually renders for a few frames after suppression flips
+ * on, and multiplies its per-row blend by this value. */
+static float dof_intensity = 0.0f;
+#define DOF_FADE_STEP (1.0f / 20.0f)
+
 /* Locked texture state (valid between begin_frame and end_frame) */
 static pixel_t *locked_pixels;
 static int locked_pitch;
@@ -230,13 +245,17 @@ static inline uint8_t fx_clamp_byte(float v) {
                                         * visible in practice at the old
                                         * radius/blend combo, even though
                                         * the band-size math was correct) */
-#define DOF_MAX_BLEND    0.8f          /* even at the extreme edge, blend at
-                                        * most 80% toward the blurred pixel
-                                        * (was 0.55, before that "up to
-                                        * 100%" -- 0.55 read as too subtle
-                                        * to actually notice; 0.8 is a
-                                        * moderate step up, not back to
-                                        * the original unclamped look) */
+#define DOF_MAX_BLEND    0.6f          /* even at the extreme edge, blend at
+                                        * most 60% toward the blurred pixel
+                                        * (was 0.8, reported as too intense
+                                        * once the fade-in/out made the
+                                        * effect easy to actually observe
+                                        * end-to-end -- dropped by ~25%.
+                                        * Before that: 0.55, before that
+                                        * "up to 100%" -- 0.55 read as too
+                                        * subtle to notice at all, 0.8
+                                        * overcorrected once the fade made
+                                        * it more noticeable in general) */
 
 /* Separable rewrite (was a direct (2*DOF_BLUR_RADIUS+1)-square-per-pixel
  * box average, i.e. 25 taps/pixel back when DOF_BLUR_RADIUS was 2): the
@@ -255,7 +274,7 @@ static inline uint8_t fx_clamp_byte(float v) {
  * (tracked via dof_needs_hsum[]), not once per *blurred* row's full square
  * footprint -- (2*DOF_BLUR_RADIUS+1) taps/pixel each pass instead of
  * (2*DOF_BLUR_RADIUS+1)^2, for rows that need it. */
-static void apply_dof(pixel_t *pixels, int pitch) {
+static void apply_dof(pixel_t *pixels, int pitch, float intensity) {
     int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
     int stride = pitch / (int)sizeof(pixel_t);
 #ifdef EB_FX_PROFILE
@@ -296,7 +315,7 @@ static void apply_dof(pixel_t *pixels, int pitch) {
             t = t * t * (3.0 - 2.0 * t); /* smoothstep: eased in AND out --
                                            * this is what actually removes
                                            * the seam, not just the lerp. */
-            dof_blend_row[y] = (float)(t * DOF_MAX_BLEND);
+            dof_blend_row[y] = (float)(t * DOF_MAX_BLEND) * intensity;
         }
     }
 
@@ -707,8 +726,26 @@ void platform_video_end_frame(void) {
         uint64_t p0, p1;
         p0 = platform_timer_ticks();
 #endif
-        if (want_experimental && !dof_suppressed)
-            apply_dof(locked_pixels, locked_pitch);
+        /* Ease dof_intensity toward whether DoF should be showing this
+         * frame (see its doc comment above) instead of gating apply_dof()
+         * on the hard boolean directly -- that's what produced the
+         * "abrupt stop" (reported live): fully present one frame, fully
+         * gone the next the instant dof_suppressed flips (battle entry,
+         * opening a window, Town Map, ...). Called every frame
+         * unconditionally (not just when the target is true) so the
+         * step is always exactly one DOF_FADE_STEP regardless of which
+         * direction it's easing, and apply_dof() itself is only called
+         * while there's still something to show. */
+        float dof_target = (want_experimental && !dof_suppressed) ? 1.0f : 0.0f;
+        if (dof_intensity < dof_target) {
+            dof_intensity += DOF_FADE_STEP;
+            if (dof_intensity > dof_target) dof_intensity = dof_target;
+        } else if (dof_intensity > dof_target) {
+            dof_intensity -= DOF_FADE_STEP;
+            if (dof_intensity < dof_target) dof_intensity = dof_target;
+        }
+        if (dof_intensity > 0.0f)
+            apply_dof(locked_pixels, locked_pitch, dof_intensity);
 #ifdef EB_FX_PROFILE
         p1 = platform_timer_ticks(); acc_dof += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
 #endif
