@@ -107,6 +107,16 @@ void platform_video_set_fx_suppressed(bool suppressed);
 void platform_video_set_dof_suppressed(bool suppressed);
 void platform_render_frame(scanline_stamp_cb_t fps_overlay_cb);
 
+/* Short build version string ("v1.2.1", "dev", ...) for display on the
+ * title screen / file-select (see version_overlay_stamp_scanline(),
+ * game_main.c) -- never NULL, but may be "" if none is available.
+ * Desktop (port/unix): the same git-describe string the self-updater
+ * compares releases against (main.c, generated/version.h) -- available
+ * unconditionally, independent of whether the updater itself is
+ * configured (EB_UPDATER_ENABLED). Embedded: always "" (no build-time
+ * git-describe step exists there yet) -- see updater_backend_stub.c. */
+const char *platform_get_version_string(void);
+
 /*
  * Input
  *

@@ -28,6 +28,16 @@
 #include "game/settings.h"
 #include "core/log.h"
 #include "core/state_dump.h"
+#include "version.h"    /* EB_VERSION_STRING -- generated, see CMakeLists.txt.
+                          * Unconditionally generated (not gated behind
+                          * EB_UPDATER_ENABLED the way sdl2_updater.c's own
+                          * #include of it is), so platform_get_version_string()
+                          * lives here rather than there -- it needs to work
+                          * even when the updater itself isn't configured. */
+
+const char *platform_get_version_string(void) {
+    return EB_VERSION_STRING;
+}
 
 #ifdef EB_RUNTIME_ASSETS
 #include "data/runtime_assets.h"

@@ -37,4 +37,13 @@ void platform_update_poll(EbUpdateProgress *out) {
     out->status = EB_UPDATE_UNSUPPORTED;
 }
 
+/* platform_get_version_string() lives here too, despite the "updater"
+ * filename -- same reasoning as everything else in this file: an
+ * embedded target has no build-time git-describe step (or self-update
+ * story) at all yet. Desktop's real implementation is in port/unix/
+ * main.c, unconditionally (not gated behind EB_UPDATER_ENABLED). */
+const char *platform_get_version_string(void) {
+    return "";
+}
+
 #endif /* EB_EMBEDDED */

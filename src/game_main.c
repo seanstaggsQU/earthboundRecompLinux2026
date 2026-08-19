@@ -282,6 +282,76 @@ static void fps_overlay_stamp_scanline(int y, pixel_t *pixels) {
     }
 }
 
+/* ---- Version string overlay (title screen / file-select only) ----
+ * This port's own addition: stamps the build version ("v1.2.1", "dev",
+ * ...) as small dim text near the bottom of the screen -- same scanline-
+ * stamp technique as the FPS overlay above, so it bypasses BG/tilemap
+ * state entirely and works identically over the title screen's raw
+ * sprite-driven logo animation and file-select's windowed UI.
+ *
+ * Positioned inside SNES_HEIGHT's own visible range, not the full
+ * EB_VIEWPORT_HEIGHT compiled canvas: platform_video_end_frame()'s
+ * default (zoom-off) crop only shows rows
+ * (EB_VIEWPORT_HEIGHT-SNES_HEIGHT)/2 .. that+SNES_HEIGHT (see
+ * sdl2_video.c) -- anything stamped below that range would render into
+ * the letterboxed-off margin and never actually be seen. Right-aligned
+ * with a small margin from the bottom-right corner, dim gray so it
+ * reads as a watermark rather than UI. */
+static void version_overlay_stamp_scanline(int y, pixel_t *pixels) {
+    const char *ver = platform_get_version_string();
+    if (!ver || !ver[0]) return;
+    if (!font_get_glyph(FONT_ID_TINY, 0)) return;
+
+    uint8_t h = font_get_height(FONT_ID_TINY);
+    int crop_top = (EB_VIEWPORT_HEIGHT - SNES_HEIGHT) / 2;
+    int text_top = crop_top + SNES_HEIGHT - h - 3; /* 3px margin above the visible bottom edge */
+    if (y < text_top || y >= text_top + h) return;
+    int glyph_y = y - text_top;
+
+    int text_w = 0;
+    for (const char *s = ver; *s; s++)
+        text_w += font_get_width(FONT_ID_TINY, ascii_to_eb_char(*s) - 0x50);
+    int ox = EB_VIEWPORT_WIDTH - text_w - 3;
+
+    pixel_t color = PIXEL_RGB(0x80, 0x80, 0x80);
+    int cx = ox;
+    for (const char *s = ver; *s; s++) {
+        uint8_t idx = ascii_to_eb_char(*s) - 0x50;
+        const uint8_t *glyph = font_get_glyph(FONT_ID_TINY, idx);
+        uint8_t w = font_get_width(FONT_ID_TINY, idx);
+        if (glyph) {
+            uint8_t bits = glyph[glyph_y];
+            for (int col = 0; col < w && col < 8; col++) {
+                if (!(bits & (0x80 >> col))) { /* 0-bit = drawn */
+                    int px = cx + col;
+                    if (px >= 0 && px < EB_VIEWPORT_WIDTH)
+                        pixels[px] = color;
+                }
+            }
+        }
+        cx += w;
+    }
+}
+
+/* Set fresh each frame in host_process_frame() before rendering; read by
+ * combined_overlay_stamp_scanline() below. A plain flag (not a parameter)
+ * for the same reason fps_overlay's state is module-level: platform_
+ * render_frame() only takes a single no-argument-beyond-(y,pixels)
+ * callback. */
+static bool version_overlay_show = false;
+
+/* Dispatches to whichever of the FPS/version overlays are active this
+ * frame -- platform_render_frame() takes only one scanline_stamp_cb_t,
+ * so when both can be on simultaneously (F3 toggled while looking at the
+ * title screen), this is the single callback passed for both. They don't
+ * collide on screen: FPS sits in the top-right corner, version overlay in
+ * the bottom-right. */
+static void combined_overlay_stamp_scanline(int y, pixel_t *pixels) {
+    if (show_fps && font_get_glyph(FONT_ID_TINY, 0))
+        fps_overlay_stamp_scanline(y, pixels);
+    if (version_overlay_show)
+        version_overlay_stamp_scanline(y, pixels);
+}
 
 /* Host-side per-frame processing (rendering, input, audio, timing).
  * Called by the host main loop after each fiber yield. This contains
@@ -390,10 +460,25 @@ void host_process_frame(void) {
          * Dual-core platforms distribute scanlines across cores. */
         {
             scanline_stamp_cb_t fps_cb = NULL;
-            if (show_fps && font_get_glyph(FONT_ID_TINY, 0)) {
+            bool want_fps = show_fps && font_get_glyph(FONT_ID_TINY, 0);
+            if (want_fps)
                 fps_overlay_prepare();
-                fps_cb = fps_overlay_stamp_scanline;
+
+            /* Version overlay: title screen / file-select only -- see
+             * version_overlay_stamp_scanline()'s doc comment. Same
+             * whole-stack scan shape as the zoom-reset/fx-suppression
+             * checks elsewhere in this file. */
+            version_overlay_show = false;
+            for (int i = 0; i < g_mode_stack.depth; i++) {
+                if (g_mode_stack.mode[i] == GAME_MODE_TITLE_SCREEN ||
+                    g_mode_stack.mode[i] == GAME_MODE_FILE_MENU) {
+                    version_overlay_show = true;
+                    break;
+                }
             }
+
+            if (want_fps || version_overlay_show)
+                fps_cb = combined_overlay_stamp_scanline;
             platform_render_frame(fps_cb);
         }
 
