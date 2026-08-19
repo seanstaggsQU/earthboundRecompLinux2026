@@ -775,10 +775,33 @@ void remove_char_from_party(uint16_t char_id) {
 
 /* --- Item access functions --- */
 
+/* Key Items pool feature, not part of the original ROM/assembly. Several
+ * item-use event scripts (found live: Key to the Cabin's unlock check,
+ * MSG_EVT1_CABIN_KEY_USE in EEVENT1.yml) re-fetch "the item currently
+ * being used" mid-script via GET_CHARACTER_ITEM(char_id, item_slot),
+ * reading the exact (char_id, item_slot) that mode_step_use_item()'s
+ * UI_SETUP already wrote to working_memory/argument_memory for ANY item
+ * use -- a pattern that only works when item_slot is a real inventory
+ * position, which a pool item doesn't have. mode_step_use_item() routes
+ * around this by setting item_slot to this sentinel (never a real 1-14
+ * slot) and recording the in-progress item_id here; get_character_item()
+ * recognizes the sentinel and returns that instead of indexing into
+ * items[]. See UseItemState.from_key_items_pool's doc comment
+ * (mode_stack.h) for the rest of the pool-Use adaptation.
+ * KEY_ITEMS_POOL_USE_SLOT_SENTINEL is declared in inventory.h (text.c
+ * needs it too, to set UseItemState.item_slot). */
+static uint16_t key_items_pool_use_item_id = 0;
+
+void key_items_set_use_in_progress(uint16_t item_id) {
+    key_items_pool_use_item_id = item_id;
+}
+
 /* GET_CHARACTER_ITEM: Port of asm/misc/get_character_item.asm.
  * Assembly calling convention: A=char_id, X=slot (both 1-indexed).
  * Returns the item ID at items[slot-1] for party_characters[char_id-1]. */
 uint16_t get_character_item(uint16_t char_id, uint16_t slot) {
+    if (slot == KEY_ITEMS_POOL_USE_SLOT_SENTINEL && key_items_pool_use_item_id != 0)
+        return key_items_pool_use_item_id;
     if (char_id == 0 || char_id > TOTAL_PARTY_COUNT) return 0;
     uint16_t char_idx = char_id - 1;
     uint16_t slot_idx = slot - 1;

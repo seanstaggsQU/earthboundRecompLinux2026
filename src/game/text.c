@@ -2327,9 +2327,21 @@ StepResult mode_step_use_item(ModeState *ms) {
 
             /* Assembly lines 29-37: get item from inventory. Key Items pool
              * feature: a pool item has no character/slot to read from --
-             * the parent already set item_id directly. */
-            if (!st->from_key_items_pool)
+             * the parent already set item_id directly. item_slot is set to
+             * KEY_ITEMS_POOL_USE_SLOT_SENTINEL (rather than left 0) because
+             * UI_SETUP below writes it to argument_memory for ANY item use,
+             * and some item-use scripts re-fetch "the item being used" via
+             * GET_CHARACTER_ITEM(working_memory, argument_memory) mid-script
+             * (found live: Key to the Cabin's unlock check) -- the sentinel
+             * plus key_items_set_use_in_progress() is what makes that
+             * re-fetch still resolve correctly for a pool item. See
+             * get_character_item()'s doc comment (inventory.c). */
+            if (st->from_key_items_pool) {
+                st->item_slot = KEY_ITEMS_POOL_USE_SLOT_SENTINEL;
+                key_items_set_use_in_progress(st->item_id);
+            } else {
                 st->item_id = get_character_item(st->char_id, st->item_slot) & 0xFF;
+            }
 
             /* Assembly lines 38-50: look up item config entry. A missing entry
              * skips straight to the action-window setup with can_use=0 (the
@@ -2655,6 +2667,8 @@ StepResult mode_step_use_item(ModeState *ms) {
         default:
             /* @CLOSE_TEXT_WINDOW (assembly lines 540-543) */
             close_window(WINDOW_TEXT_STANDARD);
+            if (st->from_key_items_pool)
+                key_items_set_use_in_progress(0); /* hygiene, see inventory.c */
             return STEP_RESULT_POP(1);  /* TRUE */
         }
     }

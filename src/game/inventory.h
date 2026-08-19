@@ -218,10 +218,22 @@ uint16_t key_items_give(uint16_t item_id);
  * Returns item_id (truthy) if present, 0 if not. */
 uint16_t key_items_find(uint16_t item_id);
 
+/* Sentinel item_slot value mode_step_use_item() (text.c) uses for a
+ * pool-sourced item -- see get_character_item()'s doc comment (inventory.c)
+ * for the full rationale. Never a real 1-14 inventory slot. */
+#define KEY_ITEMS_POOL_USE_SLOT_SENTINEL 0xFFFFu
+
 /* KEY_ITEMS_REMOVE: finds and removes item_id from the pool, compacting
  * (shift-left) to keep it packed toward index 0.
  * Returns the removed item_id, or 0 if not found. */
 uint16_t key_items_remove(uint16_t item_id);
+
+/* KEY_ITEMS_SET_USE_IN_PROGRESS: records which pool item is currently
+ * being Used, for get_character_item()'s KEY_ITEMS_POOL_USE_SLOT_SENTINEL
+ * special case (inventory.c) -- see that constant's doc comment for the
+ * full rationale. Called by mode_step_use_item() (text.c) when
+ * UseItemState.from_key_items_pool is set; pass 0 to clear. */
+void key_items_set_use_in_progress(uint16_t item_id);
 
 /* --- Escargo Express functions --- */
 

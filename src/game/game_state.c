@@ -641,5 +641,32 @@ bool key_items_selftest(void) {
         ok = false;
     }
 
+    /* --- 6. get_character_item() sentinel regression check. Found live:
+     * an item's own "use" script can re-fetch "the item currently being
+     * used" via GET_CHARACTER_ITEM(working_memory, argument_memory) --
+     * mode_step_use_item() answers that for a pool item by setting
+     * item_slot to KEY_ITEMS_POOL_USE_SLOT_SENTINEL and calling
+     * key_items_set_use_in_progress() first. Exercise that contract
+     * directly (no mode-stack pump needed) rather than only the CRUD
+     * layer underneath it, which is what let this regress silently the
+     * first time -- the CRUD self-test above passed the whole time this
+     * was broken live. */
+    key_items_set_use_in_progress(TEST_ITEM);
+    uint16_t sentinel_result = get_character_item(1, KEY_ITEMS_POOL_USE_SLOT_SENTINEL);
+    if (sentinel_result != TEST_ITEM) {
+        fprintf(stderr, "key_items_selftest: FAIL -- get_character_item() with the "
+                        "pool-use sentinel slot returned %u, expected %u (this is "
+                        "exactly the bug that made every key item's use-script "
+                        "possession re-check silently fail)\n",
+                sentinel_result, TEST_ITEM);
+        ok = false;
+    }
+    key_items_set_use_in_progress(0); /* clear -- a normal slot lookup must not see it */
+    if (get_character_item(1, KEY_ITEMS_POOL_USE_SLOT_SENTINEL) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- get_character_item() still "
+                        "returns a pool item after key_items_set_use_in_progress(0)\n");
+        ok = false;
+    }
+
     return ok;
 }
