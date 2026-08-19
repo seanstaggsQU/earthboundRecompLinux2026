@@ -57,6 +57,11 @@
 static SDL_Window *window;
 static SDL_Renderer *renderer;
 static SDL_Texture *texture;
+/* 2x-resolution texture for the Experimental Visuals Scale2x/EPX
+ * antialiasing pass (see apply_aa_upscale()) -- fed via SDL_UpdateTexture
+ * (not locked/streamed like `texture`), swapped in for the final blit
+ * instead of `texture` only on frames where it ran. */
+static SDL_Texture *aa_texture;
 
 /* Overworld FOV/zoom cycle (R3) -- see platform_video_set_zoom() below and
  * AUX_ZOOM_TOGGLE in game_main.c. EB_ZOOM_OFF = default, matches every
@@ -493,6 +498,112 @@ static void apply_color_grade(pixel_t *pixels, int pitch) {
     }
 }
 
+/* ---- Anti-Aliasing: a Scale2x/EPX 2x pixel-art upscale, folded into
+ * Experimental Visuals per request rather than a separate Config row.
+ * Runs last, after DoF/Light Shafts/Color Grading have already modified
+ * locked_pixels, so it smooths the fully composited frame.
+ *
+ * Unlike DoF/Light Shafts/Color Grading, this does NOT respect fx_
+ * suppressed/dof_suppressed (title screen, file-select, battle, Town Map,
+ * open windows): those suppressions exist because those three effects are
+ * stylistic choices that specific screens weren't art-directed for.
+ * Antialiasing isn't a style choice -- smoothing jagged diagonal edges
+ * looks equally correct everywhere, including the title screen, so it
+ * simply runs whenever Experimental Visuals is on, full stop.
+ *
+ * Scale2x/EPX (not a blur): for each source pixel, compares its 4
+ * orthogonal neighbors (above/left/right/below) and expands it to a 2x2
+ * block, using an edge-aware rule that only replaces a corner with a
+ * neighboring color when that neighbor pair agrees on one axis and
+ * disagrees on the other -- this smooths a jagged diagonal staircase edge
+ * into single-pixel steps without blurring flat color regions or fine
+ * detail the way a naive resize would. Verified against a synthetic
+ * staircase test pattern (finer, smoother steps in the output vs. the
+ * source's blockier steps) before shipping. Chosen over the fancier xBRZ
+ * for a first pass: much simpler to implement and verify correctly, at
+ * the cost of xBRZ's more sophisticated corner/pattern detection -- worth
+ * revisiting later if Scale2x's results aren't sharp enough on real
+ * sprite art.
+ *
+ * Produces a full 2x-resolution frame (aa_upscaled/aa_texture below), not
+ * an in-place effect on the EB_VIEWPORT-sized buffer like the other three
+ * -- platform_video_end_frame() swaps in aa_texture (with a correspondingly
+ * 2x'd crop rect) for the final blit instead of the normal texture when
+ * this ran, rather than writing back into locked_pixels.
+ *
+ * Tolerance-based neighbor comparison, not exact equality: reported (and
+ * root-caused) as making text look "wonky"/like it's toggling between
+ * pixels frame to frame. Scale2x's corner-replacement decision is a hard
+ * function of exact pixel equality -- for genuinely static source pixels
+ * that's perfectly stable (same input, same output, always), but this
+ * engine has legitimate, intentional per-frame ambient palette animation
+ * (see update_map_palette_animation(), overworld_palette.c -- used for
+ * water shimmer and similar SNES-era cosmetic effects), which shifts
+ * affected pixels by a color step or two every frame. Imperceptible on
+ * its own, but exact-equality Scale2x turns that subtle wobble into a
+ * full binary flip of which corner gets replaced -- and text sitting
+ * next to an animating background is exactly where a stable neighbor
+ * relationship (background == background) can intermittently stop
+ * holding, producing a visibly flickering edge each time the animation
+ * ticks. aa_similar() treats two colors as equivalent for this decision
+ * if they're within AA_COLOR_TOLERANCE per channel (roughly one BGR565
+ * quantization step), absorbing that kind of small ambient wobble while
+ * still telling genuinely different colors (an actual sprite/text edge)
+ * apart. Verified with a synthetic test before shipping: a background
+ * wobbling by one full quantization step between two synthetic "frames"
+ * produced zero text-edge-shape disagreements with tolerance, versus
+ * real disagreements without it. */
+#define AA_SCALE 2
+#define AA_COLOR_TOLERANCE 10  /* max per-8-bit-channel delta to treat two
+                                 * colors as the same for this decision */
+
+static pixel_t aa_upscaled[EB_VIEWPORT_WIDTH * AA_SCALE * EB_VIEWPORT_HEIGHT * AA_SCALE];
+
+static inline pixel_t aa_at(const pixel_t *src, int stride, int w, int h, int x, int y) {
+    if (x < 0) x = 0;
+    if (x >= w) x = w - 1;
+    if (y < 0) y = 0;
+    if (y >= h) y = h - 1;
+    return src[y * stride + x];
+}
+
+static inline bool aa_similar(pixel_t a, pixel_t b) {
+    if (a == b) return true;
+    uint8_t ar, ag, ab, br, bg, bb;
+    fx_unpack(a, &ar, &ag, &ab);
+    fx_unpack(b, &br, &bg, &bb);
+    int dr = ar - br; if (dr < 0) dr = -dr;
+    int dg = ag - bg; if (dg < 0) dg = -dg;
+    int db = ab - bb; if (db < 0) db = -db;
+    return dr <= AA_COLOR_TOLERANCE && dg <= AA_COLOR_TOLERANCE && db <= AA_COLOR_TOLERANCE;
+}
+
+static void apply_aa_upscale(const pixel_t *src, int src_pitch, pixel_t *dst, int dst_stride) {
+    int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
+    int src_stride = src_pitch / (int)sizeof(pixel_t);
+
+    for (int y = 0; y < h; y++) {
+        for (int x = 0; x < w; x++) {
+            pixel_t e = aa_at(src, src_stride, w, h, x, y);
+            pixel_t b = aa_at(src, src_stride, w, h, x, y - 1); /* above */
+            pixel_t d = aa_at(src, src_stride, w, h, x - 1, y); /* left */
+            pixel_t f = aa_at(src, src_stride, w, h, x + 1, y); /* right */
+            pixel_t g = aa_at(src, src_stride, w, h, x, y + 1); /* below */
+
+            pixel_t p1 = (aa_similar(d, b) && !aa_similar(d, g) && !aa_similar(b, f)) ? d : e;
+            pixel_t p2 = (aa_similar(b, f) && !aa_similar(b, d) && !aa_similar(f, g)) ? f : e;
+            pixel_t p3 = (aa_similar(d, g) && !aa_similar(d, b) && !aa_similar(g, f)) ? d : e;
+            pixel_t p4 = (aa_similar(g, f) && !aa_similar(d, g) && !aa_similar(b, f)) ? f : e;
+
+            int ox = x * AA_SCALE, oy = y * AA_SCALE;
+            dst[oy * dst_stride + ox]         = p1;
+            dst[oy * dst_stride + ox + 1]     = p2;
+            dst[(oy + 1) * dst_stride + ox]     = p3;
+            dst[(oy + 1) * dst_stride + ox + 1] = p4;
+        }
+    }
+}
+
 bool platform_video_init(void) {
     if (platform_headless)
         return true;  /* No window needed */
@@ -569,14 +680,22 @@ bool platform_video_init(void) {
         EB_VIEWPORT_WIDTH, EB_VIEWPORT_HEIGHT);
     if (!texture) return false;
 
+    aa_texture = SDL_CreateTexture(renderer,
+        SDL_PIXELFORMAT_BGR565,
+        SDL_TEXTUREACCESS_STREAMING,
+        EB_VIEWPORT_WIDTH * AA_SCALE, EB_VIEWPORT_HEIGHT * AA_SCALE);
+    if (!aa_texture) return false;
+
     return true;
 }
 
 void platform_video_shutdown(void) {
-    if (texture)  SDL_DestroyTexture(texture);
-    if (renderer) SDL_DestroyRenderer(renderer);
-    if (window)   SDL_DestroyWindow(window);
+    if (texture)    SDL_DestroyTexture(texture);
+    if (aa_texture) SDL_DestroyTexture(aa_texture);
+    if (renderer)   SDL_DestroyRenderer(renderer);
+    if (window)     SDL_DestroyWindow(window);
     texture = NULL;
+    aa_texture = NULL;
     renderer = NULL;
     window = NULL;
 }
@@ -609,6 +728,14 @@ pixel_t *platform_video_get_framebuffer(void) {
 void platform_video_end_frame(void) {
     if (platform_headless)
         return;
+
+    bool want_experimental = engine_experimental_visuals == EXPERIMENTAL_VISUALS_ON;
+    /* Set true only if the Scale2x upscale actually ran this frame (i.e.
+     * locked_pixels was valid) -- guards against swapping to aa_texture
+     * on a frame where SDL_LockTexture failed in platform_video_begin_frame()
+     * and it would otherwise hold stale content from a previous frame. */
+    bool aa_ran = false;
+
     if (locked_pixels) {
         /* All three Experimental Visuals effects share one Config toggle
          * (engine_experimental_visuals) but keep independent suppression:
@@ -617,19 +744,32 @@ void platform_video_end_frame(void) {
          * platform_video_set_dof_suppressed()/host_process_frame()).
          * Fixed pipeline order: DoF blurs the base scene first (so Light
          * Shafts/Color Grading's highlights stay crisp, not pre-blurred);
-         * Color Grading runs last so it grades the fully composited
-         * image. */
-        bool want_experimental = engine_experimental_visuals == EXPERIMENTAL_VISUALS_ON;
-
+         * Color Grading runs before antialiasing so it grades the base
+         * scene, not the upscaled one (grading is resolution-independent,
+         * so this order doesn't matter for correctness, just consistency
+         * with "grade the composited scene" already established). AA runs
+         * last and unconditionally when Experimental Visuals is on -- see
+         * apply_aa_upscale()'s doc comment for why it skips fx_suppressed/
+         * dof_suppressed unlike the other three. */
         if (want_experimental && !dof_suppressed)
             apply_dof(locked_pixels, locked_pitch);
         if (want_experimental && !fx_suppressed)
             apply_light_shafts(locked_pixels, locked_pitch);
         if (want_experimental && !fx_suppressed)
             apply_color_grade(locked_pixels, locked_pitch);
+        if (want_experimental) {
+            apply_aa_upscale(locked_pixels, locked_pitch,
+                              aa_upscaled, EB_VIEWPORT_WIDTH * AA_SCALE);
+            aa_ran = true;
+        }
 
         SDL_UnlockTexture(texture);
         locked_pixels = NULL;
+
+        if (aa_ran) {
+            SDL_UpdateTexture(aa_texture, NULL, aa_upscaled,
+                               EB_VIEWPORT_WIDTH * AA_SCALE * (int)sizeof(pixel_t));
+        }
     }
     SDL_RenderClear(renderer);
 
@@ -688,10 +828,17 @@ void platform_video_end_frame(void) {
         content_h = SNES_HEIGHT;
         break;
     }
+    /* crop is expressed in whichever texture is about to be blitted:
+     * aa_texture (AA_SCALE resolution) on a frame the Scale2x upscale ran,
+     * `texture` (native EB_VIEWPORT resolution) otherwise -- same
+     * proportions either way, just scaled up by AA_SCALE when sourcing
+     * from the upscaled texture, so every zoom mode's crop math above
+     * still applies unchanged. */
+    int crop_scale = aa_ran ? AA_SCALE : 1;
     SDL_Rect crop = {
-        (EB_VIEWPORT_WIDTH  - content_w) / 2,
-        (EB_VIEWPORT_HEIGHT - content_h) / 2,
-        content_w, content_h
+        ((EB_VIEWPORT_WIDTH  - content_w) / 2) * crop_scale,
+        ((EB_VIEWPORT_HEIGHT - content_h) / 2) * crop_scale,
+        content_w * crop_scale, content_h * crop_scale
     };
 
     /* Explicitly compute the aspect-preserving, centered destination rect
@@ -709,7 +856,7 @@ void platform_video_end_frame(void) {
     int dst_h = (int)(content_h * scale);
     SDL_Rect dst = { (out_w - dst_w) / 2, (out_h - dst_h) / 2, dst_w, dst_h };
 
-    SDL_RenderCopy(renderer, texture, &crop, &dst);
+    SDL_RenderCopy(renderer, aa_ran ? aa_texture : texture, &crop, &dst);
 
     if (pending_screenshot_path[0]) {
         write_window_screenshot(pending_screenshot_path);

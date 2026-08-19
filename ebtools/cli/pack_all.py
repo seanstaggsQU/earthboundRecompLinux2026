@@ -570,10 +570,13 @@ def pack_all(
     # A custom_assets override (src/custom_assets/dont_care_names.json) wins
     # over the ROM-extracted default (assets_dir/locale/data/dont_care_names.json,
     # which lives under the gitignored extraction cache and gets silently
-    # regenerated from the donor ROM by every `ebtools extract`). This is the
-    # one JSON asset type with a custom_assets override today: unlike the
+    # regenerated from the donor ROM by every `ebtools extract`). Unlike the
     # ROM-extracted default, a customized name list is original, non-ROM text
-    # a modder/maintainer wants version-controlled and durable across re-extracts.
+    # a modder/maintainer wants version-controlled and durable across
+    # re-extracts. (See also: enemy name overrides, applied further below in
+    # the json_packers loop -- same reasoning, different shape, since that
+    # one patches specific fields of an otherwise-ROM-derived table rather
+    # than replacing a whole small file.)
     dont_care_custom_json = assets_dir.parent / "custom_assets" / "dont_care_names.json"
     dont_care_json = (
         dont_care_custom_json
@@ -600,6 +603,8 @@ def pack_all(
 
     for label, rel_path, func, kwargs in json_packers:
         json_path = assets_dir / rel_path
+        if rel_path == "enemies/enemies.json":
+            json_path = _apply_enemy_name_overrides(json_path, assets_dir, output_dir)
         if json_path.exists():
             func(json_path, output_dir, addr_remap=addr_remap, **kwargs)  # type: ignore[call-arg]
             packed += 1
@@ -1096,6 +1101,57 @@ def _pack_items(json_path: Path, output_dir: Path, *, doc, string_table=None, ad
         string_table=string_table,
         addr_remap=addr_remap,
     )
+
+
+def _apply_enemy_name_overrides(json_path: Path, assets_dir: Path, output_dir: Path) -> Path:
+    """Applies src/custom_assets/enemy_name_overrides.json (if present) on top
+    of the ROM-extracted enemies.json, writing a patched copy for the packer
+    to read instead of the original.
+
+    enemies.json itself lives under the gitignored extraction cache and gets
+    silently regenerated from the donor ROM by every `ebtools extract` --- a
+    direct edit to it (e.g. renaming one enemy) would vanish on the next
+    extract. Unlike dont_care_names.json's override (a small, wholly
+    original file that's fine to replace outright), enemies.json is a large,
+    mostly ROM-derived table where a maintainer usually wants to tweak one
+    or two fields, not maintain a full 250+-entry shadow copy that silently
+    drifts out of sync with future ROM-extraction fixes. So this patches
+    specific fields instead of replacing the whole file.
+
+    Override file format: ``{"<enemy id>": {"name": "New Name"}}`` (only
+    "name" is supported today; extend the loop below if more fields need
+    this). Silently skipped if the override file or `enemies.json` itself
+    doesn't exist, or if an id doesn't match any entry (warned, not fatal,
+    so a stale override from a ROM-layout change doesn't break the build).
+    """
+    overrides_path = assets_dir.parent / "custom_assets" / "enemy_name_overrides.json"
+    if not overrides_path.exists() or not json_path.exists():
+        return json_path
+
+    import json as _json
+
+    overrides = _json.loads(overrides_path.read_text())
+    data = _json.loads(json_path.read_text())
+    entries_by_id = {entry["id"]: entry for entry in data.get("enemies", [])}
+
+    applied = 0
+    for id_str, patch in overrides.items():
+        entry = entries_by_id.get(int(id_str))
+        if entry is None:
+            print(f"  WARNING: enemy_name_overrides.json references unknown enemy id {id_str}, skipping")
+            continue
+        if "name" in patch:
+            entry["name"] = patch["name"]
+            applied += 1
+
+    if applied == 0:
+        return json_path
+
+    patched_path = output_dir / "_enemies_with_name_overrides.json"
+    patched_path.parent.mkdir(parents=True, exist_ok=True)
+    patched_path.write_text(_json.dumps(data))
+    print(f"  Applying {applied} enemy name override(s) from custom_assets/enemy_name_overrides.json")
+    return patched_path
 
 
 def _pack_enemies(json_path: Path, output_dir: Path, *, doc, common_data, string_table=None, addr_remap=None) -> None:
