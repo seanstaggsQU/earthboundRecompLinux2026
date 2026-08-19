@@ -2431,6 +2431,19 @@ static uint8_t get_collision_tile_and_check_ladder(int16_t tile_x, int16_t tile_
     uint16_t ty = (uint16_t)tile_y & 0x3F;
     uint8_t flags = ml.loaded_collision_tiles[ty * 64 + tx];
 
+#ifdef EB_DOOR_COLLISION_PROFILE
+    /* Diagnostic added while chasing a report of a door that's never even
+     * detected (process_door_at_tile never fires -- no door TYPE logged at
+     * all, not just blocked). Logs every collision-tile sample so a tester
+     * walking directly into the door shows exactly which tiles the 6-point
+     * pattern actually checked and their raw flag bytes -- if the door's
+     * own tile (bit 0x10) never appears in this log while standing right
+     * next to it, that confirms the sample points are missing its row/col
+     * entirely rather than finding it but failing some later guard. */
+    LOG_WARN("collision: tile(%d,%d) flags=0x%02X%s\n", tile_x, tile_y, flags,
+             (flags & 0x10) ? " LADDER/DOOR" : "");
+#endif
+
     if (flags & 0x10) {
         ow.ladder_stairs_tile_x = tile_x;
         ow.ladder_stairs_tile_y = tile_y;

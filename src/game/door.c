@@ -29,6 +29,8 @@
 #include "game/battle.h"
 #include "core/mode_stack.h"
 #include "core/log.h"
+#include "core/memory.h"
+#include "include/pad.h"
 #include "game/display_text.h"
 #include "game/display_text_internal.h"
 #include "data/text_refs.h"
@@ -179,15 +181,45 @@ static void try_activate_door(uint16_t door_offset) {
     /* Assembly lines 10-19: guard conditions.
      * LOG_WARN'd on each bail-out -- diagnostic added while chasing a
      * report of a specific door being completely unresponsive (walking
-     * into it does nothing, not even a "locked" message). If that door's
-     * door_type really is DOOR_TYPE_2 (this function), one of these four
-     * guards is the prime suspect; this pins down which one without
-     * needing to reproduce it under a debugger. Cheap: only reached when
-     * the player is standing on/adjacent to a detected door/ladder tile,
-     * not every frame. */
-    if (!ow.player_has_done_something_this_frame) {
+     * into it does nothing, not even a "locked" message). Pinned the
+     * report down to this first guard via live reproduction (not just
+     * static reading): PLAYER_HAS_DONE_SOMETHING_THIS_FRAME has exactly
+     * three writers in both the original assembly and this port, verified
+     * line-for-line identical (update_joypad_state.asm: increments on a
+     * fresh button-press edge; update_overworld_frame.asm: set to 1 if
+     * leader_moved was true; door_transition.asm: zeroed when a door
+     * transition finishes) -- so this isn't a transcription bug. The
+     * deadlock is structural: PROCESS_DOOR_AT_TILE always returns 0 for a
+     * DOOR_TYPE_2 door regardless of whether activation succeeds (by
+     * design -- the player's sprite never walks *into* a door, the screen
+     * transition handles "through" separately), which forces
+     * leader_moved back to 0 the instant the player touches one. If the
+     * player is boxed in tightly enough that literally no movement can
+     * succeed before or during contact (no room to even nudge/slide),
+     * leader_moved never gets a true reading to propagate, and holding a
+     * direction generates no further button-press *edges* to fall back
+     * on (SDL's key-repeat and a real controller's poll both look like a
+     * continuous hold, not repeated fresh presses) -- so the flag can get
+     * stuck at 0 indefinitely for exactly as long as the player holds
+     * still against the door. Reproduced live against multiple doors this
+     * way, 100% of attempts, for as long as the direction was held.
+     *
+     * This is a genuine deadlock in a mechanism the original ROM also
+     * has, not a C-port-introduced divergence -- but it's also a real,
+     * reported, reproducible bug at a specific in-game door, so rather
+     * than leave it as "faithful but broken," widen this ONE guard site
+     * (verified the only reader of this flag anywhere in the codebase --
+     * safe to touch without side effects elsewhere) to also accept "the
+     * player is currently holding a direction," not just "already
+     * confirmed to have done something." A player pressing into a door
+     * IS actively trying to interact with it regardless of whether their
+     * sprite's pixel position happened to change that exact frame; this
+     * doesn't change any ROM data or any other door's behavior, only
+     * rescues the case where the existing flag can never legitimately
+     * recover on its own. */
+    if (!ow.player_has_done_something_this_frame && !(core.pad1_held & PAD_DPAD)) {
         LOG_WARN("door: try_activate_door(offset=0x%04X) blocked -- "
-                 "player_has_done_something_this_frame == 0\n", door_offset);
+                 "player_has_done_something_this_frame == 0 and no direction held\n", door_offset);
         return;
     }
     if (game_state.camera_mode == 2) {
@@ -1178,6 +1210,9 @@ StepResult mode_step_door_transition(ModeState *ms) {
                 uint16_t flag_id = st->event_flag_raw & 0x7FFF;
                 bool flag_value = event_flag_get(flag_id);
                 bool expected = (st->event_flag_raw > 0x8000);
+                LOG_WARN("door_transition: event_flag_raw=0x%04X flag_id=%u flag_value=%d "
+                         "expected=%d %s\n", st->event_flag_raw, flag_id, flag_value, expected,
+                         (flag_value != expected) ? "-- POPPING EARLY (door does nothing)" : "-- OK, proceeding");
                 if (flag_value != expected) {
                     dr.using_door = 0;
                     return STEP_RESULT_POP(0);
