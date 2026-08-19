@@ -176,11 +176,36 @@ static void check_door_event_flag(uint16_t door_offset) {
 /* ---- TRY_ACTIVATE_DOOR (C06ACA) ---- */
 
 static void try_activate_door(uint16_t door_offset) {
-    /* Assembly lines 10-19: guard conditions */
-    if (!ow.player_has_done_something_this_frame) return;
-    if (game_state.camera_mode == 2) return;
-    if (ow.pending_interactions) return;
-    if (ow.enemy_has_been_touched || ow.battle_swirl_countdown) return;
+    /* Assembly lines 10-19: guard conditions.
+     * LOG_WARN'd on each bail-out -- diagnostic added while chasing a
+     * report of a specific door being completely unresponsive (walking
+     * into it does nothing, not even a "locked" message). If that door's
+     * door_type really is DOOR_TYPE_2 (this function), one of these four
+     * guards is the prime suspect; this pins down which one without
+     * needing to reproduce it under a debugger. Cheap: only reached when
+     * the player is standing on/adjacent to a detected door/ladder tile,
+     * not every frame. */
+    if (!ow.player_has_done_something_this_frame) {
+        LOG_WARN("door: try_activate_door(offset=0x%04X) blocked -- "
+                 "player_has_done_something_this_frame == 0\n", door_offset);
+        return;
+    }
+    if (game_state.camera_mode == 2) {
+        LOG_WARN("door: try_activate_door(offset=0x%04X) blocked -- "
+                 "camera_mode == 2\n", door_offset);
+        return;
+    }
+    if (ow.pending_interactions) {
+        LOG_WARN("door: try_activate_door(offset=0x%04X) blocked -- "
+                 "pending_interactions == %u\n", door_offset, ow.pending_interactions);
+        return;
+    }
+    if (ow.enemy_has_been_touched || ow.battle_swirl_countdown) {
+        LOG_WARN("door: try_activate_door(offset=0x%04X) blocked -- "
+                 "enemy_has_been_touched=%u battle_swirl_countdown=%u\n",
+                 door_offset, ow.enemy_has_been_touched, ow.battle_swirl_countdown);
+        return;
+    }
 
     /* Assembly lines 20-35: set up door interaction */
     door_offset &= 0x7FFF;
@@ -610,6 +635,20 @@ static void handle_stairs_leave_callback(void) {
 
 uint16_t process_door_at_tile(uint16_t x_tile, uint16_t y_tile) {
     uint8_t door_type = find_door_at_position(x_tile, y_tile);
+
+    /* Diagnostic added while chasing a report of a specific door being
+     * completely unresponsive -- see try_activate_door()'s doc comment.
+     * Logs the resolved door_type/offset for every actual door hit (not
+     * every ladder-tile scan -- find_door_at_position() already returns
+     * 0xFF for "no door here", the overwhelmingly common case, which this
+     * skips) so a tester's log pinpoints whether a "dead" door is even
+     * being *found* with the expected type, vs. found-but-blocked inside
+     * one of the type handlers, vs. not found at all (wrong tile/sector
+     * data). */
+    if (door_type != 0xFF) {
+        LOG_WARN("door: process_door_at_tile(x=%u,y=%u) -> type=%u offset=0x%04X\n",
+                 x_tile, y_tile, door_type, dr.door_found);
+    }
 
     uint16_t result = 0;
 
