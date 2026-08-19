@@ -415,22 +415,25 @@ static void apply_light_shafts(pixel_t *pixels, int pitch) {
  * edge, and DOF_FOCUS_BAND_FRACTION now covers more of the screen (only
  * the outer edges taper at all) -- both narrowing per feedback that the
  * effect needed to be smaller/more subtle overall, not just smoother. */
-#define DOF_FOCUS_BAND_FRACTION 0.75  /* central 75% of height stays fully
-                                        * sharp (was 0.55 -- "needs to be
-                                        * smaller"). NOTE: this is compared
-                                        * directly against `dist` below,
-                                        * which is already normalized to
-                                        * 0..1 across the center-to-edge
-                                        * half of the screen -- do NOT halve
-                                        * it again (a `/ 2.0` crept in here
-                                        * once and silently shrank the sharp
-                                        * band to ~37.5% of the height
-                                        * instead of the 75% this comment
-                                        * promises; found via a synthetic
-                                        * per-row blend dump, not visually
-                                        * obvious since the blur stayed
-                                        * symmetric, just far more of the
-                                        * screen than intended). */
+/* Compared directly against `dist` below, which is already normalized
+ * 0..1 across the center-to-edge half of the screen -- so this value IS
+ * the fraction of the height that stays sharp, no further halving.
+ *
+ * An earlier version of this code computed `band_half = <this> / 2.0`
+ * with the constant set to 0.75 and a comment claiming "central 75% of
+ * height stays fully sharp" -- the extra `/ 2.0` meant the ACTUAL sharp
+ * band was half that, ~37.5%. Tried correcting the math to match the
+ * comment (dropping the `/ 2.0`, keeping 0.75) and shipped it to a live
+ * test: the effect nearly vanished -- confined to a 16-row strip at the
+ * very screen edge, peak blend cut from ~0.49 to ~0.26, reported back as
+ * "no tilt shift effect at all". Whatever 0.75-with-the-bug produced
+ * (effectively 0.375) was the actually-tuned, actually-liked look, even
+ * though the comment never matched it. Set directly to that effective
+ * value instead of re-deriving it through a stale "75%" framing --
+ * restores the exact shipped behavior, just without the self-
+ * contradicting math. If this ever needs retuning, treat 0.375 as the
+ * current baseline "how much of the height stays sharp", not 0.75. */
+#define DOF_FOCUS_BAND_FRACTION 0.375
 #define DOF_BLUR_RADIUS  2             /* fixed blur kernel radius -- only
                                         * the blend amount ramps, not this */
 #define DOF_MAX_BLEND    0.55f         /* even at the extreme edge, blend at
