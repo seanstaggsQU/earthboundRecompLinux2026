@@ -119,6 +119,7 @@ def pack_enemies_cmd(
     commondata: Annotated[Path, Parameter(alias="-c")] = Path("commondefs.yml"),
 ) -> None:
     """Pack enemies.json back to binary enemy configuration table."""
+    from ebtools.cli.pack_all import _apply_enemy_name_overrides
     from ebtools.parsers.enemy import pack_enemies
 
     if not enemies_json.exists():
@@ -128,7 +129,14 @@ def pack_enemies_cmd(
     doc = load_dump_doc(yaml_config)
     common_data = load_common_data(commondata)
     output_path = output_dir / "data" / "enemy_configuration_table.bin"
-    pack_enemies(enemies_json, doc.textTable, common_data, output_path)
+    # Same override step `pack-all` applies (see that function's docstring)
+    # -- without this, running `pack enemies` directly (rather than through
+    # `pack-all`) would silently skip src/custom_assets/enemy_name_overrides.json
+    # and pack the unpatched ROM-extracted names instead.
+    patched_json = _apply_enemy_name_overrides(enemies_json, enemies_json.parent.parent, output_dir)
+    pack_enemies(patched_json, doc.textTable, common_data, output_path)
+    if patched_json != enemies_json and patched_json.exists():
+        patched_json.unlink()  # scratch intermediate, see _apply_enemy_name_overrides()
     print(f"Packed enemies to {output_path}")
 
 

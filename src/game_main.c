@@ -376,6 +376,19 @@ static void combined_overlay_stamp_scanline(int y, pixel_t *pixels) {
         version_overlay_stamp_scanline(y, pixels);
 }
 
+/* Shared by the several "is a full-screen-layout / title-file-select mode
+ * anywhere on the stack" checks below (zoom reset, version overlay, Fx/DoF
+ * suppression) -- scans the whole stack, not just the top, since any of
+ * them can be pushed while a text box is still an ancestor frame (see the
+ * individual call sites' comments for why each one cares). */
+static bool mode_stack_has_any(GameMode a, GameMode b) {
+    for (int i = 0; i < g_mode_stack.depth; i++) {
+        if (g_mode_stack.mode[i] == a || g_mode_stack.mode[i] == b)
+            return true;
+    }
+    return false;
+}
+
 /* Host-side per-frame processing (rendering, input, audio, timing).
  * Called by the host main loop after each fiber yield. This contains
  * the work that the SNES NMI handler + main loop timing would do. */
@@ -383,6 +396,17 @@ void host_process_frame(void) {
     uint64_t t0, t1, t2;
 
     t0 = platform_timer_ticks();
+
+    /* Computed once per frame and reused by every "is a full-screen-layout
+     * / title-file-select mode anywhere on the stack" check below (zoom
+     * reset, version overlay, Fx/DoF suppression) -- the mode stack can't
+     * change mid-frame (mode transitions only happen via the dispatch loop
+     * that calls host_process_frame(), never from inside it), so scanning
+     * it once here and reusing the result is equivalent to each site
+     * re-scanning it itself, just without repeating the same tiny loop
+     * four times a frame. */
+    bool in_battle_or_town_map = mode_stack_has_any(GAME_MODE_BATTLE, GAME_MODE_TOWN_MAP);
+    bool in_title_or_file_select = mode_stack_has_any(GAME_MODE_TITLE_SCREEN, GAME_MODE_FILE_MENU);
 
     /* Capture-safety free-run: while a snapshot is pending, this frame is a pure
      * unwind step — keep the per-frame logic (fade/timers/RNG/tasks) so blocking
@@ -498,18 +522,9 @@ void host_process_frame(void) {
              * script) reached one of these modes without resetting it
              * first -- rather than have the overlay itself try to track
              * every possible crop size, just don't show it that frame.
-             * Same whole-stack scan shape as the zoom-reset/fx-
-             * suppression checks elsewhere in this file. */
-            version_overlay_show = false;
-            if (ow.zoom_mode == EB_ZOOM_OFF) {
-                for (int i = 0; i < g_mode_stack.depth; i++) {
-                    if (g_mode_stack.mode[i] == GAME_MODE_TITLE_SCREEN ||
-                        g_mode_stack.mode[i] == GAME_MODE_FILE_MENU) {
-                        version_overlay_show = true;
-                        break;
-                    }
-                }
-            }
+             * Reuses the whole-stack scan cached at the top of this
+             * function (same pair the fx-suppression check below tests). */
+            version_overlay_show = (ow.zoom_mode == EB_ZOOM_OFF) && in_title_or_file_select;
 
             if (want_fps || version_overlay_show)
                 fps_cb = combined_overlay_stamp_scanline;
@@ -587,15 +602,9 @@ void host_process_frame(void) {
      * ancestor frame. Everywhere else (dialogue, menus, ...) leaves the
      * player's persistent zoom *choice* alone -- see the separate
      * any_window_open() check below for the one case that still needs
-     * a temporary (not persistent) override. */
-    bool needs_zoom_reset = false;
-    for (int i = 0; i < g_mode_stack.depth; i++) {
-        if (g_mode_stack.mode[i] == GAME_MODE_BATTLE ||
-            g_mode_stack.mode[i] == GAME_MODE_TOWN_MAP) {
-            needs_zoom_reset = true;
-            break;
-        }
-    }
+     * a temporary (not persistent) override. Reuses the whole-stack scan
+     * cached at the top of this function. */
+    bool needs_zoom_reset = in_battle_or_town_map;
     if (!needs_zoom_reset) {
         if (aux_new & AUX_ZOOM_TOGGLE) {
             /* Cycle EB_ZOOM_OFF -> EB_ZOOM_OUT -> EB_ZOOM_IN -> EB_ZOOM_OFF. */
@@ -640,15 +649,9 @@ void host_process_frame(void) {
      * self-update screen) stays suppressed too. This is a per-frame
      * override of platform_video_end_frame()'s render step, not a change
      * to the player's setting -- it resumes exactly where the player left
-     * it the instant either screen is left. */
-    bool suppress_fx = false;
-    for (int i = 0; i < g_mode_stack.depth; i++) {
-        if (g_mode_stack.mode[i] == GAME_MODE_TITLE_SCREEN ||
-            g_mode_stack.mode[i] == GAME_MODE_FILE_MENU) {
-            suppress_fx = true;
-            break;
-        }
-    }
+     * it the instant either screen is left. Reuses the whole-stack scan
+     * cached at the top of this function. */
+    bool suppress_fx = in_title_or_file_select;
     platform_video_set_fx_suppressed(suppress_fx);
 
     /* Depth of Field additionally suppresses during battle/Town Map (their
@@ -657,16 +660,7 @@ void host_process_frame(void) {
      * blur radius can soften dialogue text right at the screen edges,
      * where windows are usually positioned) -- on top of, not instead of,
      * the title/file-select suppression above. */
-    bool suppress_dof = suppress_fx || any_window_open();
-    if (!suppress_dof) {
-        for (int i = 0; i < g_mode_stack.depth; i++) {
-            if (g_mode_stack.mode[i] == GAME_MODE_BATTLE ||
-                g_mode_stack.mode[i] == GAME_MODE_TOWN_MAP) {
-                suppress_dof = true;
-                break;
-            }
-        }
-    }
+    bool suppress_dof = suppress_fx || any_window_open() || in_battle_or_town_map;
     platform_video_set_dof_suppressed(suppress_dof);
     if (aux_new & AUX_FAST_FORWARD) {
         fast_forward_active = !fast_forward_active;

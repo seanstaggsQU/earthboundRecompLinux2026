@@ -590,10 +590,21 @@ static void apply_aa_upscale(const pixel_t *src, int src_pitch, pixel_t *dst, in
             pixel_t f = aa_at(src, src_stride, w, h, x + 1, y); /* right */
             pixel_t g = aa_at(src, src_stride, w, h, x, y + 1); /* below */
 
-            pixel_t p1 = (aa_similar(d, b) && !aa_similar(d, g) && !aa_similar(b, f)) ? d : e;
-            pixel_t p2 = (aa_similar(b, f) && !aa_similar(b, d) && !aa_similar(f, g)) ? f : e;
-            pixel_t p3 = (aa_similar(d, g) && !aa_similar(d, b) && !aa_similar(g, f)) ? d : e;
-            pixel_t p4 = (aa_similar(g, f) && !aa_similar(d, g) && !aa_similar(b, f)) ? f : e;
+            /* Each corner's decision only ever tests one of 4 distinct
+             * neighbor pairs (d,b)/(d,g)/(b,f)/(f,g) -- the naive
+             * per-corner aa_similar() calls above evaluated the same pair
+             * redundantly (12 calls/pixel, each up to 2 fx_unpack() calls
+             * deep, for 4 pairs' worth of information); computing each
+             * pair once and reusing it is the same boolean logic with a
+             * 3x fewer aa_similar() calls. */
+            bool sim_db = aa_similar(d, b);
+            bool sim_dg = aa_similar(d, g);
+            bool sim_bf = aa_similar(b, f);
+            bool sim_fg = aa_similar(f, g);
+            pixel_t p1 = (sim_db && !sim_dg && !sim_bf) ? d : e;
+            pixel_t p2 = (sim_bf && !sim_db && !sim_fg) ? f : e;
+            pixel_t p3 = (sim_dg && !sim_db && !sim_fg) ? d : e;
+            pixel_t p4 = (sim_fg && !sim_dg && !sim_bf) ? f : e;
 
             int ox = x * AA_SCALE, oy = y * AA_SCALE;
             dst[oy * dst_stride + ox]         = p1;
@@ -751,11 +762,12 @@ void platform_video_end_frame(void) {
          * last and unconditionally when Experimental Visuals is on -- see
          * apply_aa_upscale()'s doc comment for why it skips fx_suppressed/
          * dof_suppressed unlike the other three. */
+        bool want_fx = want_experimental && !fx_suppressed;
         if (want_experimental && !dof_suppressed)
             apply_dof(locked_pixels, locked_pitch);
-        if (want_experimental && !fx_suppressed)
+        if (want_fx)
             apply_light_shafts(locked_pixels, locked_pitch);
-        if (want_experimental && !fx_suppressed)
+        if (want_fx)
             apply_color_grade(locked_pixels, locked_pitch);
         if (want_experimental) {
             apply_aa_upscale(locked_pixels, locked_pitch,

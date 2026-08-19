@@ -603,12 +603,23 @@ def pack_all(
 
     for label, rel_path, func, kwargs in json_packers:
         json_path = assets_dir / rel_path
+        original_json_path = json_path
         if rel_path == "enemies/enemies.json":
             json_path = _apply_enemy_name_overrides(json_path, assets_dir, output_dir)
         if json_path.exists():
             func(json_path, output_dir, addr_remap=addr_remap, **kwargs)  # type: ignore[call-arg]
             packed += 1
             print(f"  Packed {label}")
+        # _apply_enemy_name_overrides() writes its patched copy into
+        # output_dir itself -- the same directory embed-registry treats as
+        # bin_dir for the next step. It isn't actually at risk of being
+        # embedded (that step only collects paths listed in assets.manifest,
+        # not a directory glob), but it's a scratch intermediate with no
+        # reason to persist once the packer above has read it, so clean it
+        # up rather than leaving it in a directory meant to hold real
+        # packed assets.
+        if json_path != original_json_path and json_path.exists():
+            json_path.unlink()
 
     # Telephone contacts (text packer that also needs addr_remap for text pointers)
     _telephone_json = assets_dir / "data" / "telephone_contacts_table.json"
