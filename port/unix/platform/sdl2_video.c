@@ -103,12 +103,18 @@ static void write_window_screenshot(const char *path) {
 
 /* ---- Experimental Visuals post-processing (this port's own addition;
  * gated together by Config's single "Experimental Visuals" setting -- see
- * game/settings.h: Depth of Field, Light Shafts, Color Grading). A fourth
- * effect, Bloom, existed earlier in this feature's development and was
- * removed outright per feedback, not folded into this toggle. ----
+ * game/settings.h: Depth of Field, Color Grading). Two other effects
+ * existed earlier in this feature's development and were removed outright
+ * rather than folded into this toggle: Bloom (per feedback), and Light
+ * Shafts (a "god ray" ray-march effect, removed after repeated attempts to
+ * bring its per-frame cost down -- extract-bright/pre-blur running at full
+ * resolution, then downsampling that, then trimming the ray-march sample
+ * count -- still left it as the dominant cost in this whole pipeline;
+ * reported as still causing a significant framerate dip after all of that,
+ * so it's gone rather than continuing to chase it).
  *
- * All three are applied directly to the locked texture buffer in
- * platform_video_end_frame(), after the PPU finishes writing all
+ * Both remaining effects are applied directly to the locked texture buffer
+ * in platform_video_end_frame(), after the PPU finishes writing all
  * EB_VIEWPORT_HEIGHT scanlines into it (see platform_video_send_scanline()
  * below) and before it's uploaded to the GPU. Entirely desktop-side: none
  * of this touches src/snes/ppu_render.c or any other shared game-lib code,
@@ -119,16 +125,6 @@ static void write_window_screenshot(const char *path) {
  * comfortably inside a 60fps desktop budget, before even accounting for
  * this being an opt-in setting most frames don't pay for at all. */
 
-typedef struct { uint8_t r, g, b; } FxRGB;
-
-/* Scratch buffers sized to the compile-time-fixed viewport -- this file is
- * desktop-only, so unlike the shared game-lib code there's no embedded
- * target to keep these off of.
- *
- * fx_bright/fx_blur_tmp/shaft_bright (Light Shafts' bright-extract + pre-
- * blur scratch) are declared further down, sized to the downsampled grid
- * instead of the full viewport -- see the doc comment above
- * apply_light_shafts() for why. */
 static pixel_t dof_src[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
 /* apply_dof()'s horizontal-sum intermediate -- see that function's doc
  * comment. int16_t is plenty (max possible sum is (2*DOF_BLUR_RADIUS+1)
@@ -155,7 +151,7 @@ static float   dof_blend_row[EB_VIEWPORT_HEIGHT];
  * 6-bit inputs (e.g. a 5-bit 3 unpacks to 24 here, 25 there). That's a
  * real, if tiny, per-pixel color shift, and this file's whole Experimental
  * Visuals effect stack has already been tuned twice against exactly this
- * math (DoF/Light Shafts/Color Grading's constants above) -- switching the
+ * math (DoF/Color Grading's constants above) -- switching the
  * unpack/pack math out from under that tuning as a "reuse the existing
  * helper" cleanup would silently redo the tuning instead. Kept separate on
  * purpose; don't merge these without re-tuning the effects against
@@ -176,296 +172,12 @@ static inline pixel_t fx_pack(uint8_t r, uint8_t g, uint8_t b) {
     return (pixel_t)((b5 << 11) | (g6 << 5) | r5);
 }
 
-/* Generic float -> clamped-byte helper, shared by DoF/Light Shafts' blend
- * and Color Grading's tone curve. */
+/* Generic float -> clamped-byte helper, shared by DoF's blend and Color
+ * Grading's tone curve. */
 static inline uint8_t fx_clamp_byte(float v) {
     if (v < 0.0f) return 0;
     if (v > 255.0f) return 255;
     return (uint8_t)(v + 0.5f);
-}
-
-/* Extract-bright pass, feeding Light Shafts: luma-thresholded, real color
- * kept above threshold so colored highlights (not just white ones) streak
- * in their own color rather than washing out to white. Threshold raised
- * (see FX_BRIGHT_THRESHOLD) to be more selective about what counts as a
- * light source, per feedback that Light Shafts read as too washed-out/broad.
- *
- * Point-samples the source at each downsampled cell's center instead of
- * visiting every one of EB_VIEWPORT_WIDTH x HEIGHT source pixels -- this
- * was the one full-resolution step left in a pipeline that otherwise
- * downsamples everything else (see apply_light_shafts()'s doc comment):
- * measured at ~27ms/frame before this fix (this pass plus the two full-res
- * fx_blur_axis() calls that used to follow it), against ~1.5-2ms for the
- * downsampled ray-march this was already supposedly optimized down to --
- * i.e. the "expensive" part everyone assumed was the ray-march was actually
- * >90% this. Same reasoning the ray-march and the final upsample already
- * rely on applies here too: the effect is soft/diffuse and selective about
- * what counts as a source (FX_BRIGHT_THRESHOLD), so missing a bright pixel
- * that doesn't land on a sample center is the same kind of already-accepted
- * tradeoff, not a new one. Writes into `out`, sized rw x rh. */
-#define FX_BRIGHT_THRESHOLD 210  /* 0-255; only quite bright pixels contribute
-                                   * (was 190 when shared with the now-
-                                   * removed Bloom, which wanted a lower bar) */
-
-static void extract_bright_downsampled(const pixel_t *pixels, int pitch,
-                                        int w, int h, int downsample,
-                                        FxRGB *out, int rw, int rh) {
-    int stride = pitch / (int)sizeof(pixel_t);
-    for (int ry = 0; ry < rh; ry++) {
-        int sy = ry * downsample + downsample / 2;
-        if (sy >= h) sy = h - 1;
-        const pixel_t *row = pixels + (size_t)sy * stride;
-        for (int rx = 0; rx < rw; rx++) {
-            int sx = rx * downsample + downsample / 2;
-            if (sx >= w) sx = w - 1;
-            uint8_t r, g, b;
-            fx_unpack(row[sx], &r, &g, &b);
-            int luma = (r * 77 + g * 150 + b * 29) >> 8; /* standard luma weights */
-            FxRGB *o = &out[ry * rw + rx];
-            if (luma >= FX_BRIGHT_THRESHOLD) {
-                o->r = r; o->g = g; o->b = b;
-            } else {
-                o->r = o->g = o->b = 0;
-            }
-        }
-    }
-}
-
-/* Separable box blur, one axis at a time (horizontal then vertical from the
- * caller). Small, fixed radius -- a plain clamped-window sum is simpler and
- * plenty fast at this resolution; no need for a sliding-window optimization.
- * Used by Light Shafts' pre-blur step below. */
-static void fx_blur_axis(const FxRGB *src, FxRGB *dst, int w, int h,
-                          int radius, bool horizontal) {
-    for (int y = 0; y < h; y++) {
-        for (int x = 0; x < w; x++) {
-            int sum_r = 0, sum_g = 0, sum_b = 0, count = 0;
-            for (int k = -radius; k <= radius; k++) {
-                int xx = horizontal ? x + k : x;
-                int yy = horizontal ? y : y + k;
-                if (xx < 0 || xx >= w || yy < 0 || yy >= h) continue;
-                const FxRGB *p = &src[yy * w + xx];
-                sum_r += p->r; sum_g += p->g; sum_b += p->b;
-                count++;
-            }
-            FxRGB *out = &dst[y * w + x];
-            out->r = (uint8_t)(sum_r / count);
-            out->g = (uint8_t)(sum_g / count);
-            out->b = (uint8_t)(sum_b / count);
-        }
-    }
-}
-
-/* ---- Light Shafts: subtle "god ray" streaks sampled from extract_bright()
- * above, radially toward a fixed screen-space origin -- there's no real
- * scene light here to derive a source position from (the overworld has no
- * single sun/lamp concept the engine tracks), so this picks a plausible
- * fixed point (top-center of the viewport, as if sunlight were coming from
- * directly overhead) rather than simulating one. For each low-res cell,
- * walks a short line of samples toward the origin, each sample weighted
- * less than the last (LIGHT_SHAFT_DECAY), so a bright spot leaves a fading
- * streak trailing away from the origin -- the streak IS the "ray" look.
- * Kept subtle: selective bright threshold, short decay, low blend strength
- * (see the tuning notes on each constant below -- dialed back twice after
- * feedback that it first looked too washed-out/broad).
- *
- * Ray-marches shaft_bright, a small pre-blur of extract_bright()'s raw mask
- * (into shaft_bright via fx_blur_tmp as scratch). This isn't just smoothing
- * for its own sake: a single bright pixel or small effect sprite is easy
- * for LIGHT_SHAFT_SAMPLES sparse, discrete ray steps to skip over entirely
- * once the step spacing (distance-to-origin / SAMPLES) exceeds the
- * source's own size -- verified empirically (a standalone test) before
- * shipping this fix: point-sampling the raw mask directly produced a
- * barely-there streak even from a 4x4-pixel source. Pre-blurring first
- * turns any source into a wider soft blob the ray march reliably hits at
- * any distance -- the standard fix for exactly this in any point-sampled
- * light-shaft implementation. Kept fairly tight (LIGHT_SHAFT_PREBLUR_RADIUS)
- * rather than wide, since a wider pre-blur was part of what made the
- * effect read as a broad wash rather than a defined ray.
- *
- * Ray-marched at 1/LIGHT_SHAFT_DOWNSAMPLE resolution, then upsampled, NOT
- * once per full-res pixel: an earlier version ray-marched every one of
- * EB_VIEWPORT_WIDTH x HEIGHT pixels individually with bilinear sampling
- * (needed -- see the "Bilinear, not nearest-neighbor" note below) at
- * LIGHT_SHAFT_SAMPLES steps each, which reportedly made the whole game run
- * very slowly: that's EB_VIEWPORT_WIDTH*HEIGHT*SAMPLES*4-neighbors
- * scattered reads per frame (~12.6M at 512x256/24 samples) into a 393KB
- * buffer that doesn't fit in cache, and radial ray-marching from every
- * pixel toward a shared origin is an inherently cache-hostile access
- * pattern -- exactly the kind of workload real engines (Crysis, Unreal,
- * ...) universally solve by computing god-rays at a fraction of render
- * resolution and upsampling, not by computing them cheaper per-pixel.
- * Doing the same here: the expensive ray-march runs on a
- * (w/DOWNSAMPLE)x(h/DOWNSAMPLE) grid -- 16x fewer outer iterations at the
- * default DOWNSAMPLE=4 -- into shaft_result, then a second, cheap,
- * single-bilinear-lookup-per-pixel pass upsamples shaft_result back over
- * the real framebuffer. The downsampled result is visually
- * indistinguishable for an effect this soft/diffuse to begin with.
- *
- * The bright-extraction + pre-blur feeding the ray march (extract_bright_
- * downsampled(), fx_blur_axis() x2 below) run on that SAME downsampled
- * grid, not the full viewport -- this was the one full-resolution step
- * still left when that reasoning was first applied to the ray march alone;
- * measured at ~27ms/frame on its own before this fix, versus ~1.5-2ms for
- * the ray march it was sitting in front of. LIGHT_SHAFT_PREBLUR_RADIUS is
- * accordingly now in downsampled-grid pixels, not full-res ones -- 1 grid
- * pixel at DOWNSAMPLE=4 covers roughly the same ground a radius-2 full-res
- * blur did before, so the "tight, not wide" look this was tuned for
- * carries over rather than turning into a much wider blur.
- *
- * Bilinear, not nearest-neighbor, sampling shaft_bright inside the ray
- * march: reported (correctly) as looking like "compressed JPEG" blocking
- * in an earlier version that used nearest-neighbor rounding at only 8
- * sample points -- that collapsed many neighboring rays onto the SAME
- * discrete source pixel, then re-quantized through BGR565's 5/6/5 bits on
- * top of that, producing visible stepped/blocky bands along each ray's
- * diagonal. shaft_sample_bilinear() interpolates the 4 nearest pixels at
- * each fractional sample position instead of rounding to one, producing a
- * continuous gradient with no discrete cells to see -- verified via a
- * standalone test (no long flat/repeated-value runs along a sampled ray)
- * before shipping. */
-#define LIGHT_SHAFT_DOWNSAMPLE 4  /* ray-march (and now bright-extract +
-                                    * pre-blur too) at 1/4 resolution each
-                                    * axis (1/16 the pixels), then upsample
-                                    * -- see the long comment above */
-#define LIGHT_SHAFT_PREBLUR_RADIUS 1  /* in DOWNSAMPLED-grid pixels -- see
-                                        * above. Was 2 in full-res pixels
-                                        * (~= 0.5 grid pixels at DOWNSAMPLE=4;
-                                        * rounded up to 1 rather than down to
-                                        * 0 so a single bright source pixel
-                                        * still reliably survives the ray
-                                        * march's sparse steps, same reason
-                                        * this blur exists at all -- see
-                                        * above) */
-#define LIGHT_SHAFT_SAMPLES   24
-#define LIGHT_SHAFT_DECAY     0.78f  /* was 0.85 -- faster falloff, a
-                                       * shorter/tighter streak instead of a
-                                       * long broad trail */
-#define LIGHT_SHAFT_ADD_NUM   1  /* additive blend strength: NUM/DEN of the */
-#define LIGHT_SHAFT_ADD_DEN   8  /* accumulated streak, added back -- was 4,
-                                   * halved again per "washed-out" feedback */
-
-#define LIGHT_SHAFT_RESULT_W (EB_VIEWPORT_WIDTH  / LIGHT_SHAFT_DOWNSAMPLE)
-#define LIGHT_SHAFT_RESULT_H (EB_VIEWPORT_HEIGHT / LIGHT_SHAFT_DOWNSAMPLE)
-static FxRGB shaft_result[LIGHT_SHAFT_RESULT_W * LIGHT_SHAFT_RESULT_H];
-/* Bright-extract + pre-blur scratch, sized to the SAME downsampled grid as
- * shaft_result -- see the doc comment above LIGHT_SHAFT_DOWNSAMPLE for why
- * these aren't full-viewport-sized despite feeding a bilinear sample of
- * the framebuffer. */
-static FxRGB fx_bright[LIGHT_SHAFT_RESULT_W * LIGHT_SHAFT_RESULT_H];
-static FxRGB fx_blur_tmp[LIGHT_SHAFT_RESULT_W * LIGHT_SHAFT_RESULT_H];
-static FxRGB shaft_bright[LIGHT_SHAFT_RESULT_W * LIGHT_SHAFT_RESULT_H];
-
-static inline void shaft_sample_bilinear(const FxRGB *buf, int w, int h,
-                                          float x, float y,
-                                          float *out_r, float *out_g, float *out_b) {
-    if (x < 0.0f) x = 0.0f;
-    if (y < 0.0f) y = 0.0f;
-    if (x > w - 1.001f) x = w - 1.001f;
-    if (y > h - 1.001f) y = h - 1.001f;
-    int x0 = (int)x, y0 = (int)y;
-    int x1 = x0 + 1, y1 = y0 + 1;
-    float fx = x - x0, fy = y - y0;
-    const FxRGB *p00 = &buf[y0 * w + x0];
-    const FxRGB *p10 = &buf[y0 * w + x1];
-    const FxRGB *p01 = &buf[y1 * w + x0];
-    const FxRGB *p11 = &buf[y1 * w + x1];
-    float w00 = (1 - fx) * (1 - fy), w10 = fx * (1 - fy);
-    float w01 = (1 - fx) * fy,       w11 = fx * fy;
-    *out_r = p00->r * w00 + p10->r * w10 + p01->r * w01 + p11->r * w11;
-    *out_g = p00->g * w00 + p10->g * w10 + p01->g * w01 + p11->g * w11;
-    *out_b = p00->b * w00 + p10->b * w10 + p01->b * w01 + p11->b * w11;
-}
-
-static void apply_light_shafts(pixel_t *pixels, int pitch) {
-    int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
-    int stride = pitch / (int)sizeof(pixel_t);
-    int rw = LIGHT_SHAFT_RESULT_W, rh = LIGHT_SHAFT_RESULT_H;
-    /* Origin and ray march both now live entirely in downsampled-grid
-     * coordinates -- origin_rx/ry is just origin_x/y scaled down by
-     * LIGHT_SHAFT_DOWNSAMPLE, same top-center point as before. */
-    float origin_rx = rw / 2.0f;
-    float origin_ry = 0.0f;
-
-#ifdef EB_FX_PROFILE
-    static double acc_extract, acc_march, acc_upsample;
-    static int prof_frames2;
-    uint64_t q0 = platform_timer_ticks(), q1;
-#endif
-    extract_bright_downsampled(pixels, pitch, w, h, LIGHT_SHAFT_DOWNSAMPLE, fx_bright, rw, rh);
-    fx_blur_axis(fx_bright, fx_blur_tmp, rw, rh, LIGHT_SHAFT_PREBLUR_RADIUS, true);
-    fx_blur_axis(fx_blur_tmp, shaft_bright, rw, rh, LIGHT_SHAFT_PREBLUR_RADIUS, false);
-#ifdef EB_FX_PROFILE
-    q1 = platform_timer_ticks(); acc_extract += (double)(q1-q0)*1000.0/platform_timer_ticks_per_sec(); q0 = q1;
-#endif
-
-    /* Ray-march on the low-res grid -- each step now covers 1/DOWNSAMPLE
-     * as much ground in grid-pixel terms as it used to in full-res-pixel
-     * terms, but since both the current cell and the origin are expressed
-     * in the same grid units, the march still crosses the same PROPORTION
-     * of the total distance to the origin over LIGHT_SHAFT_SAMPLES steps
-     * as before -- same streak shape/reach, just computed on 1/16th the
-     * pixels this loop itself already ran on. */
-    for (int ry = 0; ry < rh; ry++) {
-        for (int rx = 0; rx < rw; rx++) {
-            float step_x = (origin_rx - rx) / LIGHT_SHAFT_SAMPLES;
-            float step_y = (origin_ry - ry) / LIGHT_SHAFT_SAMPLES;
-            float sx = (float)rx, sy = (float)ry;
-            float accum_r = 0, accum_g = 0, accum_b = 0, total_weight = 0;
-            float weight = 1.0f;
-            for (int i = 0; i < LIGHT_SHAFT_SAMPLES; i++) {
-                sx += step_x; sy += step_y;
-                if (sx >= 0.0f && sx < rw && sy >= 0.0f && sy < rh) {
-                    float sr, sg, sb;
-                    shaft_sample_bilinear(shaft_bright, rw, rh, sx, sy, &sr, &sg, &sb);
-                    accum_r += sr * weight;
-                    accum_g += sg * weight;
-                    accum_b += sb * weight;
-                    total_weight += weight;
-                }
-                weight *= LIGHT_SHAFT_DECAY;
-            }
-            FxRGB *out = &shaft_result[ry * rw + rx];
-            if (total_weight <= 0.0f) {
-                out->r = out->g = out->b = 0;
-            } else {
-                out->r = fx_clamp_byte(accum_r / total_weight);
-                out->g = fx_clamp_byte(accum_g / total_weight);
-                out->b = fx_clamp_byte(accum_b / total_weight);
-            }
-        }
-    }
-#ifdef EB_FX_PROFILE
-    q1 = platform_timer_ticks(); acc_march += (double)(q1-q0)*1000.0/platform_timer_ticks_per_sec(); q0 = q1;
-#endif
-
-    /* Cheap pass: one bilinear lookup per real pixel, into the tiny
-     * (already cache-resident) low-res result. */
-    for (int y = 0; y < h; y++) {
-        pixel_t *row = pixels + (size_t)y * stride;
-        float sy = y / (float)LIGHT_SHAFT_DOWNSAMPLE;
-        for (int x = 0; x < w; x++) {
-            float sx = x / (float)LIGHT_SHAFT_DOWNSAMPLE;
-            float glow_r, glow_g, glow_b;
-            shaft_sample_bilinear(shaft_result, rw, rh, sx, sy, &glow_r, &glow_g, &glow_b);
-            if (glow_r < 1.0f && glow_g < 1.0f && glow_b < 1.0f) continue;
-            uint8_t r, g, b;
-            fx_unpack(row[x], &r, &g, &b);
-            r = fx_clamp_byte(r + (glow_r * LIGHT_SHAFT_ADD_NUM) / LIGHT_SHAFT_ADD_DEN);
-            g = fx_clamp_byte(g + (glow_g * LIGHT_SHAFT_ADD_NUM) / LIGHT_SHAFT_ADD_DEN);
-            b = fx_clamp_byte(b + (glow_b * LIGHT_SHAFT_ADD_NUM) / LIGHT_SHAFT_ADD_DEN);
-            row[x] = fx_pack(r, g, b);
-        }
-    }
-#ifdef EB_FX_PROFILE
-    q1 = platform_timer_ticks(); acc_upsample += (double)(q1-q0)*1000.0/platform_timer_ticks_per_sec();
-    if (++prof_frames2 >= 120) {
-        LOG_WARN("shafts_profile: extract+blur=%.3fms march=%.3fms upsample=%.3fms (avg/frame over %d frames)\n",
-                 acc_extract/prof_frames2, acc_march/prof_frames2, acc_upsample/prof_frames2, prof_frames2);
-        acc_extract = acc_march = acc_upsample = 0;
-        prof_frames2 = 0;
-    }
-#endif
 }
 
 /* ---- Depth of Field / tilt-shift: a very subtle blur that increases
@@ -654,8 +366,8 @@ static void apply_dof(pixel_t *pixels, int pitch) {
 }
 
 /* ---- Color Grading: a mild global contrast/saturation/warmth adjustment,
- * applied last (after Light Shafts is already blended in) so it grades the
- * whole final composited look rather than just the base scene. All four
+ * applied after DoF so it grades the whole post-blur composited look
+ * rather than just the base scene. All four
  * knobs dialed back once already after feedback that it looked too
  * saturated, then further per "make it more subtle" -- the current values
  * are meant to be barely perceptible on their own, only additive over a
@@ -692,12 +404,12 @@ static void apply_color_grade(pixel_t *pixels, int pitch) {
 
 /* ---- Anti-Aliasing: a Scale2x/EPX 2x pixel-art upscale, folded into
  * Experimental Visuals per request rather than a separate Config row.
- * Runs last, after DoF/Light Shafts/Color Grading have already modified
- * locked_pixels, so it smooths the fully composited frame.
+ * Runs last, after DoF/Color Grading have already modified locked_pixels,
+ * so it smooths the fully composited frame.
  *
- * Unlike DoF/Light Shafts/Color Grading, this does NOT respect fx_
- * suppressed/dof_suppressed (title screen, file-select, battle, Town Map,
- * open windows): those suppressions exist because those three effects are
+ * Unlike DoF/Color Grading, this does NOT respect fx_suppressed/
+ * dof_suppressed (title screen, file-select, battle, Town Map, open
+ * windows): those suppressions exist because those effects are
  * stylistic choices that specific screens weren't art-directed for.
  * Antialiasing isn't a style choice -- smoothing jagged diagonal edges
  * looks equally correct everywhere, including the title screen, so it
@@ -718,7 +430,7 @@ static void apply_color_grade(pixel_t *pixels, int pitch) {
  * sprite art.
  *
  * Produces a full 2x-resolution frame (aa_upscaled/aa_texture below), not
- * an in-place effect on the EB_VIEWPORT-sized buffer like the other three
+ * an in-place effect on the EB_VIEWPORT-sized buffer like DoF/Color Grading
  * -- platform_video_end_frame() swaps in aa_texture (with a correspondingly
  * 2x'd crop rect) for the final blit instead of the normal texture when
  * this ran, rather than writing back into locked_pixels.
@@ -940,23 +652,23 @@ void platform_video_end_frame(void) {
     bool aa_ran = false;
 
     if (locked_pixels) {
-        /* All three Experimental Visuals effects share one Config toggle
-         * (engine_experimental_visuals) but keep independent suppression:
-         * DoF has its own extra battle/Town-Map/window-open condition on
-         * top of the shared title/file-select one (see
+        /* Both remaining Experimental Visuals effects share one Config
+         * toggle (engine_experimental_visuals) but keep independent
+         * suppression: DoF has its own extra battle/Town-Map/window-open
+         * condition on top of the shared title/file-select one (see
          * platform_video_set_dof_suppressed()/host_process_frame()).
-         * Fixed pipeline order: DoF blurs the base scene first (so Light
-         * Shafts/Color Grading's highlights stay crisp, not pre-blurred);
-         * Color Grading runs before antialiasing so it grades the base
-         * scene, not the upscaled one (grading is resolution-independent,
-         * so this order doesn't matter for correctness, just consistency
-         * with "grade the composited scene" already established). AA runs
-         * last and unconditionally when Experimental Visuals is on -- see
-         * apply_aa_upscale()'s doc comment for why it skips fx_suppressed/
-         * dof_suppressed unlike the other three. */
+         * Fixed pipeline order: DoF blurs the base scene first, Color
+         * Grading runs on the result before antialiasing so it grades the
+         * base scene, not the upscaled one (grading is resolution-
+         * independent, so this order doesn't matter for correctness, just
+         * consistency with "grade the composited scene" already
+         * established). AA runs last and unconditionally when
+         * Experimental Visuals is on -- see apply_aa_upscale()'s doc
+         * comment for why it skips fx_suppressed/dof_suppressed unlike
+         * DoF/Color Grading. */
         bool want_fx = want_experimental && !fx_suppressed;
 #ifdef EB_FX_PROFILE
-        static double acc_dof, acc_shafts, acc_grade, acc_aa;
+        static double acc_dof, acc_grade, acc_aa;
         static int prof_frames;
         uint64_t p0, p1;
         p0 = platform_timer_ticks();
@@ -965,11 +677,6 @@ void platform_video_end_frame(void) {
             apply_dof(locked_pixels, locked_pitch);
 #ifdef EB_FX_PROFILE
         p1 = platform_timer_ticks(); acc_dof += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
-#endif
-        if (want_fx)
-            apply_light_shafts(locked_pixels, locked_pitch);
-#ifdef EB_FX_PROFILE
-        p1 = platform_timer_ticks(); acc_shafts += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
 #endif
         if (want_fx)
             apply_color_grade(locked_pixels, locked_pitch);
@@ -984,9 +691,9 @@ void platform_video_end_frame(void) {
 #ifdef EB_FX_PROFILE
         p1 = platform_timer_ticks(); acc_aa += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec();
         if (++prof_frames >= 120) {
-            LOG_WARN("fx_profile: dof=%.3fms shafts=%.3fms grade=%.3fms aa=%.3fms (avg/frame over %d frames)\n",
-                     acc_dof/prof_frames, acc_shafts/prof_frames, acc_grade/prof_frames, acc_aa/prof_frames, prof_frames);
-            acc_dof = acc_shafts = acc_grade = acc_aa = 0;
+            LOG_WARN("fx_profile: dof=%.3fms grade=%.3fms aa=%.3fms (avg/frame over %d frames)\n",
+                     acc_dof/prof_frames, acc_grade/prof_frames, acc_aa/prof_frames, prof_frames);
+            acc_dof = acc_grade = acc_aa = 0;
             prof_frames = 0;
         }
 #endif

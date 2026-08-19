@@ -63,11 +63,12 @@ typedef enum {
 
 extern uint8_t engine_alt_controls; /* current value, one of AltControlsSetting */
 
-/* Experimental Visuals: a single toggle covering three subtle screen-space
- * post-processes, all applied in platform_video_end_frame() (sdl2_video.c)
- * after the PPU finishes rendering, entirely on the SDL2/desktop side --
- * desktop-only, there's no equivalent hook on the embedded ports (Pico/
- * Game&Watch), which just never read this:
+/* Experimental Visuals: a single toggle covering two subtle screen-space
+ * post-processes, plus antialiasing, all applied in
+ * platform_video_end_frame() (sdl2_video.c) after the PPU finishes
+ * rendering, entirely on the SDL2/desktop side -- desktop-only, there's no
+ * equivalent hook on the embedded ports (Pico/Game&Watch), which just
+ * never read this:
  *
  *   - Depth of Field / tilt-shift: a very subtle blur that increases toward
  *     the top/bottom screen edges and stays sharp in a central band,
@@ -78,20 +79,25 @@ extern uint8_t engine_alt_controls; /* current value, one of AltControlsSetting 
  *     setting) during battle, the Town Map, and any time a text/menu
  *     window is open -- see platform_video_set_dof_suppressed()/
  *     host_process_frame().
- *   - Light Shafts: subtle "god ray" streaks radiating from a fixed
- *     screen-space point (not a real scene light -- the overworld has no
- *     single light-source position to derive one from). An atmospheric
- *     flourish, not a lighting simulation.
  *   - Color Grading: a mild global contrast/saturation/warmth adjustment
  *     applied to the whole frame as the last post-process step, after
- *     Light Shafts is already blended in.
+ *     DoF is already applied.
+ *   - Antialiasing: a Scale2x/EPX 2x upscale, smoothing jagged pixel-art
+ *     edges. Runs unconditionally whenever this setting is on, unlike the
+ *     other two -- see apply_aa_upscale()'s doc comment (sdl2_video.c).
  *
- * Originally three separate settings (plus a fourth, Bloom, since
- * removed): combined into one after feedback that a 7-row Config screen
- * was more granularity than useful, and simply labeled "Experimental
- * Visuals" since all three are still being tuned. Off by default -- purely
- * a visual preference, shouldn't change any existing screenshot/
- * recording's look without the player opting in. */
+ * A third post-process, Light Shafts (a "god ray" ray-march effect), and
+ * before that a fourth, Bloom, both existed earlier in this feature's
+ * development and were removed outright rather than folded into this
+ * toggle -- Bloom per feedback that it looked washed out, Light Shafts
+ * after repeated attempts to bring its per-frame cost down still left it
+ * as the single largest expense in this whole pipeline and a reported
+ * framerate dip. Originally several separate settings: combined into one
+ * after feedback that a many-row Config screen was more granularity than
+ * useful, and simply labeled "Experimental Visuals" since these are still
+ * being tuned. Off by default -- purely a visual preference, shouldn't
+ * change any existing screenshot/recording's look without the player
+ * opting in. */
 typedef enum {
     EXPERIMENTAL_VISUALS_OFF = 0,
     EXPERIMENTAL_VISUALS_ON  = 1,

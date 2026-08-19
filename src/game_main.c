@@ -637,8 +637,8 @@ void host_process_frame(void) {
         effective_zoom = EB_ZOOM_OFF;
     platform_video_set_zoom(effective_zoom);
 
-    /* Light Shafts/Color Grading (part of the combined "Experimental
-     * Visuals" Config setting, see settings.h) are never shown on the
+    /* Color Grading (part of the combined "Experimental
+     * Visuals" Config setting, see settings.h) is never shown on the
      * title screen or file-select: neither was art-directed with these
      * effects in mind (the title logo/flash art and the file-select slot
      * list), and unlike a battle/PSI flash the player only sees for a few

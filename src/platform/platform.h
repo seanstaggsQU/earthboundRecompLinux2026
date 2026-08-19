@@ -81,18 +81,18 @@ typedef enum {
     EB_ZOOM_IN  = 2,
 } EbZoomMode;
 void platform_video_set_zoom(EbZoomMode mode);
-/* Atmosphere-FX suppression override (Light Shafts, Color Grading -- see
+/* Atmosphere-FX suppression override (Color Grading -- see
  * game_main.c's host_process_frame(), which scans the mode stack for
  * GAME_MODE_TITLE_SCREEN/GAME_MODE_FILE_MENU the same way it already scans
  * for GAME_MODE_BATTLE/GAME_MODE_TOWN_MAP above). A per-frame *override* of
  * the player's Config setting, not a change to it -- engine_experimental_
  * visuals (settings.h) stays whatever the player chose; this just forces
- * both off on screens they shouldn't touch (the title screen's logo/flash
- * art and the file-select slots were never art-directed with either in
+ * it off on screens it shouldn't touch (the title screen's logo/flash
+ * art and the file-select slots were never art-directed with it in
  * mind, and a wrong-looking permanent effect there -- unlike a battle/PSI
  * flash the player leaves in a few seconds -- would be the first and last
  * thing every session shows). Desktop-only, like the setting itself -- see
- * apply_light_shafts()/apply_color_grade() in sdl2_video.c, the only
+ * apply_color_grade() in sdl2_video.c, the only
  * implementation, mirroring platform_video_set_zoom() just above (also
  * unix-only, no embedded stub). */
 void platform_video_set_fx_suppressed(bool suppressed);
@@ -103,7 +103,7 @@ void platform_video_set_fx_suppressed(bool suppressed);
  * dialogue text right at the screen edges where windows are usually
  * positioned. Computed independently in host_process_frame() (checked
  * there, not derived from the flag above, since none of DoF's extra
- * conditions apply to Light Shafts/Color Grading). */
+ * conditions apply to Color Grading). */
 void platform_video_set_dof_suppressed(bool suppressed);
 void platform_render_frame(scanline_stamp_cb_t fps_overlay_cb);
 
