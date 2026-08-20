@@ -32,7 +32,6 @@
 #include "game_main.h"
 #include "game/audio.h"
 #include "game/game_state.h"
-#include "game/overworld.h"
 #include "game/settings.h"
 #include "core/log.h"
 #include "core/state_dump.h"
@@ -418,13 +417,16 @@ int main(int argc, char *argv[]) {
      * keep capturing a bug that only shows up after several launches. */
     if (engine_logging == LOGGING_ON)
         platform_log_set_enabled(true);
-    /* Modern Alternative Visuals defaults to the zoomed-out FOV (see
-     * settings.h) -- applied here as the initial zoom_mode for a fresh
-     * boot with Modern already configured from a prior session (e.g. via
-     * settings.dat); mode_step_settings_menu() (text.c) applies the same
-     * default live when the player switches to Modern mid-session. */
-    if (engine_alternative_visuals == ALT_VISUALS_MODERN)
-        ow.zoom_mode = EB_ZOOM_OUT;
+    /* Modern Alternative Visuals defaulting gameplay to the zoomed-out FOV
+     * (settings.h) is NOT applied here at raw boot -- tried that first; it
+     * left ow.zoom_mode non-OFF by the time the title screen itself
+     * rendered (title/file-select is reached immediately after boot),
+     * which broke the version overlay there (reported live). Applied
+     * instead in game_main.c's host_process_frame(), on the frame the
+     * player actually leaves title/file-select for gameplay -- see that
+     * function's own doc comment for the full reasoning; that site
+     * subsumes both "already configured at boot" and "switched mid-game"
+     * without this file needing to know about either. */
     /* Registered first so it runs LAST (atexit is LIFO): the relaunch
      * execv(), if the updater ever staged one, must happen after
      * platform_cleanup()'s SDL_Quit() below, never before. See

@@ -598,14 +598,21 @@ void host_process_frame(void) {
      * same footprint whether the player was zoomed or not) and
      * GAME_MODE_TOWN_MAP (its own full-screen map graphic, not an overlay
      * on the walking-around scene -- untested against any zoom crop, and
-     * visually wrong to show zoomed regardless). Scans the whole stack, not
-     * just the top, since either can be pushed while a text box is still an
-     * ancestor frame. Everywhere else (dialogue, menus, ...) leaves the
-     * player's persistent zoom *choice* alone -- see the separate
-     * any_window_open() check below for the one case that still needs
-     * a temporary (not persistent) override. Reuses the whole-stack scan
-     * cached at the top of this function. */
-    bool needs_zoom_reset = in_battle_or_town_map;
+     * visually wrong to show zoomed regardless). Also GAME_MODE_TITLE_SCREEN/
+     * GAME_MODE_FILE_MENU -- title/file-select never let the player change
+     * zoom themselves (see version_overlay_show's doc comment below, which
+     * assumes zoom is off there), but ow.zoom_mode can still be non-OFF by
+     * the time either is reached (e.g. Modern Alternative Visuals defaulting
+     * gameplay to EB_ZOOM_OUT the moment the player leaves these screens,
+     * below -- reported live: this left the title screen zoomed on the very
+     * next boot, which quietly broke the version overlay). Scans the whole
+     * stack, not just the top, since any of these can be pushed while a
+     * text box is still an ancestor frame. Everywhere else (dialogue,
+     * menus, ...) leaves the player's persistent zoom *choice* alone -- see
+     * the separate any_window_open() check below for the one case that
+     * still needs a temporary (not persistent) override. Reuses the
+     * whole-stack scan cached at the top of this function. */
+    bool needs_zoom_reset = in_battle_or_town_map || in_title_or_file_select;
     if (!needs_zoom_reset) {
         /* Classic Alternative Visuals is always true 4:3 -- zoom and
          * "original aspect ratio" are contradictory asks, so the R3 toggle
@@ -620,6 +627,27 @@ void host_process_frame(void) {
     } else if (ow.zoom_mode != EB_ZOOM_OFF) {
         ow.zoom_mode = EB_ZOOM_OFF;
     }
+
+    /* Modern Alternative Visuals defaults gameplay to the zoomed-out FOV
+     * (settings.h) the moment the player actually leaves title/file-select
+     * -- not at raw process boot (tried that first; it left ow.zoom_mode
+     * non-OFF by the time the title screen itself rendered, which broke
+     * the version overlay above via the persistent reset's own doc
+     * comment). Detected as a title/file-select -> anything-else edge on
+     * in_title_or_file_select, which the persistent reset just above
+     * guarantees was OFF up through this exact frame -- so this always
+     * fires from a known-OFF baseline, whether that's the very first
+     * frame of gameplay after boot, after a New Game/Continue, or after
+     * this session's own "Return to Title" reboot and a subsequent
+     * restart. mode_step_settings_menu() (text.c) applies the same
+     * default live for the separate case of switching to Modern mid-game,
+     * without leaving title/file-select at all. */
+    static bool was_in_title_or_file_select = true;
+    if (was_in_title_or_file_select && !in_title_or_file_select &&
+        engine_alternative_visuals == ALT_VISUALS_MODERN) {
+        ow.zoom_mode = EB_ZOOM_OUT;
+    }
+    was_in_title_or_file_select = in_title_or_file_select;
 
     /* Zoom In specifically can't safely show while any text/menu window is
      * open: EarthBound positions windows (e.g. the standard dialogue box,
