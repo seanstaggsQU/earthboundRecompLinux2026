@@ -15,6 +15,7 @@
 #include "snes/ppu.h"
 #include "snes/dma.h"
 #include "game/game_state.h"
+#include "game/settings.h"
 #include "game/fade.h"
 #include "game/audio.h"
 #include "intro/init_intro.h"
@@ -606,7 +607,13 @@ void host_process_frame(void) {
      * cached at the top of this function. */
     bool needs_zoom_reset = in_battle_or_town_map;
     if (!needs_zoom_reset) {
-        if (aux_new & AUX_ZOOM_TOGGLE) {
+        /* Classic Alternative Visuals is always true 4:3 -- zoom and
+         * "original aspect ratio" are contradictory asks, so the R3 toggle
+         * is a no-op while Classic is active (see settings.h's doc
+         * comment). Left as a no-op rather than resetting ow.zoom_mode to
+         * OFF on every frame here, so a player's zoom choice from Off/
+         * Modern is preserved if they switch back later. */
+        if ((aux_new & AUX_ZOOM_TOGGLE) && engine_alternative_visuals != ALT_VISUALS_CLASSIC) {
             /* Cycle EB_ZOOM_OFF -> EB_ZOOM_OUT -> EB_ZOOM_IN -> EB_ZOOM_OFF. */
             ow.zoom_mode = (ow.zoom_mode + 1) % 3;
         }
@@ -633,8 +640,17 @@ void host_process_frame(void) {
      * aux_new edge) since any_window_open() can change independently of
      * an R3 press. */
     EbZoomMode effective_zoom = (EbZoomMode)ow.zoom_mode;
-    if (effective_zoom == EB_ZOOM_IN && any_window_open())
+    if (engine_alternative_visuals == ALT_VISUALS_CLASSIC) {
+        /* Defense in depth alongside the R3-toggle gate above -- forces
+         * the *effective* (this-frame) zoom off even if ow.zoom_mode
+         * somehow still holds a stale non-OFF value (e.g. the player was
+         * zoomed in Modern, then switched to Classic mid-session). The
+         * render side (sdl2_video.c) also force-crops to 4:3 regardless of
+         * this value, so this is belt and suspenders, not load-bearing. */
         effective_zoom = EB_ZOOM_OFF;
+    } else if (effective_zoom == EB_ZOOM_IN && any_window_open()) {
+        effective_zoom = EB_ZOOM_OFF;
+    }
     platform_video_set_zoom(effective_zoom);
 
     /* Color Grading (part of the combined "Experimental

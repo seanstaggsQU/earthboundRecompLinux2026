@@ -3477,9 +3477,9 @@ StepResult mode_step_pause_menu(ModeState *ms) {
  * mode_step_debug_menu (game_main.c). Cancel (B/Select) closes the screen
  * and returns to the command menu underneath.
  *
- * Five rows exist today (Sprint Speed, High Quality Audio, Alt Controls,
- * Experimental Visuals, Logging); more engine preferences can be added as
- * additional userdata cases without changing this shape. */
+ * Six rows exist today (Sprint Speed, High Quality Audio, Alt Controls,
+ * Alternative Visuals, Logging, Auto Save); more engine preferences can be
+ * added as additional userdata cases without changing this shape. */
 static const char *sprint_speed_labels[SPRINT_SPEED_COUNT] = {
     [SPRINT_SPEED_OFF]    = "Sprint: Off",
     [SPRINT_SPEED_MEDIUM] = "Sprint: Medium (+50%)",
@@ -3493,13 +3493,18 @@ static const char *alt_controls_labels[ALT_CONTROLS_COUNT] = {
     [ALT_CONTROLS_OFF] = "Alt Controls: Off",
     [ALT_CONTROLS_ON]  = "Alt Controls: On",
 };
-static const char *experimental_visuals_labels[EXPERIMENTAL_VISUALS_COUNT] = {
-    [EXPERIMENTAL_VISUALS_OFF] = "Experimental Visuals: Off",
-    [EXPERIMENTAL_VISUALS_ON]  = "Experimental Visuals: On",
+static const char *alternative_visuals_labels[ALT_VISUALS_COUNT] = {
+    [ALT_VISUALS_OFF]     = "Alt. Visuals: Off",
+    [ALT_VISUALS_CLASSIC] = "Alt. Visuals: Classic",
+    [ALT_VISUALS_MODERN]  = "Alt. Visuals: Modern",
 };
 static const char *logging_labels[LOGGING_COUNT] = {
     [LOGGING_OFF] = "Logging: Off",
     [LOGGING_ON]  = "Logging: On",
+};
+static const char *auto_save_labels[AUTO_SAVE_COUNT] = {
+    [AUTO_SAVE_OFF] = "Auto Save: Off",
+    [AUTO_SAVE_ON]  = "Auto Save: On",
 };
 
 StepResult mode_step_settings_menu(ModeState *ms) {
@@ -3511,8 +3516,9 @@ StepResult mode_step_settings_menu(ModeState *ms) {
         add_menu_item(sprint_speed_labels[engine_sprint_speed], 1, 0, 0);
         add_menu_item(hq_audio_labels[engine_hq_audio], 2, 0, 1);
         add_menu_item(alt_controls_labels[engine_alt_controls], 3, 0, 2);
-        add_menu_item(experimental_visuals_labels[engine_experimental_visuals], 4, 0, 3);
+        add_menu_item(alternative_visuals_labels[engine_alternative_visuals], 4, 0, 3);
         add_menu_item(logging_labels[engine_logging], 5, 0, 4);
+        add_menu_item(auto_save_labels[engine_auto_save], 6, 0, 5);
         open_window_and_print_menu(1, 0);
         st->phase = SET_RESULT;
         return menu_push_selection(&st->result_ready, &st->result, 1);
@@ -3554,18 +3560,30 @@ StepResult mode_step_settings_menu(ModeState *ms) {
             return STEP_RESULT_CONTINUE();
         }
         if (selection == 4) {
-            /* Experimental Visuals row confirmed: cycle Off <-> On. Gates
-             * three post-process effects together (Depth of Field, Light
-             * Shafts, Color Grading -- see settings.h) -- purely rendering
-             * flags read fresh every frame by platform_video_end_frame()
-             * (sdl2_video.c), no resync needed, takes effect on the very
-             * next frame. Depth of Field additionally has its own extra
-             * battle/Town-Map/window-open suppression regardless of this
-             * setting -- see platform_video_set_dof_suppressed()/
-             * host_process_frame(). */
-            engine_experimental_visuals =
-                (uint8_t)((engine_experimental_visuals + 1) % EXPERIMENTAL_VISUALS_COUNT);
+            /* Alternative Visuals row confirmed: cycle Off -> Classic ->
+             * Modern -> Off. Purely a rendering flag read fresh every frame
+             * by platform_video_end_frame() (sdl2_video.c), no resync
+             * needed, takes effect on the very next frame. Classic also
+             * locks the zoom toggle off (game_main.c's R3 handling) and
+             * Modern defaults zoom to EB_ZOOM_OUT on the next overworld
+             * entry (overworld.c) -- both read this setting fresh too, no
+             * extra bookkeeping needed here. Depth of Field (Modern only)
+             * additionally has its own extra battle/Town-Map/window-open
+             * suppression regardless of this setting -- see
+             * platform_video_set_dof_suppressed()/host_process_frame(). */
+            engine_alternative_visuals =
+                (uint8_t)((engine_alternative_visuals + 1) % ALT_VISUALS_COUNT);
             settings_save();
+            /* Modern defaults to the zoomed-out FOV the instant it's
+             * selected (matches the same default applied at boot in
+             * main.c for a fresh session that already has Modern
+             * configured) -- the player can still R3-cycle away from it
+             * afterward. Classic doesn't need a symmetric reset here:
+             * game_main.c's R3-toggle gate and sdl2_video.c's forced 4:3
+             * crop both already force the *effective* zoom off for
+             * Classic regardless of ow.zoom_mode's stored value. */
+            if (engine_alternative_visuals == ALT_VISUALS_MODERN)
+                ow.zoom_mode = EB_ZOOM_OUT;
             play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
             st->phase = SET_BUILD;
             return STEP_RESULT_CONTINUE();
@@ -3582,6 +3600,17 @@ StepResult mode_step_settings_menu(ModeState *ms) {
             settings_save();
             if (engine_logging == LOGGING_ON)
                 platform_log_set_enabled(true);
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 6) {
+            /* Auto Save row confirmed: cycle Off <-> On. Purely a flag
+             * read fresh at each area-transition hook point (door.c,
+             * overworld_teleport.c, display_text_cc.c) -- no resync
+             * needed, takes effect on the very next transition. */
+            engine_auto_save = (uint8_t)((engine_auto_save + 1) % AUTO_SAVE_COUNT);
+            settings_save();
             play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
             st->phase = SET_BUILD;
             return STEP_RESULT_CONTINUE();

@@ -22,10 +22,18 @@
  * were collapsed into the single experimental_visuals byte below: same
  * byte position, different meaning, which is exactly the "old file reads
  * as something it didn't mean" trap the 1->2 bump above already fixed
- * once. Bumping again makes any file written before this collapse fail
- * the check and fall through to today's defaults, rather than silently
- * reinterpreting a stale "Bloom" byte as "Experimental Visuals". */
-#define SETTINGS_VERSION 3
+ * once. Bumped 3 -> 4 when experimental_visuals's Off/On toggle became the
+ * 3-way alternative_visuals Off/Classic/Modern mode (same byte position,
+ * new meaning/range -- same trap as the 2->3 bump). Unlike the earlier
+ * bumps, this one keeps a narrow, explicit migration path in
+ * settings_load() below (see the `blob.version == 3` branch) instead of
+ * just falling back to defaults, since collapsing an existing On/Off
+ * preference into "reset to Off" would silently drop something the player
+ * had actively chosen; the mapping is simple enough (old On -> Modern) to
+ * be worth preserving. `auto_save` is new in this version too -- it has no
+ * old-byte position to migrate from, so it just defaults to Off for a
+ * migrated v3 file, same as it would for a fresh install. */
+#define SETTINGS_VERSION 4
 
 typedef struct {
     uint32_t magic;
@@ -33,45 +41,60 @@ typedef struct {
     uint8_t  sprint_speed;
     uint8_t  hq_audio;
     uint8_t  alt_controls;
-    uint8_t  experimental_visuals;
+    uint8_t  alternative_visuals; /* was `experimental_visuals` (Off/On) through version 3 */
     uint8_t  logging;
+    uint8_t  auto_save;           /* new in version 4 */
 } EngineSettingsBlob;
 
 uint8_t engine_sprint_speed = SPRINT_SPEED_MEDIUM;             /* default until settings_load() runs */
 uint8_t engine_hq_audio = HQ_AUDIO_ON;                         /* default until settings_load() runs */
 uint8_t engine_alt_controls = ALT_CONTROLS_OFF;                /* default until settings_load() runs */
-uint8_t engine_experimental_visuals = EXPERIMENTAL_VISUALS_OFF; /* default until settings_load() runs */
+uint8_t engine_alternative_visuals = ALT_VISUALS_OFF;          /* default until settings_load() runs */
 uint8_t engine_logging = LOGGING_OFF;                          /* default until settings_load() runs */
+uint8_t engine_auto_save = AUTO_SAVE_OFF;                      /* default until settings_load() runs */
 
 void settings_load(void) {
     EngineSettingsBlob blob;
     memset(&blob, 0, sizeof(blob));
 
-    /* `logging` was appended after SETTINGS_VERSION 3 shipped -- no version
-     * bump needed for it specifically: growing the struct means an old,
-     * shorter on-disk blob now reads fewer bytes than sizeof(blob), which
-     * already fails the == sizeof(blob) check below and falls through to
-     * defaults, the same protection a version bump would buy. (Contrast
-     * the 2->3 bump in the comment above SETTINGS_VERSION -- that case
-     * reused an *existing* byte's position with a new meaning, which the
-     * size check alone can't catch.) */
+    /* Accept either the current version or exactly the prior version (3),
+     * so a pre-existing file's experimental_visuals On/Off preference can
+     * be migrated below rather than discarded -- see the SETTINGS_VERSION
+     * comment above. Both versions currently happen to produce the same
+     * sizeof(EngineSettingsBlob) (the new auto_save byte fills what was
+     * trailing struct padding in the old layout), so the size check alone
+     * can't distinguish them; blob.version does that instead. Any other
+     * version (older still, or a future one this build doesn't know
+     * about) falls through to defaults. */
     if (platform_settings_read(&blob, sizeof(blob)) == sizeof(blob) &&
-        blob.magic == SETTINGS_MAGIC && blob.version == SETTINGS_VERSION &&
+        blob.magic == SETTINGS_MAGIC &&
+        (blob.version == SETTINGS_VERSION || blob.version == 3) &&
         blob.sprint_speed < SPRINT_SPEED_COUNT) {
         engine_sprint_speed = blob.sprint_speed;
         engine_hq_audio = (blob.hq_audio < HQ_AUDIO_COUNT) ? blob.hq_audio : HQ_AUDIO_ON;
         engine_alt_controls = (blob.alt_controls < ALT_CONTROLS_COUNT) ? blob.alt_controls : ALT_CONTROLS_OFF;
-        engine_experimental_visuals = (blob.experimental_visuals < EXPERIMENTAL_VISUALS_COUNT)
-            ? blob.experimental_visuals : EXPERIMENTAL_VISUALS_OFF;
         engine_logging = (blob.logging < LOGGING_COUNT) ? blob.logging : LOGGING_OFF;
+        if (blob.version == SETTINGS_VERSION) {
+            engine_alternative_visuals = (blob.alternative_visuals < ALT_VISUALS_COUNT)
+                ? blob.alternative_visuals : ALT_VISUALS_OFF;
+            engine_auto_save = (blob.auto_save < AUTO_SAVE_COUNT) ? blob.auto_save : AUTO_SAVE_OFF;
+        } else {
+            /* version == 3: blob.alternative_visuals actually holds the
+             * old experimental_visuals byte at this same offset (0=Off,
+             * 1=On) -- map On to the closest new equivalent, Modern.
+             * auto_save didn't exist yet; defaults to Off. */
+            engine_alternative_visuals = (blob.alternative_visuals == 1) ? ALT_VISUALS_MODERN : ALT_VISUALS_OFF;
+            engine_auto_save = AUTO_SAVE_OFF;
+        }
     } else {
         /* No settings file, or unreadable/foreign/stale -- fall back to
          * defaults rather than leaving partially-read garbage in place. */
         engine_sprint_speed = SPRINT_SPEED_MEDIUM;
         engine_hq_audio = HQ_AUDIO_ON;
         engine_alt_controls = ALT_CONTROLS_OFF;
-        engine_experimental_visuals = EXPERIMENTAL_VISUALS_OFF;
+        engine_alternative_visuals = ALT_VISUALS_OFF;
         engine_logging = LOGGING_OFF;
+        engine_auto_save = AUTO_SAVE_OFF;
     }
 }
 
@@ -83,7 +106,8 @@ void settings_save(void) {
     blob.sprint_speed = engine_sprint_speed;
     blob.hq_audio = engine_hq_audio;
     blob.alt_controls = engine_alt_controls;
-    blob.experimental_visuals = engine_experimental_visuals;
+    blob.alternative_visuals = engine_alternative_visuals;
     blob.logging = engine_logging;
+    blob.auto_save = engine_auto_save;
     platform_settings_write(&blob, sizeof(blob));
 }

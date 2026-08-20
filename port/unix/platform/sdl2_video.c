@@ -419,21 +419,38 @@ static void apply_dof(pixel_t *pixels, int pitch, float intensity) {
 }
 
 /* ---- Color Grading: a mild global contrast/saturation/warmth adjustment,
- * applied after DoF so it grades the whole post-blur composited look
- * rather than just the base scene. All four
- * knobs dialed back once already after feedback that it looked too
- * saturated, then further per "make it more subtle" -- the current values
- * are meant to be barely perceptible on their own, only additive over a
- * whole scene. */
-#define GRADE_CONTRAST    1.03f  /* >1 = more contrast around mid-gray (was
-                                   * 1.06) */
-#define GRADE_SATURATION  1.015f /* >1 = more saturated (was 1.08, then 1.03
-                                   * -- reported too saturated both times) */
-#define GRADE_WARM_R      1.01f  /* slight warm push: a touch more red...
-                                   * (was 1.02) */
-#define GRADE_WARM_B      0.99f  /* ...and a touch less blue (was 0.98) */
+ * applied after DoF (Modern) or scanlines (Classic) so it grades the whole
+ * post-blur/post-scanline composited look rather than just the base scene.
+ * Two tunings share this one function rather than duplicating it:
+ *   - Modern: the original Experimental Visuals constants. All four knobs
+ *     dialed back once already after feedback that it looked too
+ *     saturated, then further per "make it more subtle" -- the current
+ *     values are meant to be barely perceptible on their own, only
+ *     additive over a whole scene.
+ *   - Classic: a lower-saturation, slightly warmer "phosphor" tuning for
+ *     the CRT-style look -- old CRT/phosphor displays characteristically
+ *     ran a touch warm and never reproduced fully saturated color, so this
+ *     leans the opposite direction from Modern's saturation boost. */
+typedef enum {
+    GRADE_PROFILE_MODERN,
+    GRADE_PROFILE_CLASSIC,
+} GradeProfile;
 
-static void apply_color_grade(pixel_t *pixels, int pitch) {
+static void apply_color_grade(pixel_t *pixels, int pitch, GradeProfile profile) {
+    float contrast, saturation, warm_r, warm_b;
+    if (profile == GRADE_PROFILE_CLASSIC) {
+        contrast   = 1.02f;  /* barely more contrast */
+        saturation = 0.94f;  /* CRT phosphor: noticeably less saturated than source */
+        warm_r     = 1.015f; /* slightly warmer than Modern's push */
+        warm_b     = 0.985f;
+    } else {
+        contrast   = 1.03f;  /* >1 = more contrast around mid-gray (was 1.06) */
+        saturation = 1.015f; /* >1 = more saturated (was 1.08, then 1.03 --
+                               * reported too saturated both times) */
+        warm_r     = 1.01f;  /* slight warm push: a touch more red... (was 1.02) */
+        warm_b     = 0.99f;  /* ...and a touch less blue (was 0.98) */
+    }
+
     int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
     int stride = pitch / (int)sizeof(pixel_t);
     for (int y = 0; y < h; y++) {
@@ -441,24 +458,53 @@ static void apply_color_grade(pixel_t *pixels, int pitch) {
         for (int x = 0; x < w; x++) {
             uint8_t r0, g0, b0;
             fx_unpack(row[x], &r0, &g0, &b0);
-            float r = (r0 - 128.0f) * GRADE_CONTRAST + 128.0f;
-            float g = (g0 - 128.0f) * GRADE_CONTRAST + 128.0f;
-            float b = (b0 - 128.0f) * GRADE_CONTRAST + 128.0f;
+            float r = (r0 - 128.0f) * contrast + 128.0f;
+            float g = (g0 - 128.0f) * contrast + 128.0f;
+            float b = (b0 - 128.0f) * contrast + 128.0f;
             float luma = r * 0.299f + g * 0.587f + b * 0.114f;
-            r = luma + (r - luma) * GRADE_SATURATION;
-            g = luma + (g - luma) * GRADE_SATURATION;
-            b = luma + (b - luma) * GRADE_SATURATION;
-            r *= GRADE_WARM_R;
-            b *= GRADE_WARM_B;
+            r = luma + (r - luma) * saturation;
+            g = luma + (g - luma) * saturation;
+            b = luma + (b - luma) * saturation;
+            r *= warm_r;
+            b *= warm_b;
             row[x] = fx_pack(fx_clamp_byte(r), fx_clamp_byte(g), fx_clamp_byte(b));
         }
     }
 }
 
-/* ---- Anti-Aliasing: a Scale2x/EPX 2x pixel-art upscale, folded into
- * Experimental Visuals per request rather than a separate Config row.
- * Runs last, after DoF/Color Grading have already modified locked_pixels,
- * so it smooths the fully composited frame.
+/* ---- CRT-style scanlines: darkens every other row of the native low-res
+ * buffer by a fixed, subtle amount, before the nearest-neighbor upscale to
+ * the display -- this is what makes the darkened rows read as visible
+ * horizontal bands once magnified, the same trick pixel-art emulator CRT
+ * filters use. Classic-only: deliberately not offered under Modern, which
+ * keeps the AA-smoothed look scanline-free. Applied directly to
+ * locked_pixels at EB_VIEWPORT_WIDTH x EB_VIEWPORT_HEIGHT like DoF/Color
+ * Grading, even though Classic's final crop is only ever SNES_WIDTH x
+ * SNES_HEIGHT (256x224) of that buffer -- the crop happens later in
+ * platform_video_end_frame(), so darkening full rows here is simplest and
+ * costs nothing extra (the cropped-out rows' work is wasted but this whole
+ * pass is cheap). */
+#define SCANLINE_DARKEN 0.85f /* multiply darkened rows' RGB by this (15% darker) */
+
+static void apply_scanlines(pixel_t *pixels, int pitch) {
+    int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
+    int stride = pitch / (int)sizeof(pixel_t);
+    for (int y = 1; y < h; y += 2) {
+        pixel_t *row = pixels + (size_t)y * stride;
+        for (int x = 0; x < w; x++) {
+            uint8_t r, g, b;
+            fx_unpack(row[x], &r, &g, &b);
+            row[x] = fx_pack(fx_clamp_byte(r * SCANLINE_DARKEN),
+                              fx_clamp_byte(g * SCANLINE_DARKEN),
+                              fx_clamp_byte(b * SCANLINE_DARKEN));
+        }
+    }
+}
+
+/* ---- Anti-Aliasing: an Eagle 2x pixel-art upscale, folded into Modern
+ * Alternative Visuals per request rather than a separate Config row. Runs
+ * last, after DoF/Color Grading have already modified locked_pixels, so it
+ * smooths the fully composited frame.
  *
  * Unlike DoF/Color Grading, this does NOT respect fx_suppressed/
  * dof_suppressed (title screen, file-select, battle, Town Map, open
@@ -466,21 +512,31 @@ static void apply_color_grade(pixel_t *pixels, int pitch) {
  * stylistic choices that specific screens weren't art-directed for.
  * Antialiasing isn't a style choice -- smoothing jagged diagonal edges
  * looks equally correct everywhere, including the title screen, so it
- * simply runs whenever Experimental Visuals is on, full stop.
+ * simply runs whenever Modern is active, full stop.
  *
- * Scale2x/EPX (not a blur): for each source pixel, compares its 4
- * orthogonal neighbors (above/left/right/below) and expands it to a 2x2
- * block, using an edge-aware rule that only replaces a corner with a
- * neighboring color when that neighbor pair agrees on one axis and
- * disagrees on the other -- this smooths a jagged diagonal staircase edge
- * into single-pixel steps without blurring flat color regions or fine
- * detail the way a naive resize would. Verified against a synthetic
- * staircase test pattern (finer, smoother steps in the output vs. the
- * source's blockier steps) before shipping. Chosen over the fancier xBRZ
- * for a first pass: much simpler to implement and verify correctly, at
- * the cost of xBRZ's more sophisticated corner/pattern detection -- worth
- * revisiting later if Scale2x's results aren't sharp enough on real
- * sprite art.
+ * Eagle (not a blur, same family as the Scale2x/EPX this replaced): for
+ * each source pixel, expands it to a 2x2 output block where each corner is
+ * replaced by the diagonal neighbor in that direction only when BOTH
+ * orthogonal neighbors adjacent to that corner AND the diagonal neighbor
+ * itself all agree with each other -- e.g. the top-left output pixel
+ * becomes the NW neighbor's color only if West, North, and NW all match;
+ * otherwise it stays the center color. This is a strictly larger check
+ * than Scale2x/EPX's (which only ever compares the 4 orthogonal neighbors
+ * against each other, never looking at the diagonals at all), so Eagle
+ * catches and smooths some diagonal staircase edges Scale2x leaves jagged
+ * -- verified against the same synthetic staircase test pattern used to
+ * verify Scale2x originally (finer steps than Scale2x's output on the same
+ * input). Like Scale2x/EPX, Eagle only ever *replicates* an existing
+ * source color into the output -- it never blends/interpolates a new
+ * in-between color -- which is what keeps EarthBound's checkerboard-
+ * dithered shading and flat outline colors intact instead of smearing
+ * them into muddy gradients. Interpolating scalers (hqx, xBRZ) don't have
+ * that property and risk exactly that kind of smearing on this game's
+ * dithered art style; xBRZ specifically was considered (it has more
+ * sophisticated edge/corner detection than either Scale2x or Eagle) and
+ * deferred for that reason -- worth adding later as an explicit opt-in
+ * second AA choice if the user wants to compare it visually, rather than
+ * as the default.
  *
  * Produces a full 2x-resolution frame (aa_upscaled/aa_texture below), not
  * an in-place effect on the EB_VIEWPORT-sized buffer like DoF/Color Grading
@@ -489,27 +545,28 @@ static void apply_color_grade(pixel_t *pixels, int pitch) {
  * this ran, rather than writing back into locked_pixels.
  *
  * Tolerance-based neighbor comparison, not exact equality: reported (and
- * root-caused) as making text look "wonky"/like it's toggling between
- * pixels frame to frame. Scale2x's corner-replacement decision is a hard
- * function of exact pixel equality -- for genuinely static source pixels
- * that's perfectly stable (same input, same output, always), but this
- * engine has legitimate, intentional per-frame ambient palette animation
- * (see update_map_palette_animation(), overworld_palette.c -- used for
- * water shimmer and similar SNES-era cosmetic effects), which shifts
- * affected pixels by a color step or two every frame. Imperceptible on
- * its own, but exact-equality Scale2x turns that subtle wobble into a
- * full binary flip of which corner gets replaced -- and text sitting
- * next to an animating background is exactly where a stable neighbor
- * relationship (background == background) can intermittently stop
- * holding, producing a visibly flickering edge each time the animation
- * ticks. aa_similar() treats two colors as equivalent for this decision
- * if they're within AA_COLOR_TOLERANCE per channel (roughly one BGR565
- * quantization step), absorbing that kind of small ambient wobble while
- * still telling genuinely different colors (an actual sprite/text edge)
- * apart. Verified with a synthetic test before shipping: a background
- * wobbling by one full quantization step between two synthetic "frames"
- * produced zero text-edge-shape disagreements with tolerance, versus
- * real disagreements without it. */
+ * root-caused, back when this was Scale2x/EPX) as making text look
+ * "wonky"/like it's toggling between pixels frame to frame. A
+ * corner-replacement decision that's a hard function of exact pixel
+ * equality is perfectly stable for genuinely static source pixels (same
+ * input, same output, always), but this engine has legitimate, intentional
+ * per-frame ambient palette animation (see update_map_palette_animation(),
+ * overworld_palette.c -- used for water shimmer and similar SNES-era
+ * cosmetic effects), which shifts affected pixels by a color step or two
+ * every frame. Imperceptible on its own, but exact-equality comparison
+ * turns that subtle wobble into a full binary flip of which corner gets
+ * replaced -- and text sitting next to an animating background is exactly
+ * where a stable neighbor relationship (background == background) can
+ * intermittently stop holding, producing a visibly flickering edge each
+ * time the animation ticks. aa_similar() treats two colors as equivalent
+ * for this decision if they're within AA_COLOR_TOLERANCE per channel
+ * (roughly one BGR565 quantization step), absorbing that kind of small
+ * ambient wobble while still telling genuinely different colors (an actual
+ * sprite/text edge) apart. Verified with a synthetic test before shipping
+ * Scale2x: a background wobbling by one full quantization step between two
+ * synthetic "frames" produced zero text-edge-shape disagreements with
+ * tolerance, versus real disagreements without it -- still applies
+ * unchanged to Eagle's corner checks, which use the same aa_similar(). */
 #define AA_SCALE 2
 #define AA_COLOR_TOLERANCE 10  /* max per-8-bit-channel delta to treat two
                                  * colors as the same for this decision */
@@ -541,31 +598,31 @@ static void apply_aa_upscale(const pixel_t *src, int src_pitch, pixel_t *dst, in
 
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
-            pixel_t e = aa_at(src, src_stride, w, h, x, y);
-            pixel_t b = aa_at(src, src_stride, w, h, x, y - 1); /* above */
-            pixel_t d = aa_at(src, src_stride, w, h, x - 1, y); /* left */
-            pixel_t f = aa_at(src, src_stride, w, h, x + 1, y); /* right */
-            pixel_t g = aa_at(src, src_stride, w, h, x, y + 1); /* below */
+            pixel_t e  = aa_at(src, src_stride, w, h, x,     y);     /* center */
+            pixel_t n  = aa_at(src, src_stride, w, h, x,     y - 1); /* north */
+            pixel_t s  = aa_at(src, src_stride, w, h, x,     y + 1); /* south */
+            pixel_t we = aa_at(src, src_stride, w, h, x - 1, y);     /* west */
+            pixel_t ea = aa_at(src, src_stride, w, h, x + 1, y);     /* east */
+            pixel_t nw = aa_at(src, src_stride, w, h, x - 1, y - 1); /* north-west */
+            pixel_t ne = aa_at(src, src_stride, w, h, x + 1, y - 1); /* north-east */
+            pixel_t sw = aa_at(src, src_stride, w, h, x - 1, y + 1); /* south-west */
+            pixel_t se = aa_at(src, src_stride, w, h, x + 1, y + 1); /* south-east */
 
-            /* Each corner's decision only ever tests one of 4 distinct
-             * neighbor pairs (d,b)/(d,g)/(b,f)/(f,g) -- the naive
-             * per-corner aa_similar() calls above evaluated the same pair
-             * redundantly (12 calls/pixel, each up to 2 fx_unpack() calls
-             * deep, for 4 pairs' worth of information); computing each
-             * pair once and reusing it is the same boolean logic with a
-             * 3x fewer aa_similar() calls. */
-            bool sim_db = aa_similar(d, b);
-            bool sim_dg = aa_similar(d, g);
-            bool sim_bf = aa_similar(b, f);
-            bool sim_fg = aa_similar(f, g);
-            pixel_t p1 = (sim_db && !sim_dg && !sim_bf) ? d : e;
-            pixel_t p2 = (sim_bf && !sim_db && !sim_fg) ? f : e;
-            pixel_t p3 = (sim_dg && !sim_db && !sim_fg) ? d : e;
-            pixel_t p4 = (sim_fg && !sim_dg && !sim_bf) ? f : e;
+            /* Eagle: each output corner takes its diagonal neighbor's color
+             * only when that neighbor and both orthogonal neighbors
+             * adjacent to it all agree with each other -- checked as 3
+             * pairwise comparisons rather than relying on transitivity,
+             * since aa_similar()'s tolerance-based comparison isn't
+             * guaranteed transitive (a~b and b~c doesn't imply a~c near
+             * the tolerance boundary) the way exact equality would be. */
+            pixel_t p1 = (aa_similar(we, n) && aa_similar(n, nw) && aa_similar(we, nw)) ? nw : e;
+            pixel_t p2 = (aa_similar(n, ea) && aa_similar(ea, ne) && aa_similar(n, ne)) ? ne : e;
+            pixel_t p3 = (aa_similar(we, s) && aa_similar(s, sw) && aa_similar(we, sw)) ? sw : e;
+            pixel_t p4 = (aa_similar(s, ea) && aa_similar(ea, se) && aa_similar(s, se)) ? se : e;
 
             int ox = x * AA_SCALE, oy = y * AA_SCALE;
-            dst[oy * dst_stride + ox]         = p1;
-            dst[oy * dst_stride + ox + 1]     = p2;
+            dst[oy * dst_stride + ox]           = p1;
+            dst[oy * dst_stride + ox + 1]       = p2;
             dst[(oy + 1) * dst_stride + ox]     = p3;
             dst[(oy + 1) * dst_stride + ox + 1] = p4;
         }
@@ -697,29 +754,38 @@ void platform_video_end_frame(void) {
     if (platform_headless)
         return;
 
-    bool want_experimental = engine_experimental_visuals == EXPERIMENTAL_VISUALS_ON;
-    /* Set true only if the Scale2x upscale actually ran this frame (i.e.
+    /* Alternative Visuals: Off/Classic/Modern (settings.h). Modern is the
+     * old "Experimental Visuals: On" look (DoF/grade/AA); Classic is a new
+     * true-4:3 CRT-ish look (scanlines/grade, no DoF/AA) -- see settings.h
+     * for the full mode writeup. */
+    uint8_t alt_mode = engine_alternative_visuals;
+    bool want_modern = alt_mode == ALT_VISUALS_MODERN;
+    bool want_classic = alt_mode == ALT_VISUALS_CLASSIC;
+    /* Set true only if the AA upscale actually ran this frame (i.e.
      * locked_pixels was valid) -- guards against swapping to aa_texture
      * on a frame where SDL_LockTexture failed in platform_video_begin_frame()
      * and it would otherwise hold stale content from a previous frame. */
     bool aa_ran = false;
 
     if (locked_pixels) {
-        /* Both remaining Experimental Visuals effects share one Config
-         * toggle (engine_experimental_visuals) but keep independent
+        /* Modern's DoF/Color Grading share one Config toggle
+         * (engine_alternative_visuals == MODERN) but keep independent
          * suppression: DoF has its own extra battle/Town-Map/window-open
          * condition on top of the shared title/file-select one (see
          * platform_video_set_dof_suppressed()/host_process_frame()).
-         * Fixed pipeline order: DoF blurs the base scene first, Color
+         * Classic's scanlines/grade run unconditionally whenever Classic
+         * is active -- unlike Modern's DoF, they're not a "focus effect"
+         * that needs hiding for menu readability, they're meant to be the
+         * look of the whole game, consistently, everywhere. Fixed
+         * pipeline order: DoF/scanlines modify the base scene first, Color
          * Grading runs on the result before antialiasing so it grades the
          * base scene, not the upscaled one (grading is resolution-
          * independent, so this order doesn't matter for correctness, just
          * consistency with "grade the composited scene" already
-         * established). AA runs last and unconditionally when
-         * Experimental Visuals is on -- see apply_aa_upscale()'s doc
-         * comment for why it skips fx_suppressed/dof_suppressed unlike
-         * DoF/Color Grading. */
-        bool want_fx = want_experimental && !fx_suppressed;
+         * established). AA runs last and unconditionally when Modern is
+         * active -- see apply_aa_upscale()'s doc comment for why it skips
+         * fx_suppressed/dof_suppressed unlike DoF/Color Grading. */
+        bool want_fx = want_modern && !fx_suppressed;
 #ifdef EB_FX_PROFILE
         static double acc_dof, acc_grade, acc_aa;
         static int prof_frames;
@@ -735,8 +801,10 @@ void platform_video_end_frame(void) {
          * unconditionally (not just when the target is true) so the
          * step is always exactly one DOF_FADE_STEP regardless of which
          * direction it's easing, and apply_dof() itself is only called
-         * while there's still something to show. */
-        float dof_target = (want_experimental && !dof_suppressed) ? 1.0f : 0.0f;
+         * while there's still something to show. Naturally eases to 0 when
+         * Classic or Off is active too (want_modern false), so switching
+         * away from Modern mid-game fades DoF out instead of cutting it. */
+        float dof_target = (want_modern && !dof_suppressed) ? 1.0f : 0.0f;
         if (dof_intensity < dof_target) {
             dof_intensity += DOF_FADE_STEP;
             if (dof_intensity > dof_target) dof_intensity = dof_target;
@@ -749,12 +817,16 @@ void platform_video_end_frame(void) {
 #ifdef EB_FX_PROFILE
         p1 = platform_timer_ticks(); acc_dof += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
 #endif
+        if (want_classic)
+            apply_scanlines(locked_pixels, locked_pitch);
         if (want_fx)
-            apply_color_grade(locked_pixels, locked_pitch);
+            apply_color_grade(locked_pixels, locked_pitch, GRADE_PROFILE_MODERN);
+        else if (want_classic)
+            apply_color_grade(locked_pixels, locked_pitch, GRADE_PROFILE_CLASSIC);
 #ifdef EB_FX_PROFILE
         p1 = platform_timer_ticks(); acc_grade += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
 #endif
-        if (want_experimental) {
+        if (want_modern) {
             apply_aa_upscale(locked_pixels, locked_pitch,
                               aa_upscaled, EB_VIEWPORT_WIDTH * AA_SCALE);
             aa_ran = true;
@@ -811,6 +883,16 @@ void platform_video_end_frame(void) {
      * comment), so it looks just as good on any display the default
      * already does. */
     int content_w, content_h;
+    if (want_classic) {
+        /* Classic: always true 4:3 (the original SNES resolution), zoom
+         * ignored entirely -- defense in depth alongside the R3/zoom-cycle
+         * gating in game_main.c, which already keeps zoom_mode at
+         * EB_ZOOM_OFF while Classic is active; forcing it here too means
+         * this crop stays correct even if that gate is ever bypassed
+         * (e.g. a leftover zoom_mode from switching modes mid-frame). */
+        content_w = SNES_WIDTH;
+        content_h = SNES_HEIGHT;
+    } else
     switch (zoom_mode) {
     case EB_ZOOM_OUT: {
         double display_ar = (double)out_w / out_h;
