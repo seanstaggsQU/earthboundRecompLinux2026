@@ -172,18 +172,12 @@ def pack_npcs(
             # so a genuinely opaque 4-byte value (money, padding) is
             # essentially never mistaken for one and passes through
             # unchanged, exactly as before this fix.
+            remapped = None
             if addr_remap and len(npc.secondary_bytes) == 4:
-                raw_val = (
-                    npc.secondary_bytes[0]
-                    | (npc.secondary_bytes[1] << 8)
-                    | (npc.secondary_bytes[2] << 16)
-                    | (npc.secondary_bytes[3] << 24)
-                )
-                if raw_val in addr_remap:
-                    buf.extend(struct.pack("<I", addr_remap[raw_val]))
-                else:
-                    for b in npc.secondary_bytes:
-                        buf.append(b)
+                raw_val = int.from_bytes(bytes(npc.secondary_bytes), "little")
+                remapped = addr_remap.get(raw_val)
+            if remapped is not None:
+                buf.extend(struct.pack("<I", remapped))
             else:
                 for b in npc.secondary_bytes:
                     buf.append(b)

@@ -2471,8 +2471,19 @@ StepResult mode_step_use_item(ModeState *ms) {
             uint16_t target_result = (uint16_t)mode_child_result();
             st->target_id = target_result & 0xFF;
 
-            if (st->target_id == 0)
-                return STEP_RESULT_POP(0);  /* Targeting cancelled (lines 264-265) */
+            if (st->target_id == 0) {
+                /* Targeting cancelled (lines 264-265). Key Items pool
+                 * feature: UI_ENTER latched key_items_pool_use_item_id
+                 * for this pool item; the normal completion path clears
+                 * it in UI_EXIT below, but that phase is never reached
+                 * from here, so mirror the same hygiene clear on this
+                 * early exit -- otherwise the latch leaks past this Use
+                 * flow (see get_character_item()'s doc comment,
+                 * inventory.c). */
+                if (st->from_key_items_pool)
+                    key_items_set_use_in_progress(0);
+                return STEP_RESULT_POP(0);
+            }
 
             /* Assembly lines 266-274: consume item if CONSUMED_ON_USE flag set.
              * Key Items pool feature: remove from the pool, not a
@@ -2494,6 +2505,13 @@ StepResult mode_step_use_item(ModeState *ms) {
              * (assembly lines 275-334) */
             close_window(WINDOW_INVENTORY_MENU);
             close_window(WINDOW_INVENTORY);
+            /* Key Items pool feature: close_window() on a window that
+             * isn't currently open is a no-op, so it's safe to always
+             * close WINDOW_KEY_ITEMS here rather than have every caller
+             * of GAME_MODE_USE_ITEM remember to close it first -- the
+             * Key Items menu (mode_step_key_items_menu(), below) left it
+             * open when it pushed this mode for its "Use" action. */
+            close_window(WINDOW_KEY_ITEMS);
 
             /* Set attacker name from character (assembly lines 280-287) */
             set_battle_attacker_name(
@@ -2675,23 +2693,13 @@ StepResult mode_step_use_item(ModeState *ms) {
 }
 
 /* Maps a 1-based sequence number (as displayed/selected in the Key Items
- * browser) back to the pool item_id at that position, using the exact same
- * skip-zeros walk as the display loop in mode_step_key_items_menu() below
- * so the two can never disagree. Returns 0 if seq is out of range
- * (shouldn't happen -- SELECTION_MENU only ever returns a userdata that
- * was actually added -- but a search over the whole array is guarded
- * anyway). */
-static uint16_t key_items_pool_seq_to_item(uint16_t seq) {
-    int cur = 0;
-    for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
-        uint8_t item_id = key_items_pool[i];
-        if (item_id == 0) continue;
-        if (!get_item_entry(item_id)) continue;
-        cur++;
-        if (cur == seq) return item_id;
-    }
-    return 0;
-}
+ * browser) back to the pool item_id at that position. Populated by
+ * KIM_ENTER's list-building walk below (the same walk that assigns each
+ * displayed entry its seq number), so resolving a selection is a single
+ * array index instead of re-walking and re-looking-up key_items_pool[]
+ * a second time. Matches the file-scope-static pattern already used for
+ * sel_init/use_init below (single active menu instance assumed). */
+static uint16_t key_items_menu_seq_ids[KEY_ITEMS_POOL_SIZE];
 
 /* GAME_MODE_KEY_ITEMS_MENU step -- Key Items pool browser. Key Items pool
  * feature, not a port of any ROM routine. List-building (KIM_ENTER) is
@@ -2720,7 +2728,6 @@ StepResult mode_step_key_items_menu(ModeState *ms) {
         create_window(WINDOW_KEY_ITEMS);
         set_window_title(WINDOW_KEY_ITEMS, "Key Items", -1);
 
-        /* Must match key_items_pool_seq_to_item()'s walk exactly. */
         int seq = 1;
         for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
             uint8_t item_id = key_items_pool[i];
@@ -2732,6 +2739,7 @@ StepResult mode_step_key_items_menu(ModeState *ms) {
             char name_buf[ITEM_NAME_LEN + 1];
             eb_to_ascii_buf(item_entry->name, ITEM_NAME_LEN, name_buf);
 
+            key_items_menu_seq_ids[seq - 1] = item_id;
             add_menu_item_no_position(name_buf, (uint16_t)seq++);
         }
 
@@ -2763,11 +2771,14 @@ StepResult mode_step_key_items_menu(ModeState *ms) {
             return STEP_RESULT_POP(0);
         }
 
-        uint16_t item_id = key_items_pool_seq_to_item(seq);
+        uint16_t item_id = (seq >= 1 && seq <= KEY_ITEMS_POOL_SIZE)
+                               ? key_items_menu_seq_ids[seq - 1] : 0;
         if (item_id == 0) {
-            /* Shouldn't happen (see key_items_pool_seq_to_item()'s doc
-             * comment) -- rebuild the list rather than show an action menu
-             * for a bogus item. */
+            /* Shouldn't happen -- SELECTION_MENU only ever returns a
+             * userdata value that KIM_ENTER actually added, and every
+             * added entry has a non-zero item_id cached alongside it --
+             * but rebuild the list rather than show an action menu for a
+             * bogus item. */
             st->phase = KIM_ENTER;
             continue;
         }

@@ -156,6 +156,22 @@ def pack_npcs_cmd(
 
     common_data = load_common_data(commondata)
     output_path = output_dir / "data" / "npc_config_table.bin"
+    # addr_remap (original SNES text addr -> new compiled addr) is only
+    # available as a byproduct of repacking dialogue, which this
+    # standalone command doesn't do -- so it's never passed here, and
+    # pack_npcs()'s OBJECT/PERSON secondary-pointer remap and
+    # text_pointer remap are both silently skipped as a result. Warn
+    # rather than silently emit a table with stale pre-repack addresses
+    # (see pack_npcs()'s doc comments for the class of bug this causes:
+    # a key item's "use" script can't resolve the door/guard text it
+    # needs and silently does nothing).
+    print(
+        "Warning: standalone 'pack npcs' cannot resolve dialogue address "
+        "remapping -- NPC secondary/text pointers will keep their "
+        "pre-repack addresses. Use 'ebtools pack-all' for a build where "
+        "dialogue is also repacked.",
+        file=sys.stderr,
+    )
     pack_npcs(npcs_json, common_data, output_path)
     print(f"Packed NPCs to {output_path}")
 

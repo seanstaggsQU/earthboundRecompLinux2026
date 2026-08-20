@@ -1783,16 +1783,14 @@ bool cc_18_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
  * (text.c) set the sentinel up correctly, but this opcode's own inline
  * copy of the lookup never checked for it.
  *
- * This wrapper preserves each call site's existing bounds-checked
- * behavior for real (char_id, slot) pairs unchanged, and adds only the
- * sentinel special-case (delegating to get_character_item(), which
- * already knows how to answer it) on top. */
+ * This wrapper just delegates to get_character_item(), which already
+ * handles the sentinel *and* bounds-checks char_id/slot for the real-slot
+ * case -- an earlier version of this wrapper hand-rolled its own
+ * duplicate bounds-checked array access instead of calling it, which
+ * both duplicated that logic and left get_character_item()'s own
+ * real-slot path unguarded for its *other*, non-wrapped callers. */
 static uint8_t cc_get_character_item(uint16_t char_id, uint16_t slot) {
-    if (slot == KEY_ITEMS_POOL_USE_SLOT_SENTINEL)
-        return (uint8_t)get_character_item(char_id, slot);
-    if (char_id >= 1 && char_id <= TOTAL_PARTY_COUNT && slot >= 1 && slot <= 14)
-        return party_characters[char_id - 1].items[slot - 1];
-    return 0;
+    return (uint8_t)get_character_item(char_id, slot);
 }
 
 /* --- CC 0x19 tree: inventory/character queries ---

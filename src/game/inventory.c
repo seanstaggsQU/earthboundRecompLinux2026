@@ -798,11 +798,30 @@ void key_items_set_use_in_progress(uint16_t item_id) {
 
 /* GET_CHARACTER_ITEM: Port of asm/misc/get_character_item.asm.
  * Assembly calling convention: A=char_id, X=slot (both 1-indexed).
- * Returns the item ID at items[slot-1] for party_characters[char_id-1]. */
+ * Returns the item ID at items[slot-1] for party_characters[char_id-1].
+ *
+ * Key Items pool safety: the sentinel read is one-shot -- it consumes
+ * (clears) key_items_pool_use_item_id as it returns it. The only known
+ * consumer reads it exactly once per pool-item use (see the doc comment
+ * above key_items_pool_use_item_id), and one-shot consumption is also
+ * what keeps a *stale* sentinel value from ever reaching the real-slot
+ * path below: without it, a leftover KEY_ITEMS_POOL_USE_SLOT_SENTINEL
+ * (0xFFFF) arriving here after key_items_pool_use_item_id has already
+ * been cleared elsewhere would fall through to slot_idx = 0xFFFE, far
+ * outside items[]'s 14 entries. The explicit slot bounds check below is
+ * a second, independent guard against that same class of stale/garbage
+ * slot value -- belt and suspenders, since this function has no other
+ * caller-side validation to rely on (several callers pass slot values
+ * that themselves trace back to script/menu state, not just the
+ * sentinel path). */
 uint16_t get_character_item(uint16_t char_id, uint16_t slot) {
-    if (slot == KEY_ITEMS_POOL_USE_SLOT_SENTINEL && key_items_pool_use_item_id != 0)
-        return key_items_pool_use_item_id;
+    if (slot == KEY_ITEMS_POOL_USE_SLOT_SENTINEL) {
+        uint16_t item_id = key_items_pool_use_item_id;
+        key_items_pool_use_item_id = 0;
+        return item_id;
+    }
     if (char_id == 0 || char_id > TOTAL_PARTY_COUNT) return 0;
+    if (slot == 0 || slot > ITEM_INVENTORY_SIZE) return 0;
     uint16_t char_idx = char_id - 1;
     uint16_t slot_idx = slot - 1;
     return party_characters[char_idx].items[slot_idx];
@@ -923,8 +942,17 @@ uint16_t give_item_to_character(uint16_t char_id, uint16_t item_id) {
  * 5. Clear the last occupied slot
  * 6. Handle teddy bear removal (REMOVE_CHAR_FROM_PARTY + UPDATE_TEDDY_BEAR_PARTY)
  * 7. Handle transform flag (START_TIMED_ITEM_TRANSFORMATION)
- * Returns char_id. */
+ * Returns char_id.
+ *
+ * C-port safety guard (no assembly counterpart -- the ROM's script data
+ * always supplied a valid slot): char_id/item_slot are validated before
+ * any array access. This is what keeps a stray
+ * KEY_ITEMS_POOL_USE_SLOT_SENTINEL (0xFFFF), or any other out-of-range
+ * slot value reaching this function from script state, from computing
+ * items[item_slot-1] far outside items[]'s 14 entries. */
 uint16_t remove_item_from_inventory(uint16_t char_id, uint16_t item_slot) {
+    if (char_id == 0 || char_id > TOTAL_PARTY_COUNT) return char_id;
+    if (item_slot == 0 || item_slot > ITEM_INVENTORY_SIZE) return char_id;
     uint16_t char_idx = char_id - 1;
 
     /* --- Step 1: Unequip if the removed item is equipped --- */
