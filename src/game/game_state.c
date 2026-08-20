@@ -554,6 +554,29 @@ bool key_items_selftest(void) {
                                       * show_town_map_prepare() checks for. */
     const uint16_t JEFF = 3;        /* char_id 3 = Jeff (1-indexed) */
 
+    /* Safety guard: this test calls save_game(0) below, a real write to
+     * whatever earthbound.srm is in the current working directory --
+     * confirmed to have destroyed a real player's save once, when this was
+     * run inside a live deployed game directory instead of an isolated
+     * scratch one. Peek at slot 0 first (same "occupied" check
+     * file_select.c uses) and refuse the destructive part of this test if
+     * it looks like a real save, rather than silently clobbering it. This
+     * is a backstop, not a substitute for actually running this in a
+     * scratch directory with no real save data -- it only catches the
+     * "occupied" case; an empty/never-played slot 0 still gets
+     * overwritten with test data, which is fine for a scratch dir but NOT
+     * fine if that's meant to become someone's actual first save later. */
+    if (load_game(0) && game_state.favourite_thing[1] != 0) {
+        fprintf(stderr,
+            "key_items_selftest: REFUSING TO RUN -- save slot 1 in the "
+            "current directory's earthbound.srm looks like a real, "
+            "played save (favourite_thing is set). This test calls "
+            "save_game(0), which would overwrite it with synthetic test "
+            "data. Run this in an isolated scratch directory with no "
+            "real earthbound.srm instead.\n");
+        return false;
+    }
+
     game_state_init();
 
     /* --- 1. Simulate a pre-feature save: write the key item directly into
