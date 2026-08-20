@@ -501,10 +501,10 @@ static void apply_scanlines(pixel_t *pixels, int pitch) {
     }
 }
 
-/* ---- Anti-Aliasing: an Eagle 2x pixel-art upscale, folded into Modern
- * Alternative Visuals per request rather than a separate Config row. Runs
- * last, after DoF/Color Grading have already modified locked_pixels, so it
- * smooths the fully composited frame.
+/* ---- Anti-Aliasing: a Scale2x/EPX 2x pixel-art upscale, folded into
+ * Modern Alternative Visuals per request rather than a separate Config
+ * row. Runs last, after DoF/Color Grading have already modified
+ * locked_pixels, so it smooths the fully composited frame.
  *
  * Unlike DoF/Color Grading, this does NOT respect fx_suppressed/
  * dof_suppressed (title screen, file-select, battle, Town Map, open
@@ -514,29 +514,35 @@ static void apply_scanlines(pixel_t *pixels, int pitch) {
  * looks equally correct everywhere, including the title screen, so it
  * simply runs whenever Modern is active, full stop.
  *
- * Eagle (not a blur, same family as the Scale2x/EPX this replaced): for
- * each source pixel, expands it to a 2x2 output block where each corner is
- * replaced by the diagonal neighbor in that direction only when BOTH
- * orthogonal neighbors adjacent to that corner AND the diagonal neighbor
- * itself all agree with each other -- e.g. the top-left output pixel
- * becomes the NW neighbor's color only if West, North, and NW all match;
- * otherwise it stays the center color. This is a strictly larger check
- * than Scale2x/EPX's (which only ever compares the 4 orthogonal neighbors
- * against each other, never looking at the diagonals at all), so Eagle
- * catches and smooths some diagonal staircase edges Scale2x leaves jagged
- * -- verified against the same synthetic staircase test pattern used to
- * verify Scale2x originally (finer steps than Scale2x's output on the same
- * input). Like Scale2x/EPX, Eagle only ever *replicates* an existing
- * source color into the output -- it never blends/interpolates a new
- * in-between color -- which is what keeps EarthBound's checkerboard-
+ * History: briefly replaced with Eagle (an 8-neighbor variant that also
+ * checks diagonal corners, not just the 4 orthogonal neighbors) on the
+ * theory that its stronger diagonal-staircase smoothing would suit this
+ * game's art better. Reported live as making text noticeably less
+ * readable -- Eagle's extra diagonal check makes it replace corners more
+ * aggressively than Scale2x/EPX, which rounds off exactly the kind of
+ * thin, high-contrast single-pixel strokes text is made of. Reverted back
+ * to this Scale2x/EPX implementation, proven not to have that problem
+ * over the rest of this project's testing. A future attempt at a
+ * different algorithm should specifically verify text legibility, not
+ * just diagonal-edge smoothness, before shipping as the default.
+ *
+ * Scale2x/EPX (not a blur): for each source pixel, compares its 4
+ * orthogonal neighbors (above/left/right/below) and expands it to a 2x2
+ * block, using an edge-aware rule that only replaces a corner with a
+ * neighboring color when that neighbor pair agrees on one axis and
+ * disagrees on the other -- this smooths a jagged diagonal staircase edge
+ * into single-pixel steps without blurring flat color regions or fine
+ * detail the way a naive resize would. Verified against a synthetic
+ * staircase test pattern (finer, smoother steps in the output vs. the
+ * source's blockier steps) before shipping. Only ever *replicates* an
+ * existing source color into the output -- never blends/interpolates a
+ * new in-between color -- which is what keeps EarthBound's checkerboard-
  * dithered shading and flat outline colors intact instead of smearing
  * them into muddy gradients. Interpolating scalers (hqx, xBRZ) don't have
  * that property and risk exactly that kind of smearing on this game's
- * dithered art style; xBRZ specifically was considered (it has more
- * sophisticated edge/corner detection than either Scale2x or Eagle) and
- * deferred for that reason -- worth adding later as an explicit opt-in
- * second AA choice if the user wants to compare it visually, rather than
- * as the default.
+ * dithered art style, on top of the same or worse text-legibility risk
+ * Eagle just demonstrated -- not recommended as a next attempt without a
+ * specific plan for verifying text stays sharp.
  *
  * Produces a full 2x-resolution frame (aa_upscaled/aa_texture below), not
  * an in-place effect on the EB_VIEWPORT-sized buffer like DoF/Color Grading
@@ -545,28 +551,27 @@ static void apply_scanlines(pixel_t *pixels, int pitch) {
  * this ran, rather than writing back into locked_pixels.
  *
  * Tolerance-based neighbor comparison, not exact equality: reported (and
- * root-caused, back when this was Scale2x/EPX) as making text look
- * "wonky"/like it's toggling between pixels frame to frame. A
- * corner-replacement decision that's a hard function of exact pixel
- * equality is perfectly stable for genuinely static source pixels (same
- * input, same output, always), but this engine has legitimate, intentional
- * per-frame ambient palette animation (see update_map_palette_animation(),
- * overworld_palette.c -- used for water shimmer and similar SNES-era
- * cosmetic effects), which shifts affected pixels by a color step or two
- * every frame. Imperceptible on its own, but exact-equality comparison
- * turns that subtle wobble into a full binary flip of which corner gets
- * replaced -- and text sitting next to an animating background is exactly
- * where a stable neighbor relationship (background == background) can
- * intermittently stop holding, producing a visibly flickering edge each
- * time the animation ticks. aa_similar() treats two colors as equivalent
- * for this decision if they're within AA_COLOR_TOLERANCE per channel
- * (roughly one BGR565 quantization step), absorbing that kind of small
- * ambient wobble while still telling genuinely different colors (an actual
- * sprite/text edge) apart. Verified with a synthetic test before shipping
- * Scale2x: a background wobbling by one full quantization step between two
- * synthetic "frames" produced zero text-edge-shape disagreements with
- * tolerance, versus real disagreements without it -- still applies
- * unchanged to Eagle's corner checks, which use the same aa_similar(). */
+ * root-caused) as making text look "wonky"/like it's toggling between
+ * pixels frame to frame. Scale2x's corner-replacement decision is a hard
+ * function of exact pixel equality -- for genuinely static source pixels
+ * that's perfectly stable (same input, same output, always), but this
+ * engine has legitimate, intentional per-frame ambient palette animation
+ * (see update_map_palette_animation(), overworld_palette.c -- used for
+ * water shimmer and similar SNES-era cosmetic effects), which shifts
+ * affected pixels by a color step or two every frame. Imperceptible on
+ * its own, but exact-equality Scale2x turns that subtle wobble into a
+ * full binary flip of which corner gets replaced -- and text sitting
+ * next to an animating background is exactly where a stable neighbor
+ * relationship (background == background) can intermittently stop
+ * holding, producing a visibly flickering edge each time the animation
+ * ticks. aa_similar() treats two colors as equivalent for this decision
+ * if they're within AA_COLOR_TOLERANCE per channel (roughly one BGR565
+ * quantization step), absorbing that kind of small ambient wobble while
+ * still telling genuinely different colors (an actual sprite/text edge)
+ * apart. Verified with a synthetic test before shipping: a background
+ * wobbling by one full quantization step between two synthetic "frames"
+ * produced zero text-edge-shape disagreements with tolerance, versus
+ * real disagreements without it. */
 #define AA_SCALE 2
 #define AA_COLOR_TOLERANCE 10  /* max per-8-bit-channel delta to treat two
                                  * colors as the same for this decision */
@@ -598,31 +603,31 @@ static void apply_aa_upscale(const pixel_t *src, int src_pitch, pixel_t *dst, in
 
     for (int y = 0; y < h; y++) {
         for (int x = 0; x < w; x++) {
-            pixel_t e  = aa_at(src, src_stride, w, h, x,     y);     /* center */
-            pixel_t n  = aa_at(src, src_stride, w, h, x,     y - 1); /* north */
-            pixel_t s  = aa_at(src, src_stride, w, h, x,     y + 1); /* south */
-            pixel_t we = aa_at(src, src_stride, w, h, x - 1, y);     /* west */
-            pixel_t ea = aa_at(src, src_stride, w, h, x + 1, y);     /* east */
-            pixel_t nw = aa_at(src, src_stride, w, h, x - 1, y - 1); /* north-west */
-            pixel_t ne = aa_at(src, src_stride, w, h, x + 1, y - 1); /* north-east */
-            pixel_t sw = aa_at(src, src_stride, w, h, x - 1, y + 1); /* south-west */
-            pixel_t se = aa_at(src, src_stride, w, h, x + 1, y + 1); /* south-east */
+            pixel_t e = aa_at(src, src_stride, w, h, x, y);
+            pixel_t b = aa_at(src, src_stride, w, h, x, y - 1); /* above */
+            pixel_t d = aa_at(src, src_stride, w, h, x - 1, y); /* left */
+            pixel_t f = aa_at(src, src_stride, w, h, x + 1, y); /* right */
+            pixel_t g = aa_at(src, src_stride, w, h, x, y + 1); /* below */
 
-            /* Eagle: each output corner takes its diagonal neighbor's color
-             * only when that neighbor and both orthogonal neighbors
-             * adjacent to it all agree with each other -- checked as 3
-             * pairwise comparisons rather than relying on transitivity,
-             * since aa_similar()'s tolerance-based comparison isn't
-             * guaranteed transitive (a~b and b~c doesn't imply a~c near
-             * the tolerance boundary) the way exact equality would be. */
-            pixel_t p1 = (aa_similar(we, n) && aa_similar(n, nw) && aa_similar(we, nw)) ? nw : e;
-            pixel_t p2 = (aa_similar(n, ea) && aa_similar(ea, ne) && aa_similar(n, ne)) ? ne : e;
-            pixel_t p3 = (aa_similar(we, s) && aa_similar(s, sw) && aa_similar(we, sw)) ? sw : e;
-            pixel_t p4 = (aa_similar(s, ea) && aa_similar(ea, se) && aa_similar(s, se)) ? se : e;
+            /* Each corner's decision only ever tests one of 4 distinct
+             * neighbor pairs (d,b)/(d,g)/(b,f)/(f,g) -- the naive
+             * per-corner aa_similar() calls above evaluated the same pair
+             * redundantly (12 calls/pixel, each up to 2 fx_unpack() calls
+             * deep, for 4 pairs' worth of information); computing each
+             * pair once and reusing it is the same boolean logic with a
+             * 3x fewer aa_similar() calls. */
+            bool sim_db = aa_similar(d, b);
+            bool sim_dg = aa_similar(d, g);
+            bool sim_bf = aa_similar(b, f);
+            bool sim_fg = aa_similar(f, g);
+            pixel_t p1 = (sim_db && !sim_dg && !sim_bf) ? d : e;
+            pixel_t p2 = (sim_bf && !sim_db && !sim_fg) ? f : e;
+            pixel_t p3 = (sim_dg && !sim_db && !sim_fg) ? d : e;
+            pixel_t p4 = (sim_fg && !sim_dg && !sim_bf) ? f : e;
 
             int ox = x * AA_SCALE, oy = y * AA_SCALE;
-            dst[oy * dst_stride + ox]           = p1;
-            dst[oy * dst_stride + ox + 1]       = p2;
+            dst[oy * dst_stride + ox]         = p1;
+            dst[oy * dst_stride + ox + 1]     = p2;
             dst[(oy + 1) * dst_stride + ox]     = p3;
             dst[(oy + 1) * dst_stride + ox + 1] = p4;
         }

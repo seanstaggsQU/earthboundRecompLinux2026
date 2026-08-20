@@ -98,11 +98,12 @@ extern uint8_t engine_alt_controls; /* current value, one of AltControlsSetting 
  *       - Color Grading: a mild global contrast/saturation/warmth
  *         adjustment applied to the whole frame as the last post-process
  *         step, after DoF is already applied.
- *       - Antialiasing: an Eagle 2x upscale (replication-only, like the
- *         Scale2x/EPX it replaced -- see apply_aa_upscale()'s doc comment,
- *         sdl2_video.c, for why an interpolating scaler like hqx/xBRZ risks
- *         smearing this game's dithered shading). Runs unconditionally
- *         whenever this mode is active, unlike DoF/grade.
+ *       - Antialiasing: a Scale2x/EPX 2x upscale (replication-only -- see
+ *         apply_aa_upscale()'s doc comment, sdl2_video.c, for why an
+ *         interpolating scaler like hqx/xBRZ risks smearing this game's
+ *         dithered shading, and for the Eagle variant that was tried and
+ *         reverted after it made text noticeably less readable). Runs
+ *         unconditionally whenever this mode is active, unlike DoF/grade.
  *     Also now defaults to the zoomed-out FOV (EB_ZOOM_OUT) when entering
  *     the overworld, rather than EB_ZOOM_OFF -- see the zoom-mode reset in
  *     src/game/overworld.c.
