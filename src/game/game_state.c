@@ -1,6 +1,7 @@
 #include "game/game_state.h"
 #include "game/battle.h"
 #include "game/inventory.h"
+#include "game/settings.h"
 #include "core/memory.h"
 #include "data/assets.h"
 #include "entity/entity.h"
@@ -451,6 +452,16 @@ bool save_game(int slot) {
     /* Refresh the global version word (and pad the image to 8 KB) so the file
      * survives real EarthBound's boot integrity check / loads in snes9x. */
     return write_sram_version_word();
+}
+
+/* See game_state.h's doc comment for the call-site list and what's
+ * deliberately excluded. current_save_slot is 1-indexed (1-3) here, same
+ * as the manual Save menu item's guard (mode_step_pause_menu(), text.c) --
+ * save_game() itself takes a 0-indexed slot. */
+void auto_save_if_enabled(void) {
+    if (engine_auto_save != AUTO_SAVE_ON) return;
+    if (current_save_slot < 1) return;
+    save_game(current_save_slot - 1);
 }
 
 bool load_game(int slot) {

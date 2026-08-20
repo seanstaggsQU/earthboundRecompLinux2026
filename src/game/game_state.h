@@ -286,6 +286,22 @@ bool save_game(int slot);
 bool load_game(int slot);
 bool erase_save(int slot);
 
+/* Auto Save (settings.h) -- this port's own addition, not a ROM routine.
+ * Call from the terminal phase of any mode-step that represents "the
+ * player has finished transitioning into a new area" (door.c's
+ * DTR_BUZZ_DONE/TT_BUZZ_DONE, overworld_teleport.c's TP_CLEANUP,
+ * display_text_cc.c's Exit Mouse/Escape Rope handler) -- once
+ * entities/party position are finalized, right before that mode pops back
+ * to the root. No-ops silently when Auto Save is off (engine_auto_save,
+ * settings.h) or when current_save_slot isn't valid yet (0 -- shouldn't
+ * happen at any of the call sites above, since they're all only reachable
+ * once a save slot is active, but guarded the same way the manual Save
+ * menu item guards it, text.c). Deliberately NOT called from Game Over
+ * respawn, the ending cutscene, post-battle same-map return, or initial
+ * boot/new-game load -- none of those are "entering a new area" in the
+ * intended sense. */
+void auto_save_if_enabled(void);
+
 /* Key Items pool self-test (Key Items pool feature, not a ROM routine):
  * simulates a pre-feature save (a key item still sitting in a character's
  * items[] slot, pool empty), round-trips it through save_game()/load_game(),
