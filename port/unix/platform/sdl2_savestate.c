@@ -2,7 +2,12 @@
  * Unix/SDL2 savestate storage — file-backed ping-pong slots.
  *
  * Two slots back the crash-safe savestate (build-order item #5): each slot is a
- * file "savestate.bin.<slot>". A write is bracketed by _begin (truncate) and
+ * file "saves/savestate.bin.<slot>" -- moved into the same dedicated saves/
+ * subfolder as earthbound.srm (sdl2_save.c) rather than a flat file next to
+ * the executable, for the same reason: see sdl2_save.c's doc comment and
+ * main.c's migrate_legacy_saves_to_saves_folder(), which copies an older
+ * flat-file savestate.bin.N into this location the first time a build with
+ * this change runs. A write is bracketed by _begin (truncate) and
  * _commit (fflush + fsync + close) so a power loss between them leaves the prior
  * slot's file untouched. See state_dump.c for the format/ping-pong logic and
  * src/platform/platform.h for the interface contract.
@@ -11,12 +16,16 @@
 #include <stdio.h>
 #ifdef _WIN32
 #include <io.h>        /* _commit, _fileno */
+#include <direct.h>    /* _mkdir */
+#define MKDIR(path) _mkdir(path)
 #else
 #include <unistd.h>    /* fsync, fileno */
+#include <sys/stat.h>  /* mkdir */
+#define MKDIR(path) mkdir(path, 0755)
 #endif
 
 static const char *slot_path(int slot) {
-    return slot == 0 ? "savestate.bin.0" : "savestate.bin.1";
+    return slot == 0 ? "saves/savestate.bin.0" : "saves/savestate.bin.1";
 }
 
 /* In-progress writers, one per slot (NULL when no write is open). */
@@ -29,6 +38,7 @@ bool platform_savestate_begin(int slot) {
         fclose(slot_writer[slot]);
         slot_writer[slot] = NULL;
     }
+    MKDIR("saves"); /* harmless no-op once it already exists */
     FILE *f = fopen(slot_path(slot), "wb"); /* truncate */
     if (!f)
         return false;

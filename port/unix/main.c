@@ -19,6 +19,13 @@
 #include <libgen.h>
 #elif defined(_WIN32)
 #include <windows.h>
+#include <direct.h>    /* _mkdir, for migrate_legacy_saves_to_saves_folder() below */
+#endif
+#ifdef _WIN32
+#define MKDIR(path) _mkdir(path)
+#else
+#include <sys/stat.h>  /* mkdir */
+#define MKDIR(path) mkdir(path, 0755)
 #endif
 
 #include "platform/platform.h"
@@ -192,8 +199,63 @@ void platform_update_stage_relaunch(const char *new_exe_path) {
     g_relaunch_pending = true;
 }
 
+/* Copies old_path into new_path if new_path doesn't already exist and
+ * old_path does -- leaves old_path in place untouched either way (never
+ * moves/deletes), so it stays available as an extra safety copy. Never
+ * overwrites an existing new_path: idempotent across repeated launches,
+ * and safe even if the player has already made new progress at the
+ * migrated location by the time this runs again. Best-effort: any I/O
+ * failure partway through just leaves old_path as the intact source of
+ * truth (this function's whole point is to avoid data loss, not risk
+ * causing it). */
+static void copy_file_if_missing(const char *old_path, const char *new_path) {
+    FILE *dst_check = fopen(new_path, "rb");
+    if (dst_check) { fclose(dst_check); return; /* already migrated */ }
+
+    FILE *src = fopen(old_path, "rb");
+    if (!src) return; /* nothing to migrate */
+
+    MKDIR("saves");
+    FILE *dst = fopen(new_path, "wb");
+    if (!dst) { fclose(src); return; }
+
+    char buf[8192];
+    size_t n;
+    bool ok = true;
+    while ((n = fread(buf, 1, sizeof(buf), src)) > 0) {
+        if (fwrite(buf, 1, n, dst) != n) { ok = false; break; }
+    }
+    fclose(src);
+    fclose(dst);
+    if (!ok)
+        remove(new_path); /* don't leave a truncated/partial copy sitting at the new path */
+}
+
+/* One-time migration: earlier versions stored save data as flat files
+ * directly next to the executable (earthbound.srm, savestate.bin.0/.1).
+ * This version moves the default locations into a dedicated saves/
+ * subfolder -- partly for tidiness, but mainly so a mistake that touches
+ * "whatever's in the game's working directory" (a self-test, a stray
+ * debug write, ...) is far less likely to land on the exact same
+ * easily-collided filename as the real save. Confirmed the hard way this
+ * session: a self-test run directly in a live deployed game directory
+ * once destroyed a real player's save because it was a flat file sitting
+ * right next to everything else, with no dedicated, more-protected home.
+ * See copy_file_if_missing()'s doc comment for the copy-not-move
+ * semantics. Runs unconditionally at startup, before any --save override
+ * is parsed or platform_save_init()/settings_load() run, using the fixed
+ * legacy default paths regardless of this launch's own --save value --
+ * the point is making sure a FUTURE non-overridden launch finds its data
+ * already migrated, not reacting to this specific invocation's flags. */
+static void migrate_legacy_saves_to_saves_folder(void) {
+    copy_file_if_missing("earthbound.srm", "saves/earthbound.srm");
+    copy_file_if_missing("savestate.bin.0", "saves/savestate.bin.0");
+    copy_file_if_missing("savestate.bin.1", "saves/savestate.bin.1");
+}
+
 int main(int argc, char *argv[]) {
     chdir_to_executable_dir(); /* before anything below touches a relative path */
+    migrate_legacy_saves_to_saves_folder(); /* before any --save override or save/settings read */
     SDL_SetMainReady(); /* pairs with SDL_MAIN_HANDLED above */
     const char *verify_rom_path = NULL;
     bool savestate_selftest = false;
