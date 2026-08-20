@@ -378,9 +378,21 @@ typedef enum {
     PM_EQUIP_RESUME,        /* after EQUIP_MENU pops: single-party sfx tail -> PM_MAIN */
     PM_PSI_RESUME,          /* after PSI_MENU pops: used->cleanup / single-PSI sfx tail */
     PM_QUIT_CONFIRM_RESULT, /* after the "Really quit?" Yes/No -- this port's own addition */
+    PM_QUIT_METHOD_RESULT,  /* after "Really quit?"->Yes: Close Game/Return to Title
+                              * -- this port's own addition */
     PM_CLEANUP,             /* @CLEANUP_AND_CLOSE; push ENTITY_FADE_WAIT */
     PM_DONE,                /* enable entities + POP */
 } PauseMenuPhase;
+
+/* GAME_MODE_PAUSE_MENU's pop-result values -- this port's own addition, not
+ * a ROM concept. Documented as "Always pops 0" until PM_QUIT_METHOD_RESULT's
+ * Return to Title option needed a way to tell the overworld root
+ * (OWP_POST_TELEPORT, game_main.c) to reset back to the title screen
+ * instead of just closing the pause menu normally -- verified before
+ * adding this that nothing reads GAME_MODE_PAUSE_MENU's pop result today,
+ * so extending it is safe. Every other pop path still returns plain 0. */
+#define PAUSE_MENU_RESULT_NONE               0
+#define PAUSE_MENU_RESULT_RETURN_TO_TITLE    1
 
 typedef struct {
     uint8_t  phase;          /* PauseMenuPhase */
@@ -2512,7 +2524,7 @@ typedef struct {
  *   process_queued_interactions -> PROCESS_INTERACTION (OWP_RESUME_INTERACTION)
  *   init_battle_overworld       -> BATTLE_ENTRY        (OWP_RESUME_BATTLE)
  *   get_off_bicycle_with_message-> BICYCLE_DISMOUNT    (OWP_RESUME_BICYCLE)
- *   open_menu_button            -> PAUSE_MENU          (-> OWP_POST_TELEPORT)
+ *   open_menu_button            -> PAUSE_MENU          (OWP_PAUSE_MENU_RESULT)
  *   open_hppp_display           -> HPPP_DISPLAY        (-> OWP_POST_TELEPORT)
  *   show_town_map               -> TOWN_MAP            (OWP_RESUME_TOWNMAP)
  *   open_menu_button_checktalk  -> QUICK_CHECKTALK     (-> OWP_POST_TELEPORT)
@@ -2531,6 +2543,10 @@ typedef enum {
     OWP_POST_TOP,           /* post 1-4: interaction / special-mode / battle / bicycle */
     OWP_POST_DEBUG,         /* post 5-6: debug menu (inline), swirl/touched skip */
     OWP_POST_INPUT,         /* post 7: A/B/X/L input handlers */
+    OWP_PAUSE_MENU_RESULT,  /* after PAUSE_MENU pops: Return to Title sentinel ->
+                              * reboot to title (this port's own addition, mirrors
+                              * OWP_GAMEOVER_RESULT's Continue->reboot); anything
+                              * else -> OWP_POST_TELEPORT unchanged */
     OWP_POST_TELEPORT,      /* post 8: PSI teleport check */
     OWP_RESUME_INTERACTION, /* after PROCESS_INTERACTION: input_disable++ -> loop_end */
     OWP_RESUME_BATTLE,      /* after BATTLE_ENTRY: input_disable++ -> OWP_POST_DEBUG */

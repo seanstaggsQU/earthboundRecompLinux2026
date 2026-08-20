@@ -128,15 +128,21 @@ static const uint16_t window_configs[][4] = {
      * since only one window is ever the active input focus at a time.
      * Wide enough (24 tiles) to fit a release-version line without wrapping. */
     [WINDOW_UPDATE_CHECK] = { 4, 13, 24, 10 },
-    /* "Really quit?" confirmation -- this port's own addition, opened over
+    /* "Really quit?" confirmation, and its follow-up "Quit how?" prompt
+     * (Close Game / Title Screen) -- this port's own addition, opened over
      * the Command Menu (0x00, roughly x=1..14, y=1..13 at its current
      * height-12 size). Positioned low/right of it, same reasoning as
      * WINDOW_SETTINGS_MENU's placement relative to its own parent. Height
-     * 8 (not a tighter fit) for the same reason as WINDOW_SETTINGS_MENU:
-     * sm_handle_input()'s cursor bound is (height-2)/2 rows, and the Yes/No
-     * row sits at text_y=2 (row 0 is the "Really quit?" message, row 1 left
-     * blank for spacing) -- height 6 would cap navigation at rows 0-1 only. */
-    [WINDOW_QUIT_CONFIRM] = { 14, 14, 16, 8 },
+     * 10 (bumped from 8 when the "Quit how?" second prompt was added --
+     * its two options are stacked vertically at rows 2-3, not side-by-side
+     * like "Really quit?"'s Yes/No, since "Close Game"/"Title Screen"
+     * don't both fit on one row at this window's width) for the same
+     * reason as WINDOW_SETTINGS_MENU: sm_handle_input()'s cursor bound is
+     * (height-2)/2 rows -- "Really quit?"'s Yes/No row sits at text_y=2
+     * (row 0 is the message, row 1 left blank for spacing); "Quit how?"'s
+     * two rows sit at text_y=2/3 (row 0 message, row 1 blank). Height 8
+     * would cap navigation at rows 0-2, one short of row 3. */
+    [WINDOW_QUIT_CONFIRM] = { 14, 14, 16, 10 },
     /* Key Items pool browser -- this port's own addition (WINDOW_KEY_ITEMS,
      * window.h), Key Items pool feature. Same rect as WINDOW_INVENTORY
      * (0x02) / WINDOW_ESCARGO_EXPRESS_ITEM (0x0D) -- never open at the same

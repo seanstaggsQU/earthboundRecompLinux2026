@@ -1645,7 +1645,7 @@ StepResult mode_step_overworld(ModeState *mst) {
                 if (core.pad1_pressed & PAD_A) {
                     child = (ModeState){0};
                     child.pause_menu.phase = PM_ENTER;
-                    st->phase = OWP_POST_TELEPORT;
+                    st->phase = OWP_PAUSE_MENU_RESULT;
                     return STEP_RESULT_PUSH_INIT(GAME_MODE_PAUSE_MENU, &child);
                 } else if ((core.pad1_pressed & PAD_CANCEL) &&
                            game_state.walking_style != WALKING_STYLE_BICYCLE) {
@@ -1674,6 +1674,25 @@ StepResult mode_step_overworld(ModeState *mst) {
         case OWP_RESUME_TOWNMAP:
             /* show_town_map()'s enable bracket, after the town map pops. */
             enable_all_entities();
+            st->phase = OWP_POST_TELEPORT;
+            continue;
+
+        case OWP_PAUSE_MENU_RESULT:
+            /* This port's own addition -- PAUSE_MENU popped
+             * PAUSE_MENU_RESULT_RETURN_TO_TITLE (mode_stack.h) when the
+             * player chose "Quit how?" -> Title Screen (text.c's
+             * PM_QUIT_METHOD_RESULT); anything else (normal close,
+             * cancelled quit, Close Game -- which is about to exit the
+             * process anyway) is PAUSE_MENU_RESULT_NONE and falls through
+             * to the teleport check unchanged. Reuses the exact
+             * OWP_GAMEOVER_RESULT "Continue" reboot trick below: the root
+             * never pops, it just resets itself back to boot, replaying
+             * boot_begin()/intro straight to the title/file-select
+             * screen. */
+            if (mode_child_result() == PAUSE_MENU_RESULT_RETURN_TO_TITLE) {
+                *st = (OverworldModeState){ .phase = OWP_BOOT_SETUP };
+                return STEP_RESULT_CONTINUE();
+            }
             st->phase = OWP_POST_TELEPORT;
             continue;
 

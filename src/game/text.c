@@ -696,10 +696,13 @@ static uint16_t count_characters_with_psi(void) {
  * instead, see AUX_ZOOM_TOGGLE in game_main.c). Config opens
  * GAME_MODE_SETTINGS_MENU (mode_step_settings_menu below). Quit shows a
  * "Really quit?" Yes/No confirmation (PM_MAIN_RESULT case 9 /
- * PM_QUIT_CONFIRM_RESULT) before calling platform_request_quit() -- added
- * after it turned out to be too easy to hit by accident, exactly the risk
- * flagged when this first shipped without one. All three require
- * WINDOW::COMMAND_MENU's height to be 12, not the ROM's 8 (window.c).
+ * PM_QUIT_CONFIRM_RESULT) -- added after it turned out to be too easy to
+ * hit by accident, exactly the risk flagged when this first shipped
+ * without one -- followed by a "Quit how?" Close Game/Title Screen
+ * prompt (PM_QUIT_METHOD_RESULT) before actually calling
+ * platform_request_quit() or resetting to the title screen. All three
+ * require WINDOW::COMMAND_MENU's height to be 12, not the ROM's 8
+ * (window.c).
  */
 static uint8_t skip_adding_command_text;
 /* restore_menu_backup moved to win.restore_menu_backup (window.h WindowSystemState) */
@@ -3416,11 +3419,49 @@ StepResult mode_step_pause_menu(ModeState *ms) {
             /* This port's own addition -- see case 9 above. */
             uint16_t selection = pm_take_result(st);
             close_window(WINDOW_QUIT_CONFIRM);
-            if (selection == 1)
+            if (selection != 1) {
+                /* No/cancel -> back to the command menu. */
+                st->phase = PM_MAIN;
+                continue;
+            }
+            /* Yes -> a second prompt for HOW to quit, reusing
+             * WINDOW_QUIT_CONFIRM's same create_window/add_menu_item/
+             * push_selection shape. Options stacked vertically (rows 2-3,
+             * not side-by-side like Yes/No above) since two labels this
+             * long don't both fit on one row at this window's width --
+             * needs the height-10 variant (see window.c) for a 4th row. */
+            create_window(WINDOW_QUIT_CONFIRM);
+            set_focus_text_cursor(0, 0);
+            print_string("Quit how?");
+            add_menu_item("Close Game", 1, 0, 2);
+            add_menu_item("Title Screen", 2, 0, 3);
+            print_menu_items();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            return pm_push_selection(st, PM_QUIT_METHOD_RESULT, 1);
+        }
+
+        case PM_QUIT_METHOD_RESULT: {
+            /* This port's own addition -- see PM_QUIT_CONFIRM_RESULT above. */
+            uint16_t selection = pm_take_result(st);
+            close_window(WINDOW_QUIT_CONFIRM);
+            if (selection == 1) {
+                /* Close Game -- today's exact original quit action.
+                 * Harmless that PM_MAIN below still runs first:
+                 * platform_input_quit_requested() takes over next frame,
+                 * nothing left in PM_MAIN can be reached before then. */
                 platform_request_quit();
-            /* No/cancel, or Yes (harmless -- platform_input_quit_requested()
-             * takes over next frame; nothing left in PM_MAIN can be
-             * reached first) both return to the command menu the same way. */
+                st->phase = PM_MAIN;
+                continue;
+            }
+            if (selection == 2) {
+                /* Title Screen -- pop the whole pause menu with a sentinel
+                 * result instead of PM_MAIN's usual 0; the overworld root
+                 * (OWP_POST_TELEPORT, game_main.c) checks for it and
+                 * resets to the title screen the same way Game Over's
+                 * Continue does. */
+                return STEP_RESULT_POP(PAUSE_MENU_RESULT_RETURN_TO_TITLE);
+            }
+            /* Cancel -> back to the command menu. */
             st->phase = PM_MAIN;
             continue;
         }
