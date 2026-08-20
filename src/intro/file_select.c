@@ -230,14 +230,23 @@ static int fm_file_select_build(void) {
     }
 
     /* This port's own addition, not in WINDOW_CONFIGURATION_TABLE or the
-     * original assembly -- a 4th row below the 3 save slots, only shown on
-     * builds that actually have a self-update backend (a desktop build
-     * compiled with a private release feed configured; see platform.h).
-     * Absent entirely otherwise, so this never shows a dead menu item on a
-     * build/port where it could never work. userdata 4 is handled as a
-     * special case in FM_SELECT_RESULT, before the save-slot math below. */
+     * original assembly -- a 4th row below the 3 save slots, unconditional
+     * (unlike Check for Updates below), opening the same
+     * GAME_MODE_SETTINGS_MENU the in-game pause menu's Config item does
+     * (mode_step_settings_menu(), text.c -- generic global-state UI, no
+     * new implementation needed). userdata 4 is handled as a special case
+     * in FM_SELECT_RESULT, before the save-slot math below, same pattern
+     * as Check for Updates' userdata 5. */
+    add_menu_item("Config", 4, 0, 3);
+
+    /* Only shown on builds that actually have a self-update backend (a
+     * desktop build compiled with a private release feed configured; see
+     * platform.h). Absent entirely otherwise, so this never shows a dead
+     * menu item on a build/port where it could never work. userdata 5 is
+     * handled as a special case in FM_SELECT_RESULT, before the save-slot
+     * math below. */
     if (platform_update_supported())
-        add_menu_item("Check for Updates", 4, 0, 3);
+        add_menu_item("Check for Updates", 5, 0, 4);
 
     /* Assembly (file_select_menu.asm:111): OPEN_WINDOW_AND_PRINT_MENU(columns=1)
      * lays out and prints menu item labels BEFORE slot details. */
@@ -1788,12 +1797,19 @@ StepResult mode_step_file_menu(ModeState *ms) {
         case FM_SELECT_RESULT: {
             uint16_t selected = fm_take_result(st);
             if (selected == 4) {
-                /* "Check for Updates" -- not a save slot. Must be handled
-                 * before the current_save_slot assignment/slot math below:
-                 * selected==4 would otherwise fall through to
-                 * save_files_present[3], one past the end of a
-                 * SAVE_COUNT(3)-element array, and stomp current_save_slot
-                 * with a value every other reader of it assumes is 1..3. */
+                /* "Config" -- not a save slot. Must be handled before the
+                 * current_save_slot assignment/slot math below, same
+                 * reasoning as "Check for Updates" just below (selected==4
+                 * would otherwise fall through to save_files_present[3],
+                 * one past the end of a SAVE_COUNT(3)-element array, and
+                 * stomp current_save_slot with a value every other reader
+                 * of it assumes is 1..3). */
+                st->phase = FM_CONFIG;
+                continue;
+            }
+            if (selected == 5) {
+                /* "Check for Updates" -- same guard reasoning as Config
+                 * above. */
                 st->phase = FM_UPDATE_CHECK;
                 continue;
             }
@@ -1809,6 +1825,24 @@ StepResult mode_step_file_menu(ModeState *ms) {
             }
             continue;
         }
+
+        case FM_CONFIG: {
+            /* Pushes the exact same GAME_MODE_SETTINGS_MENU the pause
+             * menu's Config item pushes (text.c) -- generic global engine
+             * state, nothing party/save-slot specific, so it's directly
+             * reusable here with no new settings-menu implementation. */
+            fm_child_init = (ModeState){0};
+            fm_child_init.settings_menu.phase = SET_BUILD;
+            st->phase = FM_CONFIG_RESULT;
+            return STEP_RESULT_PUSH_INIT(GAME_MODE_SETTINGS_MENU, &fm_child_init);
+        }
+
+        case FM_CONFIG_RESULT:
+            /* Same shape as FM_UPDATE_CHECK_RESULT below -- rebuild the
+             * slot list, exactly like FM_SUBMENU_RESULT's B-pressed path. */
+            close_focus_window();
+            st->phase = FM_SELECT;
+            continue;
 
         case FM_UPDATE_CHECK: {
             fm_child_init = (ModeState){0};

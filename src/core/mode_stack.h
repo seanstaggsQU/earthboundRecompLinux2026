@@ -2113,6 +2113,8 @@ typedef enum {
     FM_NG_NAMING_RESULT,/* naming popped: started (pop 1) or backed out (re-enter flavour) */
     FM_UPDATE_CHECK,        /* "Check for Updates" row chosen: push GAME_MODE_UPDATE_CHECK */
     FM_UPDATE_CHECK_RESULT, /* update screen popped (no update / cancelled / error) -> back to FM_SELECT */
+    FM_CONFIG,               /* "Config" row chosen: push GAME_MODE_SETTINGS_MENU */
+    FM_CONFIG_RESULT,        /* settings menu popped -> back to FM_SELECT */
 } FileMenuPhase;
 
 typedef struct {
