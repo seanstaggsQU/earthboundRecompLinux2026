@@ -3065,7 +3065,29 @@ void cc_1d_dispatch(ScriptReader *r) {
         uint16_t result = give_item_to_character(char_id, item_id);
         uint16_t empty = 0;
         if (result) {
-            empty = find_empty_inventory_slot(result);
+            /* Key Items pool feature, not part of the original ROM/
+             * assembly. The vanilla trick here relies on
+             * find_empty_inventory_slot()'s 0-based "next empty slot"
+             * happening to equal the 1-based slot the item was JUST
+             * placed at (both scans use the same first-match algorithm,
+             * and giving the item fills exactly one slot in between) --
+             * so the generic "(Ness got the X)" message
+             * (MSG_SYS_ITEM_RECEIVED -> _SUB_GETGOODS_MES) can re-fetch
+             * "the item just received" via GET_CHARACTER_ITEM using this
+             * value as the slot. A pool item never fills a slot at all,
+             * so that trick finds the SAME (now-stale) empty slot as
+             * before the give, which the message then misreads as
+             * whatever item already happened to sit one slot earlier --
+             * reported live as "Ness got the cookie" when the item
+             * actually received was the Backstage Pass. Route pool items
+             * through the same sentinel mechanism
+             * mode_step_use_item() (text.c) uses instead. */
+            if (is_key_item_type(item_id)) {
+                key_items_set_use_in_progress(item_id);
+                empty = KEY_ITEMS_POOL_USE_SLOT_SENTINEL;
+            } else {
+                empty = find_empty_inventory_slot(result);
+            }
         }
         set_argument_memory((uint32_t)empty);
         set_working_memory((uint32_t)result);
@@ -3144,6 +3166,13 @@ void cc_1d_dispatch(ScriptReader *r) {
         uint16_t char_id = arg1 ? (uint16_t)arg1 : (uint16_t)(get_working_memory() & 0xFFFF);
         uint16_t escargo_slot = arg2 ? (uint16_t)arg2 : (uint16_t)(get_argument_memory() & 0xFFFF);
         uint16_t result_char = deliver_escargo_express_item(char_id, escargo_slot);
+        /* Note: escargo_express_move() (the only way an item gets into
+         * Escargo Express storage) can no longer place a key item there
+         * post-migration -- key items never occupy items[] to move from
+         * -- so this can't hit the "reused empty-slot" issue
+         * GIVE_ITEM_TO_CHARACTER_B has (see its comment); a pre-existing
+         * key item already sitting in an old save's escargo storage is a
+         * narrower, separate edge case not handled by this pass. */
         uint16_t empty_slot = find_empty_inventory_slot(result_char);
         set_argument_memory((uint32_t)empty_slot);
         set_working_memory((uint32_t)result_char);
