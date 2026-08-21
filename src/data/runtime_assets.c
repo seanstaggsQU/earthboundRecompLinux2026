@@ -4,8 +4,47 @@
  * the same name in src/CMakeLists.txt). Uses POSIX mmap/open, matching the
  * only port that currently opts into this (port/unix); a future embedded
  * or Windows port adding EB_RUNTIME_ASSETS support will need its own
- * file-mapping backend here. */
+ * file-mapping backend here.
+ *
+ * Exception: eb_runtime_assets_default_path() below is always compiled,
+ * regardless of EB_RUNTIME_ASSETS -- it's pure env-var string building, no
+ * dependency on anything runtime-assets-specific, and the self-updater
+ * needs it from an EB_RUNTIME_ASSETS=OFF (compile-time-embedded) build too,
+ * to know where to export a pak for the EB_RUNTIME_ASSETS=ON build it's
+ * about to swap itself out for (see pak_export.c and sdl2_updater.c). */
 #include "runtime_assets.h"
+
+#include <limits.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+bool eb_runtime_assets_default_path(char *buf, size_t buf_size) {
+#if defined(_WIN32)
+    const char *appdata = getenv("APPDATA");
+    if (appdata == NULL) {
+        return false;
+    }
+    int n = snprintf(buf, buf_size, "%s\\EarthBoundRecomp\\assets.pak", appdata);
+    return n > 0 && (size_t)n < buf_size;
+#else
+    char fallback[PATH_MAX];
+    const char *data_home = getenv("XDG_DATA_HOME");
+    if (data_home == NULL || data_home[0] == '\0') {
+        const char *home = getenv("HOME");
+        if (home == NULL) {
+            return false;
+        }
+        int n = snprintf(fallback, sizeof(fallback), "%s/.local/share", home);
+        if (n <= 0 || (size_t)n >= sizeof(fallback)) {
+            return false;
+        }
+        data_home = fallback;
+    }
+    int n = snprintf(buf, buf_size, "%s/EarthBoundRecomp/assets.pak", data_home);
+    return n > 0 && (size_t)n < buf_size;
+#endif
+}
 
 #ifdef EB_RUNTIME_ASSETS
 
@@ -14,11 +53,7 @@
 #include "embedded_assets.h"
 
 #include <fcntl.h>
-#include <limits.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -161,33 +196,6 @@ EbAssetLoadResult eb_runtime_assets_load(const char *path) {
     eb_runtime_assets_populate_families();
 
     return EB_ASSETS_OK;
-}
-
-bool eb_runtime_assets_default_path(char *buf, size_t buf_size) {
-#if defined(_WIN32)
-    const char *appdata = getenv("APPDATA");
-    if (appdata == NULL) {
-        return false;
-    }
-    int n = snprintf(buf, buf_size, "%s\\EarthBoundRecomp\\assets.pak", appdata);
-    return n > 0 && (size_t)n < buf_size;
-#else
-    char fallback[PATH_MAX];
-    const char *data_home = getenv("XDG_DATA_HOME");
-    if (data_home == NULL || data_home[0] == '\0') {
-        const char *home = getenv("HOME");
-        if (home == NULL) {
-            return false;
-        }
-        int n = snprintf(fallback, sizeof(fallback), "%s/.local/share", home);
-        if (n <= 0 || (size_t)n >= sizeof(fallback)) {
-            return false;
-        }
-        data_home = fallback;
-    }
-    int n = snprintf(buf, buf_size, "%s/EarthBoundRecomp/assets.pak", data_home);
-    return n > 0 && (size_t)n < buf_size;
-#endif
 }
 
 #endif /* EB_RUNTIME_ASSETS */

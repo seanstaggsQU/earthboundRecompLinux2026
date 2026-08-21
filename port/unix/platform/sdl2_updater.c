@@ -89,6 +89,8 @@
 #endif
 #include "version.h"          /* EB_VERSION_STRING -- generated, see CMakeLists.txt */
 #include "updater_secret.h"   /* EB_UPDATER_REPO_STRING / EB_UPDATER_TOKEN_STRING -- generated, gitignored */
+#include "data/pak_export.h"       /* pak_export_write() -- real body only in an EB_RUNTIME_ASSETS=OFF build */
+#include "data/runtime_assets.h"   /* eb_runtime_assets_default_path() -- always compiled, see its own comment */
 
 #ifndef _WIN32
 /* Unix-specific: defined in main.c, called once the new binary is verified
@@ -875,6 +877,28 @@ static int download_thread_fn(void *unused) {
         set_error(err[0] ? err : "Library download failed");
         remove(new_exe_name);
         return 0;
+    }
+#endif
+
+    /* 3.5. This binary's own compiled-in data (if it has any -- see
+     * pak_export.h's comment) is the one thing the *new* binary being
+     * installed below can't get any other way. Exporting it now, before
+     * the swap, means an existing tester updating from an old
+     * compile-time-embedded build to this project's current
+     * EB_RUNTIME_ASSETS build needs no ROM and no bundled setup helper --
+     * the new binary just finds a ready-made, already-correct pak waiting
+     * for it on first launch. A no-op (empty function body) in an
+     * EB_RUNTIME_ASSETS=ON build, since that binary never had real data to
+     * export in the first place. Best-effort: if this fails or the
+     * platform data dir can't be resolved, the new binary's own ROM-scan
+     * fallback still applies (see main.c), so don't block the update over
+     * it either way. */
+#ifndef EB_RUNTIME_ASSETS
+    {
+        char pak_path[1024];
+        if (eb_runtime_assets_default_path(pak_path, sizeof(pak_path))) {
+            pak_export_write(pak_path);
+        }
     }
 #endif
 
