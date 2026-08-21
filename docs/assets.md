@@ -343,12 +343,23 @@ ebtools pack assets asm/bin/assets.manifest asm/bin assets.pak
 layout — `asset_ids.h`, `embedded_assets.h`, `asset_pack_layout.c/.h`,
 `rom_extract_table.c/.h` — but *not* asset bytes, since a release/CI machine
 has no ROM by design. This metadata is generated once by a maintainer who has
-a legal ROM, and committed to `src/data/runtime_generated/`. The last pair,
-`rom_extract_table.c/.h`, is what lets the *shipped binary itself* build a
-pak from a player's ROM at first launch with no Python involved — see
-`src/data/rom_extract.c` and [docs/get-your-own-assets.md](get-your-own-assets.md).
-It's just `(rom_offset, rom_size)` per asset, walked directly off
-`earthbound.yml`'s `dumpEntries`:
+a legal ROM, and committed to `src/data/runtime_generated/`.
+
+A player's pak actually gets built by the bundled `ebtools-setup` standalone
+helper (`ebtools/cli/setup.py`, packaged via `ebtools_setup.spec` — a
+PyInstaller build, no Python needed on the player's machine), which the game
+runs automatically on a missing pak (see `port/unix/main.c` and
+[docs/get-your-own-assets.md](get-your-own-assets.md)) -- it's the real
+extract/pack-all/pack-assets pipeline, so it's correct for every asset,
+including the ones that need a real repack (dialogue text, sprites, data
+tables), not just a plain ROM byte range.
+
+`rom_extract_table.c/.h` backs a separate, pure-C, no-subprocess builder
+(`src/data/rom_extract.c`) that's *not* what main.c actually uses -- it only
+covers the minority of assets that really are a plain ROM byte range (kept
+as a tested building block, not the shipping mechanism; see that file's own
+header comment for why). It's just `(rom_offset, rom_size)` per asset,
+walked directly off `earthbound.yml`'s `dumpEntries`:
 
 ```
 ebtools embed-registry --runtime asm/bin/assets.manifest asm/bin src/data/runtime_generated src/vendor/incbin --locale US --rom-yaml earthbound.yml

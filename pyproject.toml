@@ -9,6 +9,12 @@ description = "EarthBound/Mother 2 ROM asset extractor"
 requires-python = ">=3.10"
 dependencies = ["pyyaml>=6.0", "cyclopts>=3.6", "Pillow>=9.0", "pydantic>=2.0"]
 
+[project.optional-dependencies]
+# Only needed to build the standalone ebtools-setup helper bundled with
+# releases (see ebtools_setup.spec, ebtools_setup_entry.py) -- not needed
+# for normal ebtools use.
+packaging = ["pyinstaller>=6.0"]
+
 [tool.hatch.version]
 source = "vcs"
 

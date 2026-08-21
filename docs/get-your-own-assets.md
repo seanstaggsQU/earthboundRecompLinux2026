@@ -14,9 +14,10 @@ that, plus adding an MSU audio pack if you want higher-quality music.
    ending in `.sfc` or `.smc` works.
 3. Launch the game.
 
-That's it. The first launch quietly checks your ROM, builds what it needs, and
-starts playing — no popup, no progress bar, nothing to click through. Every
-launch after that just works, since it only needs to do this once.
+That's it. The first launch quietly checks your ROM, builds what it needs
+(might take a few seconds), and starts playing — no popup, no progress bar,
+nothing to click through. Every launch after that just works, since it only
+needs to do this once.
 
 If something's off — no ROM found, or the file doesn't check out as a real
 EarthBound ROM — you'll get a small popup telling you so, and the game will
@@ -41,9 +42,13 @@ skip this entirely; the game sounds exactly like the original either way.
 
 ## Why it works this way
 
-Building the game's data is just slicing bytes straight out of your ROM at
-known locations — no decompression, no image conversion, nothing fancy — so
-the game can do it itself in well under a second, in C, with no extra tools
-or Python needed on your end. If you're curious about the maintainer-side
-tooling behind this (or you're building from source and want the old
-compile-everything-in build instead), see [docs/assets.md](assets.md).
+The game ships with a small bundled helper (`ebtools-setup`, sitting right
+next to the game binary) that does the actual building -- it's the exact
+same tooling used to build the game itself, so you get the exact same
+result. You never interact with it directly; the game just runs it quietly
+in the background the first time it needs to. No Python or extra install
+required on your end, it's fully self-contained.
+
+If you're curious about the maintainer-side tooling behind this (or you're
+building from source and want the old compile-everything-in build instead),
+see [docs/assets.md](assets.md).
