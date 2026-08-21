@@ -385,11 +385,36 @@ int main(int argc, char *argv[]) {
 
     /* No pak yet? Look for a ROM sitting next to the executable (any
      * .sfc/.smc file -- matched by its own checksum/title, not by
-     * filename, so it doesn't matter what the player named it) and build
-     * one silently. Only bother the player if that doesn't pan out. */
+     * filename, so it doesn't matter what the player named it), and if
+     * the bundled setup helper is also there, run it silently to build
+     * one. The helper is the real ebtools extract/pack-all/pack-assets
+     * pipeline (see ebtools/cli/setup.py), bundled as a standalone
+     * executable (no Python needed on the player's machine) -- it's the
+     * authoritative pak builder, not a from-scratch reimplementation, so
+     * it's guaranteed to match what a normal build produces (including
+     * this project's own custom content, e.g. the naming screen's names).
+     * Only bother the player if that doesn't pan out. */
     if (assets_result == EB_ASSETS_MISSING) {
-        if (rom_extract_scan_and_build_pak(".", assets_path) == EB_ROM_EXTRACT_OK) {
-            assets_result = eb_runtime_assets_load(assets_path);
+        char rom_path[4096];
+        if (rom_extract_find_rom(".", rom_path, sizeof(rom_path))) {
+            /* "./" prefix: POSIX shells (unlike Windows' CreateProcess-style
+             * search) don't look in the current directory by default, and
+             * system() always goes through a shell. */
+            const char *helper_name =
+#ifdef _WIN32
+                "ebtools-setup.exe";
+#else
+                "./ebtools-setup";
+#endif
+            struct stat helper_st;
+            if (stat(helper_name, &helper_st) == 0) {
+                char cmd[8192];
+                int n = snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\" --out \"%s\"", helper_name, rom_path, assets_path);
+                if (n > 0 && (size_t)n < sizeof(cmd)) {
+                    system(cmd); /* blocking -- retry the load right after */
+                    assets_result = eb_runtime_assets_load(assets_path);
+                }
+            }
         }
     }
 

@@ -610,4 +610,51 @@ EbRomExtractResult rom_extract_scan_and_build_pak(const char *dir, const char *o
     return tried_any ? best : EB_ROM_EXTRACT_IO_ERROR;
 }
 
+bool rom_extract_find_rom(const char *dir, char *out_path, size_t out_cap) {
+    DIR *d = opendir(dir);
+    if (!d) {
+        return false;
+    }
+
+    /* Only need enough of the file to run detect_rom()'s header check
+     * (bases up to 0x101B0 + 48 bytes) -- no need to read the whole ROM
+     * just to locate it. */
+    unsigned char header_buf[0x20000];
+
+    struct dirent *ent;
+    bool found = false;
+    while (!found && (ent = readdir(d)) != NULL) {
+        if (!has_rom_extension(ent->d_name)) {
+            continue;
+        }
+
+        char full_path[4096];
+        int n = snprintf(full_path, sizeof(full_path), "%s/%s", dir, ent->d_name);
+        if (n <= 0 || (size_t)n >= sizeof(full_path)) {
+            continue;
+        }
+
+        struct stat st;
+        if (stat(full_path, &st) != 0 || !S_ISREG(st.st_mode)) {
+            continue;
+        }
+
+        FILE *f = fopen(full_path, "rb");
+        if (!f) {
+            continue;
+        }
+        size_t nread = fread(header_buf, 1, sizeof(header_buf), f);
+        fclose(f);
+
+        bool header = false;
+        if (detect_rom(header_buf, nread, &header)) {
+            if (snprintf(out_path, out_cap, "%s", full_path) < (int)out_cap) {
+                found = true;
+            }
+        }
+    }
+    closedir(d);
+    return found;
+}
+
 #endif /* EB_RUNTIME_ASSETS */

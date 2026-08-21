@@ -745,9 +745,26 @@ def embed_registry(
             "const RomExtractEntry rom_extract_table[ASSET_COUNT] = {",
         ]
         missing = 0
+        overridden = 0
         for enum_name, _comment in enum_entries:
             path = resolved.enum_to_path.get(enum_name)
             entry = offset_table.get(path) if path else None
+            # A path can have BOTH a raw ROM byte range (earthbound.yml
+            # dumpEntries) AND a custom_dir override (src/custom_assets/,
+            # via pack-all) -- when both exist, _collect_assets() makes the
+            # override win for the real embedded build (see its "if
+            # custom_dir.is_dir(): ... assets[rel_path] = child" loop
+            # above). A raw ROM extraction would silently produce the
+            # *wrong* (original, non-customized) bytes in that case, e.g.
+            # this project's own custom Don't Care name list overriding
+            # the ROM's default names -- so treat an overridden path as a
+            # gap too, same as one with no ROM source at all.
+            if entry is not None and path is not None:
+                actual_src = resolved.assets.get(path)
+                raw_src = (bin_dir / path)
+                if actual_src is not None and raw_src.is_file() and actual_src.resolve() != raw_src.resolve():
+                    entry = None
+                    overridden += 1
             if entry is None:
                 missing += 1
                 table_src_lines.append(f"    [{enum_name}] = {{ 0, 0 }},")
@@ -776,8 +793,9 @@ def embed_registry(
         if missing:
             print(
                 f"Note: {missing} asset(s) have no ROM-derived byte range in rom_extract_table.c "
-                "(family gaps, or a custom_dir-only override) -- these will be zero-length in a "
-                "ROM-built assets.pak.",
+                f"(family gaps, custom_dir-only assets, or custom_dir overrides of an "
+                f"otherwise-ROM-derivable path -- {overridden} of these are overrides) -- these "
+                "will be zero-length in a ROM-built assets.pak.",
                 file=sys.stderr,
             )
 

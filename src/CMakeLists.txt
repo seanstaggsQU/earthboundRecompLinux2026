@@ -247,7 +247,12 @@ else()
         COMMENT "Packing all human-friendly assets to binary"
     )
 
-    # Optional asset exclusions (e.g., audio packs when audio is disabled)
+    # Optional asset exclusions (e.g., audio packs when audio is disabled).
+    # ebtools/default_asset_excludes.py's DEFAULT_ASSET_EXCLUDES mirrors
+    # everything below except the EB_ENABLE_AUDIO-conditional one (that
+    # part only matters for audio-disabled embedded ports, never the
+    # runtime-assets desktop build) -- keep both lists in sync if you
+    # change either.
     set(EMBED_EXCLUDE_ARGS "")
     if(NOT EB_ENABLE_AUDIO)
         list(APPEND EMBED_EXCLUDE_ARGS --exclude "audiopacks/*")
