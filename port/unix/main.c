@@ -21,10 +21,10 @@
 #include <windows.h>
 #include <direct.h>    /* _mkdir, for migrate_legacy_saves_to_saves_folder() below */
 #endif
+#include <sys/stat.h>  /* mkdir/stat -- mingw provides this on Windows too, just needs the include */
 #ifdef _WIN32
 #define MKDIR(path) _mkdir(path)
 #else
-#include <sys/stat.h>  /* mkdir */
 #define MKDIR(path) mkdir(path, 0755)
 #endif
 
@@ -409,7 +409,18 @@ int main(int argc, char *argv[]) {
             struct stat helper_st;
             if (stat(helper_name, &helper_st) == 0) {
                 char cmd[8192];
+                /* system() on Windows runs the string via `cmd.exe /c`,
+                 * which has a well-known quirk: if the command starts with
+                 * a quoted token and has more quoted tokens after it, cmd
+                 * mis-parses unless the whole line is wrapped in one more
+                 * pair of quotes (cmd strips exactly one leading+trailing
+                 * quote pair before parsing args). POSIX shells don't have
+                 * this problem, so only wrap on Windows. */
+#ifdef _WIN32
+                int n = snprintf(cmd, sizeof(cmd), "\"\"%s\" \"%s\" --out \"%s\"\"", helper_name, rom_path, assets_path);
+#else
                 int n = snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\" --out \"%s\"", helper_name, rom_path, assets_path);
+#endif
                 if (n > 0 && (size_t)n < sizeof(cmd)) {
                     system(cmd); /* blocking -- retry the load right after */
                     assets_result = eb_runtime_assets_load(assets_path);

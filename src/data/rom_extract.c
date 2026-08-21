@@ -17,8 +17,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <sys/stat.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR_ONE(path) _mkdir(path)
+#define strcasecmp _stricmp
+#else
+#include <strings.h>
+#define MKDIR_ONE(path) mkdir(path, 0755)
+#endif
 
 static bool write_u32le(FILE *f, uint32_t v) {
     unsigned char b[4] = { (unsigned char)v, (unsigned char)(v >> 8), (unsigned char)(v >> 16), (unsigned char)(v >> 24) };
@@ -355,7 +363,9 @@ static size_t build_psi_bundle(const uint8_t *lzhal_data, uint32_t lzhal_size, u
     return ok ? header_size + data_pos : 0;
 }
 
-/* mkdir -p, one path component at a time. POSIX only (see file header). */
+/* mkdir -p, one path component at a time. Splits on both '/' and '\\' --
+ * eb_runtime_assets_default_path() (see runtime_assets.h) builds a
+ * backslash-separated path on Windows. */
 static void mkdir_parents(const char *path) {
     char buf[4096];
     size_t len = strlen(path);
@@ -364,10 +374,11 @@ static void mkdir_parents(const char *path) {
     }
     memcpy(buf, path, len + 1);
     for (size_t i = 1; i < len; i++) {
-        if (buf[i] == '/') {
+        char c = buf[i];
+        if (c == '/' || c == '\\') {
             buf[i] = '\0';
-            mkdir(buf, 0755);
-            buf[i] = '/';
+            MKDIR_ONE(buf);
+            buf[i] = c;
         }
     }
 }
@@ -552,6 +563,10 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
         remove(tmp_path);
         return EB_ROM_EXTRACT_WRITE_FAILED;
     }
+#ifdef _WIN32
+    /* Unlike POSIX, Windows' rename() fails if out_path already exists. */
+    remove(out_path);
+#endif
     if (rename(tmp_path, out_path) != 0) {
         remove(tmp_path);
         return EB_ROM_EXTRACT_WRITE_FAILED;

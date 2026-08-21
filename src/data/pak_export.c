@@ -1,8 +1,11 @@
 /* Exports this binary's own compiled-in assets to an assets.pak, see
  * pak_export.h. Only compiled when EB_RUNTIME_ASSETS is NOT defined --
  * that's the only build with real data in embedded_assets[] before any
- * pak is loaded. POSIX file I/O, matching runtime_assets.c/rom_extract.c's
- * own "port/unix only for now" convention. */
+ * pak is loaded. Plain buffered file I/O throughout (no mmap, unlike
+ * runtime_assets.c's loader), so this one needs no platform-specific
+ * backend beyond mkdir. Needs to work on every platform sdl2_updater.c
+ * runs on -- it's what makes an existing tester's update seamless (see
+ * sdl2_updater.c's install step), not just a dev-only tool. */
 #include "pak_export.h"
 
 #ifndef EB_RUNTIME_ASSETS
@@ -15,7 +18,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _WIN32
+#include <direct.h>
+#define MKDIR_ONE(path) _mkdir(path)
+#else
 #include <sys/stat.h>
+#define MKDIR_ONE(path) mkdir(path, 0755)
+#endif
 
 static bool write_u32le(FILE *f, uint32_t v) {
     unsigned char b[4] = { (unsigned char)v, (unsigned char)(v >> 8), (unsigned char)(v >> 16), (unsigned char)(v >> 24) };
@@ -31,7 +41,9 @@ static void hex_to_bytes(const char *hex, unsigned char *out, size_t out_len) {
     }
 }
 
-/* mkdir -p, one path component at a time. */
+/* mkdir -p, one path component at a time. Splits on both '/' and '\\' --
+ * eb_runtime_assets_default_path() (see runtime_assets.h) builds a
+ * backslash-separated path on Windows. */
 static void mkdir_parents(const char *path) {
     char buf[4096];
     size_t len = strlen(path);
@@ -40,10 +52,11 @@ static void mkdir_parents(const char *path) {
     }
     memcpy(buf, path, len + 1);
     for (size_t i = 1; i < len; i++) {
-        if (buf[i] == '/') {
+        char c = buf[i];
+        if (c == '/' || c == '\\') {
             buf[i] = '\0';
-            mkdir(buf, 0755);
-            buf[i] = '/';
+            MKDIR_ONE(buf);
+            buf[i] = c;
         }
     }
 }
@@ -108,6 +121,13 @@ bool pak_export_write(const char *out_path) {
         remove(tmp_path);
         return false;
     }
+#ifdef _WIN32
+    /* Unlike POSIX, Windows' rename() fails if out_path already exists
+     * (no atomic replace) -- clear it first. Not perfectly atomic on
+     * Windows either way, but this is a single-player local file, not a
+     * concurrent-writers scenario. */
+    remove(out_path);
+#endif
     if (rename(tmp_path, out_path) != 0) {
         remove(tmp_path);
         return false;
