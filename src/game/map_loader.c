@@ -553,6 +553,38 @@ void map_loader_savestate_rebind(void) {
  *   2. Look up collision pointer: ml.tile_collision_buffer[block_id]
  *   3. Read arrangement entry at pointer + sub_row * 4 + sub_col
  *   4. Store collision flag byte in ml.loaded_collision_tiles */
+/* Computes the collision/priority flag byte for a single world tile
+ * directly from the source tables (block chunk data -> collision pointer
+ * -> arrangement table), the same computation fill_collision_tiles() does
+ * per-cell for its whole 64x64 refill, factored out so a single out-of-
+ * window tile can be answered correctly without needing the cached grid to
+ * already cover it. Returns 0x40 (wall) for a tile outside the loaded
+ * tileset/map bounds, matching fill_collision_tiles()'s own convention. */
+static uint8_t compute_collision_tile_flags(int16_t world_tx, int16_t world_ty) {
+    if (!ml.tile_collision_loaded || !collision_arrangement_table || !chunks_loaded)
+        return 0;
+    if (world_tx < 0 || world_ty < 0 || !tilesetpalette_data)
+        return 0x40;
+
+    uint32_t tp_index = (uint32_t)((uint16_t)world_ty >> 4) * 32 + ((uint16_t)world_tx >> 5);
+    if (tp_index >= tilesetpalette_size ||
+        (tilesetpalette_data[tp_index] >> 3) != (uint8_t)ml.loaded_tileset_combo) {
+        return 0x40;
+    }
+
+    uint16_t bx = (uint16_t)world_tx / 4;
+    uint16_t by = (uint16_t)world_ty / 4;
+    uint8_t sub_col = (uint16_t)world_tx & 3;
+    uint8_t sub_row = (uint16_t)world_ty & 3;
+
+    uint16_t block_id = get_block_id(bx, by);
+    if (block_id >= 960) return 0;
+    uint16_t coll_ptr = ml.tile_collision_buffer[block_id];
+    uint32_t arr_off = (uint32_t)coll_ptr + sub_row * 4 + sub_col;
+    if (arr_off >= collision_arrangement_table_size) return 0;
+    return collision_arrangement_table[arr_off];
+}
+
 static void fill_collision_tiles(int16_t view_x_tile, int16_t view_y_tile) {
     if (!ml.tile_collision_loaded || !collision_arrangement_table || !chunks_loaded)
         return;
@@ -647,34 +679,95 @@ uint16_t lookup_surface_flags(int16_t x, int16_t y, uint16_t size_code) {
 
     uint8_t flags = 0;
 
+    /* ml.loaded_collision_tiles is a 64x64 grid indexed by (world_tile & 63)
+     * (see fill_collision_tiles()), fully refilled every scroll step but only
+     * covering the range [ml.screen_left_x-16, ml.screen_left_x+47] x
+     * [ml.screen_top_y-16, ml.screen_top_y+47] -- 64 tiles, centered on the
+     * camera with 16 tiles of padding on each side of the 32-tile viewport.
+     * A sample tile outside that range still wraps via & 63 onto SOME grid
+     * cell, but that cell holds whatever was last written there for a
+     * completely different world position -- stale/wrong data, not a valid
+     * answer. Two distinct failure modes came from this:
+     *   - A MOVING entity re-samples every frame, so an aliased read only
+     *     ever lasted one frame before self-correcting -- reported live as
+     *     random-looking sprite priority glitches ("Shark gang" enemies in
+     *     Onett) whenever the entity strayed a few tiles past the padded
+     *     edge (player standing still while it paces, camera not yet
+     *     caught up).
+     *   - A STATIC entity (move_callback CB_MOVE_NOP, e.g. a one-shot
+     *     EVENT_UPDATE_ENTITY_SURFACE_FLAGS in its spawn script -- see
+     *     Frankystein Mk. II's event script 008) samples surface_flags
+     *     exactly ONCE at creation and never again. If that one sample
+     *     happened to land outside the window valid at spawn time, the
+     *     wrong answer is frozen forever -- reported live as a boss
+     *     encounter's overworld sprite permanently rendering in front of a
+     *     tree it should draw behind, regardless of where the camera goes
+     *     afterward.
+     * An early version of this fix treated an out-of-window sample as "no
+     * flags" (0), which closed the first failure mode (no more aliasing)
+     * but not the second (a wrong-but-plausible 0 is just as permanent for
+     * a static entity as a wrong-but-plausible aliased value was). The
+     * actual fix: compute an out-of-window sample directly from the source
+     * tables (compute_collision_tile_flags(), same per-tile computation
+     * fill_collision_tiles() does for its whole-grid refill) instead of
+     * either reading the alias or giving up -- correct regardless of
+     * whether the cached window happens to cover the position, for both
+     * moving and static entities. */
+    int16_t win_x0 = ml.screen_left_x - 16, win_x1 = ml.screen_left_x + 47;
+    int16_t win_y0 = ml.screen_top_y - 16, win_y1 = ml.screen_top_y + 47;
+
     /* ACCUMULATE_COLLISION_FLAGS_VERTICAL (C05639):
      * Sample at (left_x, top_y) first, then iterate downward from (left_x, (top_y+7)/8).
      * Assembly: lookup_surface_flags computes top_y = y - top_offset + height_offset,
      * stores it in CHECKED_COLLISION_TOP_Y, then passes it as A to this routine.
      * Uses top_y (not raw y). */
     {
+        int16_t world_tx = left_x >> 3;
         uint16_t cx = ((uint16_t)left_x >> 3) & 0x3F;
-        uint16_t cy_first = ((uint16_t)top_y >> 3) & 0x3F;
-        flags |= ml.loaded_collision_tiles[cy_first * 64 + cx];
+        bool cx_in_window = world_tx >= win_x0 && world_tx <= win_x1;
 
+        int16_t world_ty_first = top_y >> 3;
+        uint16_t cy_first = ((uint16_t)top_y >> 3) & 0x3F;
+        bool first_in_window = cx_in_window && world_ty_first >= win_y0 && world_ty_first <= win_y1;
+        uint8_t t = first_in_window ? ml.loaded_collision_tiles[cy_first * 64 + cx]
+                                     : compute_collision_tile_flags(world_tx, world_ty_first);
+        flags |= t;
+
+        int16_t world_ty_start = (top_y + 7) >> 3;
         uint16_t cy_start = ((uint16_t)top_y + 7) >> 3;
         for (uint16_t i = 0; i < tile_count; i++) {
-            uint16_t cy = (cy_start + i) & 0x3F;
-            flags |= ml.loaded_collision_tiles[cy * 64 + cx];
+            int16_t world_ty = world_ty_start + (int16_t)i;
+            bool in_window = cx_in_window && world_ty >= win_y0 && world_ty <= win_y1;
+            uint16_t cy = (uint16_t)(cy_start + i) & 0x3F;
+            uint8_t ti = in_window ? ml.loaded_collision_tiles[cy * 64 + cx]
+                                    : compute_collision_tile_flags(world_tx, world_ty);
+            flags |= ti;
         }
     }
 
     /* ACCUMULATE_COLLISION_FLAGS_HORIZONTAL (C056D0):
      * Sample at (right_x, top_y) first, then iterate downward from (right_x, (top_y+7)/8). */
     {
+        int16_t world_rx = (int16_t)((width_px * 8 + left_x - 1) >> 3);
         uint16_t right_x = ((uint16_t)(width_px * 8 + left_x - 1) >> 3) & 0x3F;
-        uint16_t cy_first = ((uint16_t)top_y >> 3) & 0x3F;
-        flags |= ml.loaded_collision_tiles[cy_first * 64 + right_x];
+        bool rx_in_window = world_rx >= win_x0 && world_rx <= win_x1;
 
+        int16_t world_ty_first = top_y >> 3;
+        uint16_t cy_first = ((uint16_t)top_y >> 3) & 0x3F;
+        bool first_in_window = rx_in_window && world_ty_first >= win_y0 && world_ty_first <= win_y1;
+        uint8_t t = first_in_window ? ml.loaded_collision_tiles[cy_first * 64 + right_x]
+                                     : compute_collision_tile_flags(world_rx, world_ty_first);
+        flags |= t;
+
+        int16_t world_ty_start = (top_y + 7) >> 3;
         uint16_t cy_start = ((uint16_t)top_y + 7) >> 3;
         for (uint16_t i = 0; i < tile_count; i++) {
-            uint16_t cy = (cy_start + i) & 0x3F;
-            flags |= ml.loaded_collision_tiles[cy * 64 + right_x];
+            int16_t world_ty = world_ty_start + (int16_t)i;
+            bool in_window = rx_in_window && world_ty >= win_y0 && world_ty <= win_y1;
+            uint16_t cy = (uint16_t)(cy_start + i) & 0x3F;
+            uint8_t ti = in_window ? ml.loaded_collision_tiles[cy * 64 + right_x]
+                                    : compute_collision_tile_flags(world_rx, world_ty);
+            flags |= ti;
         }
     }
 
@@ -2246,6 +2339,19 @@ void load_initial_map_data(void) {
     uint16_t view_y_tile = (uint16_t)((int16_t)ppu.bg_vofs[0] - EB_VIEWPORT_CENTER_Y) >> 3;
     fill_tilemaps(view_x_tile, view_y_tile);
     fill_collision_tiles(view_x_tile, view_y_tile);
+    /* Every other fill_collision_tiles() caller (load_map_at_position,
+     * reload_map_at_position, the incremental scroll path) syncs
+     * ml.screen_left_x/ml.screen_top_y to the view it just filled -- this
+     * one didn't, which was harmless while lookup_surface_flags() read the
+     * grid unconditionally, but now matters: that function's window-bounds
+     * check (see its doc comment) derives the currently-valid window FROM
+     * ml.screen_left_x/screen_top_y, not from what was actually just
+     * filled. Leaving them stale here (e.g. right after a warp that calls
+     * this to snap the grid to the new position) would make that check
+     * compute the wrong window and wrongly reject genuinely in-window,
+     * freshly-filled samples. Found via code review. */
+    ml.screen_left_x = (int16_t)view_x_tile;
+    ml.screen_top_y = (int16_t)view_y_tile;
 }
 
 /* --- SPAWN_NPCS_IN_COLUMN ---
