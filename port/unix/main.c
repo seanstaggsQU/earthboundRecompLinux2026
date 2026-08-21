@@ -48,6 +48,7 @@ const char *platform_get_version_string(void) {
 
 #ifdef EB_RUNTIME_ASSETS
 #include "data/runtime_assets.h"
+#include "data/rom_extract.h"
 #endif
 
 /* Unix-specific: set save file path (defined in sdl2_save.c) */
@@ -358,6 +359,17 @@ int main(int argc, char *argv[]) {
                           : "assets.pak";
     }
     EbAssetLoadResult assets_result = eb_runtime_assets_load(assets_path);
+
+    /* No pak yet? Look for a ROM sitting next to the executable (any
+     * .sfc/.smc file -- matched by its own checksum/title, not by
+     * filename, so it doesn't matter what the player named it) and build
+     * one silently. Only bother the player if that doesn't pan out. */
+    if (assets_result == EB_ASSETS_MISSING) {
+        if (rom_extract_scan_and_build_pak(".", assets_path) == EB_ROM_EXTRACT_OK) {
+            assets_result = eb_runtime_assets_load(assets_path);
+        }
+    }
+
     if (assets_result != EB_ASSETS_OK) {
         const char *reason = "unknown error";
         switch (assets_result) {
@@ -370,6 +382,21 @@ int main(int argc, char *argv[]) {
             case EB_ASSETS_OK: break;
         }
         fprintf(stderr, "Failed to load assets from %s: %s\n", assets_path, reason);
+
+        /* The game's own text rendering needs the very assets that are
+         * missing (the font is itself a ROM-derived asset), so there's no
+         * way to explain this in-game -- a plain SDL message box is the
+         * only UI available at this point. Needs SDL_INIT_VIDEO, nothing
+         * else the game itself would need. */
+        SDL_Init(SDL_INIT_VIDEO);
+        char message[512];
+        snprintf(message, sizeof(message),
+            "EarthBound couldn't find your game data (%s).\n\n"
+            "Put your EarthBound (USA) ROM file in the same folder as this "
+            "program (any filename ending in .sfc or .smc works) and launch "
+            "it again -- it'll set itself up automatically, just this once.",
+            reason);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "EarthBound - Setup Needed", message, NULL);
         return 1;
     }
 #endif

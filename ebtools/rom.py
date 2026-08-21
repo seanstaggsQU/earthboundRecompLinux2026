@@ -3,6 +3,9 @@
 import struct
 from dataclasses import dataclass
 
+# Size of an EarthBound/Mother 2 ROM, header stripped.
+ROM_SIZE = 0x300000
+
 
 @dataclass
 class DetectResult:

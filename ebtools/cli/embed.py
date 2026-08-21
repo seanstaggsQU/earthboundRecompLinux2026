@@ -312,6 +312,32 @@ def _resolve_asset_order(
     )
 
 
+def _dump_entries_to_offset_table(doc: "DumpDoc") -> dict[str, tuple[int, int]]:
+    """Map each raw-binary asset's manifest relative path to its (rom_offset, rom_size).
+
+    Mirrors the filename ebtools.parsers.raw.write_raw()/ebtools.cli.extract's
+    dump_data() produce for every ``dumpEntries`` entry whose extension isn't
+    one of the PARSERS (those produce assembly source instead of a raw binary
+    file, and are already excluded from assets.manifest -- see extract.py).
+    Lets the runtime ROM extractor (src/data/rom_extract.c) reconstruct a
+    binary asset directly from a donor ROM's byte range, without needing an
+    actual asm/bin/ extraction on disk.
+    """
+    from ebtools.parsers import PARSERS
+
+    table: dict[str, tuple[int, int]] = {}
+    for entry in doc.dumpEntries:
+        if entry.extension in PARSERS:
+            continue
+        if entry.compressed:
+            filename = f"{entry.name}.{entry.extension}.lzhal"
+        else:
+            filename = f"{entry.name}.{entry.extension}"
+        rel_path = f"{entry.subdir}/{filename}" if entry.subdir else filename
+        table[rel_path] = (entry.offset, entry.size)
+    return table
+
+
 def _compute_layout_hash(enum_entries: list[tuple[str, str]]) -> bytes:
     """32-byte SHA-256 identity hash of an asset *layout*, not its bytes.
 
@@ -339,6 +365,10 @@ def embed_registry(
         bool,
         Parameter(help="Generate metadata-only headers for the EB_RUNTIME_ASSETS build (no asset bytes, no INCBIN)."),
     ] = False,
+    rom_yaml: Annotated[
+        Path,
+        Parameter(help="Dump doc YAML (only read in --runtime mode, to emit rom_extract_table.c/.h)."),
+    ] = Path("earthbound.yml"),
 ) -> None:
     """Generate C source files for embedding binary assets using incbin.h.
 
@@ -365,7 +395,12 @@ def embed_registry(
         embedded_assets/asset_family_* as non-const (populated by the
         runtime loader instead of link-time INCBIN), and additionally
         writes asset_pack_layout.c/.h (the family population code + the
-        layout hash an assets.pak is checked against).
+        layout hash an assets.pak is checked against) plus
+        rom_extract_table.c/.h (per-asset ROM byte ranges, so the compiled
+        game can build its own assets.pak straight from a donor ROM with no
+        Python involved -- see src/data/rom_extract.c).
+    rom_yaml
+        Dump doc YAML, only read in --runtime mode.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -623,6 +658,85 @@ def embed_registry(
         layout_src_lines.append("}")
         layout_src_lines.append("")
         (output_dir / "asset_pack_layout.c").write_text("\n".join(layout_src_lines))
+
+        # ===================================================================
+        # Generate rom_extract_table.h/.c: per-asset ROM byte ranges, so
+        # src/data/rom_extract.c can build an assets.pak straight from a
+        # donor ROM without any Python/ebtools involvement at runtime. Only
+        # covers raw-binary entries (same set assets.manifest already has --
+        # PARSERS-handled entries produce assembly source, not a binary
+        # asset, and were never part of the runtime asset layout).
+        # ===================================================================
+        from ebtools.config import load_dump_doc
+        from ebtools.rom import ROM_SIZE
+
+        if rom_yaml.is_file():
+            doc = load_dump_doc(rom_yaml)
+            offset_table = _dump_entries_to_offset_table(doc)
+            rom_identifier = doc.romIdentifier
+        else:
+            # No dump doc available (e.g. a small test fixture with no real
+            # earthbound.yml) -- still emit a valid, ASSET_COUNT-sized table
+            # so anything depending on rom_extract_table.c/.h still builds;
+            # every entry is just a gap (rom_size 0), so rom_extract_build_pak()
+            # would produce an all-empty pak, not a wrong one.
+            print(
+                f"Note: {rom_yaml} not found, writing an empty rom_extract_table.c "
+                "(fine for a test fixture; a real build needs the real YAML).",
+                file=sys.stderr,
+            )
+            offset_table = {}
+            rom_identifier = ""
+
+        table_hdr_lines = [
+            header,
+            "#ifndef ROM_EXTRACT_TABLE_H",
+            "#define ROM_EXTRACT_TABLE_H",
+            "",
+            "#include <stdint.h>",
+            '#include "asset_ids.h"',
+            "",
+            f'#define ROM_IDENTIFIER "{rom_identifier}"',
+            f"#define ROM_SIZE {ROM_SIZE}u",
+            "",
+            "typedef struct {",
+            "    uint32_t rom_offset;",
+            "    uint32_t rom_size;  /* 0 means this asset has no ROM-derived source (a family gap) */",
+            "} RomExtractEntry;",
+            "",
+            "extern const RomExtractEntry rom_extract_table[ASSET_COUNT];",
+            "",
+            "#endif /* ROM_EXTRACT_TABLE_H */",
+            "",
+        ]
+        (output_dir / "rom_extract_table.h").write_text("\n".join(table_hdr_lines))
+
+        table_src_lines = [
+            header,
+            '#include "rom_extract_table.h"',
+            "",
+            "const RomExtractEntry rom_extract_table[ASSET_COUNT] = {",
+        ]
+        missing = 0
+        for enum_name, _comment in enum_entries:
+            path = resolved.enum_to_path.get(enum_name)
+            entry = offset_table.get(path) if path else None
+            if entry is None:
+                missing += 1
+                table_src_lines.append(f"    [{enum_name}] = {{ 0, 0 }},")
+            else:
+                off, size = entry
+                table_src_lines.append(f"    [{enum_name}] = {{ {off}u, {size}u }}, /* {path} */")
+        table_src_lines.append("};")
+        table_src_lines.append("")
+        (output_dir / "rom_extract_table.c").write_text("\n".join(table_src_lines))
+        if missing:
+            print(
+                f"Note: {missing} asset(s) have no ROM-derived byte range in rom_extract_table.c "
+                "(family gaps, or a custom_dir-only override) -- these will be zero-length in a "
+                "ROM-built assets.pak.",
+                file=sys.stderr,
+            )
 
     print(
         f"Generated {len(sorted_paths)} embedded assets ({len(enum_entries)} enum entries, "

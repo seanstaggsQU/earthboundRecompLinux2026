@@ -2,6 +2,8 @@
 
 `ebtools extract` pulls binary data from a donor ROM and exports human-friendly assets to `src/assets/`. Each asset type can be edited and packed back to binary with `ebtools pack`. Some JSON assets also have `ebtools generate` commands that produce C headers for the port.
 
+This is maintainer/modding-facing tooling. If you just want to play the game, see [docs/get-your-own-assets.md](get-your-own-assets.md) instead -- the released binary builds its own `assets.pak` from your ROM automatically, no ebtools/Python needed on your end. `EB_RUNTIME_ASSETS=ON` (below) is the default and only build mode for releases now; the compile-time `INCBIN`-everything path this page mostly documents is a manual/advanced dev option (`-DEB_RUNTIME_ASSETS=OFF`, or `make unix-dev-embedded`), not what ships.
+
 ## Quick Reference
 
 | Asset | Export Path | Pack Command | Generate Command |
@@ -337,14 +339,19 @@ ebtools pack assets asm/bin/assets.manifest asm/bin assets.pak
 
 ### Building the game against a pack (`EB_RUNTIME_ASSETS`)
 
-`EB_RUNTIME_ASSETS=ON` needs metadata describing the asset layout —
-`asset_ids.h`, `embedded_assets.h`, `asset_pack_layout.c/.h` — but *not*
-asset bytes, since a release/CI machine has no ROM by design. This metadata
-is generated once by a maintainer who has a legal ROM, and committed to
-`src/data/runtime_generated/`:
+`EB_RUNTIME_ASSETS=ON` (the default now) needs metadata describing the asset
+layout — `asset_ids.h`, `embedded_assets.h`, `asset_pack_layout.c/.h`,
+`rom_extract_table.c/.h` — but *not* asset bytes, since a release/CI machine
+has no ROM by design. This metadata is generated once by a maintainer who has
+a legal ROM, and committed to `src/data/runtime_generated/`. The last pair,
+`rom_extract_table.c/.h`, is what lets the *shipped binary itself* build a
+pak from a player's ROM at first launch with no Python involved — see
+`src/data/rom_extract.c` and [docs/get-your-own-assets.md](get-your-own-assets.md).
+It's just `(rom_offset, rom_size)` per asset, walked directly off
+`earthbound.yml`'s `dumpEntries`:
 
 ```
-ebtools embed-registry --runtime asm/bin/assets.manifest asm/bin src/data/runtime_generated src/vendor/incbin --locale US
+ebtools embed-registry --runtime asm/bin/assets.manifest asm/bin src/data/runtime_generated src/vendor/incbin --locale US --rom-yaml earthbound.yml
 ```
 
 Re-run and commit whenever the manifest, `--exclude` set, or locale changes

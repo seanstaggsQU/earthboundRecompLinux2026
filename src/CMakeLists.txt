@@ -92,10 +92,16 @@ else()
     target_compile_options(earthbound_game PRIVATE -Wall -Wextra -Wno-unused-parameter -ffunction-sections -fdata-sections)
 endif()
 
-# Embedded assets - game assets are compiled into the binary, either at
-# compile time via incbin.h (default) or loaded at startup from an
-# assets.pak file (EB_RUNTIME_ASSETS=ON) -- see docs/assets.md.
-find_program(EBTOOLS_EXE ebtools REQUIRED)
+# Embedded assets - game assets are either loaded at startup from an
+# assets.pak file (EB_RUNTIME_ASSETS=ON, the default -- see
+# docs/get-your-own-assets.md) or compiled into the binary at build time
+# via incbin.h (EB_RUNTIME_ASSETS=OFF, a maintainer-only dev path that
+# needs a ROM and ebtools -- see docs/assets.md). Only that OFF path (plus
+# the always-available test_runtime_assets fixture target, which isn't
+# part of the default `cmake --build`) actually needs ebtools at configure
+# time, so it's not REQUIRED here -- the default build never needs Python
+# on the machine building it.
+find_program(EBTOOLS_EXE ebtools)
 set(EMBED_INCBIN_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendor/incbin")
 # Shared generated-file output dir: used for asset embedding below (in
 # non-runtime mode) *and* unconditionally further down for music/items
@@ -109,9 +115,17 @@ target_include_directories(earthbound_game PUBLIC ${EMBED_GEN_DIR})
 option(EB_ENABLE_AUDIO "Enable audio subsystem (lakesnes SPC700/DSP emulator)" ON)
 
 option(EB_RUNTIME_ASSETS
-    "Load assets from an assets.pak file at startup instead of embedding them at compile time"
-    OFF
+    "Load assets from an assets.pak file at startup instead of embedding them at compile time. \
+This is the default and the only mode used for release builds -- the game builds its own pak \
+from a player-supplied ROM at first launch (see src/data/rom_extract.c). Turn this OFF only for \
+a one-off local dev build with a ROM already on hand -- see docs/assets.md."
+    ON
 )
+
+if(NOT EB_RUNTIME_ASSETS AND NOT EBTOOLS_EXE)
+    message(FATAL_ERROR "EB_RUNTIME_ASSETS=OFF needs ebtools on PATH (pip install -e . in a venv). "
+        "Or drop -DEB_RUNTIME_ASSETS=OFF to use the default no-ROM-needed build.")
+endif()
 
 if(EB_RUNTIME_ASSETS)
     # --- Loader self-test: builds and runs against its own small checked-in
@@ -175,7 +189,8 @@ if(EB_RUNTIME_ASSETS)
     set(EMBED_ASSET_HEADERS_DIR ${RUNTIME_GEN_DIR})
     set(EMBED_GENERATED_SOURCE "")
 
-    if(NOT EXISTS "${RUNTIME_GEN_DIR}/asset_ids.h" OR NOT EXISTS "${RUNTIME_GEN_DIR}/asset_pack_layout.c")
+    if(NOT EXISTS "${RUNTIME_GEN_DIR}/asset_ids.h" OR NOT EXISTS "${RUNTIME_GEN_DIR}/asset_pack_layout.c"
+        OR NOT EXISTS "${RUNTIME_GEN_DIR}/rom_extract_table.c")
         message(WARNING
             "EB_RUNTIME_ASSETS=ON: no pre-generated metadata in ${RUNTIME_GEN_DIR} "
             "yet, so earthbound_game/earthbound won't build until a maintainer "
@@ -187,10 +202,14 @@ if(EB_RUNTIME_ASSETS)
             "its own small fixture instead.) See docs/assets.md."
         )
     else()
-        # data/runtime_assets.c is already part of earthbound_game via the
-        # top-level DATA_SOURCES glob (it's a no-op translation unit when
-        # EB_RUNTIME_ASSETS isn't defined) -- only asset_pack_layout.c is new.
-        target_sources(earthbound_game PRIVATE "${RUNTIME_GEN_DIR}/asset_pack_layout.c")
+        # data/runtime_assets.c and data/rom_extract.c are already part of
+        # earthbound_game via the top-level DATA_SOURCES glob (they're
+        # no-op translation units when EB_RUNTIME_ASSETS isn't defined) --
+        # only the generated files are new.
+        target_sources(earthbound_game PRIVATE
+            "${RUNTIME_GEN_DIR}/asset_pack_layout.c"
+            "${RUNTIME_GEN_DIR}/rom_extract_table.c"
+        )
         target_include_directories(earthbound_game PUBLIC ${RUNTIME_GEN_DIR})
         target_compile_definitions(earthbound_game PUBLIC EB_RUNTIME_ASSETS=1)
         set(EMBED_GENERATED_SOURCE "${RUNTIME_GEN_DIR}/asset_pack_layout.c")

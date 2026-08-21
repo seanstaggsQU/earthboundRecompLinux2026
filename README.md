@@ -39,20 +39,22 @@ sudo dnf install cmake SDL2-devel gcc pkg-config git
 
 You also need **Python 3.10+** (pre-installed on most systems — check with `python3 --version`).
 
-### 2. Clone, Add Your ROM, and Build
+### 2. Clone and Build
 
 ```bash
 git clone https://github.com/Herringfield/earthbound.git
 cd earthbound
-cp path/to/your/earthbound.sfc earthbound.sfc
 make unix
 ```
 
-That's it! `make unix` automatically sets up the Python environment, extracts game assets from your ROM, and compiles the game. When it finishes, run:
+That's it — no ROM needed to build. When it finishes, drop your own legally-obtained EarthBound ROM (any filename ending in `.sfc` or `.smc`) next to the built binary and run it:
 
 ```bash
+cp path/to/your/rom.sfc port/unix/build/
 ./port/unix/build/earthbound
 ```
+
+The first launch sets itself up automatically (no prompts) and every launch after that just plays. See [docs/get-your-own-assets.md](docs/get-your-own-assets.md) for the full rundown, including adding an MSU audio pack.
 
 If any dependencies are missing, `make unix` will tell you exactly what to install.
 
@@ -64,12 +66,13 @@ If you prefer to run each step yourself:
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e .
-ebtools extract
 cd port/unix
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ./build/earthbound
 ```
+
+This still needs Python/`ebtools` on `PATH` for some non-asset codegen, but not a ROM. For the old compile-time-embedded build (needs a ROM at build time, bakes it into the binary) see `make unix-dev-embedded` and [docs/assets.md](docs/assets.md).
 
 ---
 

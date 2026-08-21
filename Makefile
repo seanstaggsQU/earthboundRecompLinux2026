@@ -106,19 +106,43 @@ $(BUILDDIR)/%.spc700.bin: asm/spc700/%.spc700.s
 #   Ubuntu: sudo apt install cmake libsdl2-dev build-essential
 #   Fedora: sudo dnf install cmake SDL2-devel gcc
 #
-# You also need Python 3.10+ and your EarthBound ROM as "earthbound.sfc"
-# in this directory. The rest is handled automatically.
+# You'll still need Python 3.10+ with ebtools installed (some non-asset
+# codegen -- items/music header generation -- uses it regardless of asset
+# mode; see the Python Environment section in CLAUDE.md), but no ROM: the
+# game builds its own assets.pak from a player-supplied ROM the first time
+# it runs (drop any .sfc/.smc file next to the built binary and launch
+# it). See docs/get-your-own-assets.md.
+#
+# `make unix-dev-embedded` is still available for a maintainer who wants
+# the old compile-time-embedded build with a ROM on hand -- see
+# docs/assets.md.
 
 UNIX_BUILD_DIR = port/unix/build
 UNIX_BINARY = $(UNIX_BUILD_DIR)/earthbound
 NPROC = $(shell nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
 
-.PHONY: unix unix-check-deps unix-check-rom unix-extract unix-venv
+.PHONY: unix unix-dev-embedded unix-check-deps unix-check-rom unix-extract unix-venv
 
-unix: unix-check-deps unix-check-rom unix-submodules unix-venv unix-extract
+unix: unix-check-deps unix-submodules unix-venv
 	@echo ""
-	@echo "=== Configuring C port ==="
+	@echo "=== Configuring C port (no ROM needed -- players supply their own at first launch) ==="
 	@cmake -S port/unix -B $(UNIX_BUILD_DIR) -DCMAKE_BUILD_TYPE=Release
+	@echo ""
+	@echo "=== Building C port ==="
+	@cmake --build $(UNIX_BUILD_DIR) -j$(NPROC)
+	@echo ""
+	@echo "============================================"
+	@echo "  Build complete!"
+	@echo "  Run the game with:  ./$(UNIX_BINARY)"
+	@echo "  (drop your EarthBound ROM next to it first -- any .sfc/.smc name works)"
+	@echo "============================================"
+
+# Old compile-time-embedded dev build: needs a ROM and Python/ebtools on
+# hand, bakes assets directly into the binary. Not for release builds.
+unix-dev-embedded: unix-check-deps unix-check-rom unix-submodules unix-venv unix-extract
+	@echo ""
+	@echo "=== Configuring C port (compile-time embedded, EB_RUNTIME_ASSETS=OFF) ==="
+	@cmake -S port/unix -B $(UNIX_BUILD_DIR) -DCMAKE_BUILD_TYPE=Release -DEB_RUNTIME_ASSETS=OFF
 	@echo ""
 	@echo "=== Building C port ==="
 	@cmake --build $(UNIX_BUILD_DIR) -j$(NPROC)
@@ -133,7 +157,6 @@ unix-check-deps:
 	@missing=""; \
 	if ! command -v cmake >/dev/null 2>&1; then missing="$$missing cmake"; fi; \
 	if ! command -v cc >/dev/null 2>&1 && ! command -v gcc >/dev/null 2>&1; then missing="$$missing C-compiler"; fi; \
-	if ! command -v python3 >/dev/null 2>&1; then missing="$$missing python3"; fi; \
 	if ! command -v pkg-config >/dev/null 2>&1; then missing="$$missing pkg-config"; fi; \
 	if [ -n "$$missing" ]; then \
 		echo ""; \
@@ -187,6 +210,12 @@ unix-extract: unix-venv
 	fi
 
 unix-venv:
+	@if ! command -v python3 >/dev/null 2>&1; then \
+		echo ""; \
+		echo "ERROR: python3 not found (only needed for unix-dev-embedded)."; \
+		echo ""; \
+		exit 1; \
+	fi
 	@if [ ! -d .venv ]; then \
 		echo "=== Setting up Python environment ==="; \
 		python3 -m venv .venv; \
