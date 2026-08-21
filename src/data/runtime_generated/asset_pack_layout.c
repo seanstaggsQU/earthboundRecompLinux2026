@@ -22,7 +22,6 @@ AssetFamilyEntry asset_family_maps_arrangements[20];
 AssetFamilyEntry asset_family_maps_gfx[20];
 AssetFamilyEntry asset_family_maps_palettes[32];
 AssetFamilyEntry asset_family_overworld_sprites_banks[5];
-AssetFamilyEntry asset_family_overworld_sprites_gfx[1146];
 AssetFamilyEntry asset_family_overworld_sprites_palettes[8];
 AssetFamilyEntry asset_family_psianims_arrangements[34];
 AssetFamilyEntry asset_family_psianims_gfx[4];
@@ -83,17 +82,13 @@ void eb_runtime_assets_populate_families(void) {
         asset_family_overworld_sprites_banks[i].data = embedded_assets[ASSET_OVERWORLD_SPRITES_BANKS_11_BIN + i].data;
         asset_family_overworld_sprites_banks[i].size_ptr = embedded_assets[ASSET_OVERWORLD_SPRITES_BANKS_11_BIN + i].size_ptr;
     }
-    for (unsigned i = 0; i < 1146u; i++) { /* overworld_sprites/gfx/.gfx */
-        asset_family_overworld_sprites_gfx[i].data = embedded_assets[ASSET_OVERWORLD_SPRITES_GFX_0000_GFX + i].data;
-        asset_family_overworld_sprites_gfx[i].size_ptr = embedded_assets[ASSET_OVERWORLD_SPRITES_GFX_0000_GFX + i].size_ptr;
-    }
     for (unsigned i = 0; i < 8u; i++) { /* overworld_sprites/palettes/.pal */
         asset_family_overworld_sprites_palettes[i].data = embedded_assets[ASSET_OVERWORLD_SPRITES_PALETTES_0_PAL + i].data;
         asset_family_overworld_sprites_palettes[i].size_ptr = embedded_assets[ASSET_OVERWORLD_SPRITES_PALETTES_0_PAL + i].size_ptr;
     }
-    for (unsigned i = 0; i < 34u; i++) { /* psianims/arrangements/.arr.lzhal */
-        asset_family_psianims_arrangements[i].data = embedded_assets[ASSET_PSIANIMS_ARRANGEMENTS_0_ARR_LZHAL + i].data;
-        asset_family_psianims_arrangements[i].size_ptr = embedded_assets[ASSET_PSIANIMS_ARRANGEMENTS_0_ARR_LZHAL + i].size_ptr;
+    for (unsigned i = 0; i < 34u; i++) { /* psianims/arrangements/.arr.bundled */
+        asset_family_psianims_arrangements[i].data = embedded_assets[ASSET_PSIANIMS_ARRANGEMENTS_0_ARR_BUNDLED + i].data;
+        asset_family_psianims_arrangements[i].size_ptr = embedded_assets[ASSET_PSIANIMS_ARRANGEMENTS_0_ARR_BUNDLED + i].size_ptr;
     }
     for (unsigned i = 0; i < 4u; i++) { /* psianims/gfx/.gfx.lzhal */
         asset_family_psianims_gfx[i].data = embedded_assets[ASSET_PSIANIMS_GFX_0_GFX_LZHAL + i].data;

@@ -3,7 +3,7 @@
 #ifndef ASSET_PACK_LAYOUT_H
 #define ASSET_PACK_LAYOUT_H
 
-#define ASSET_PACK_LAYOUT_HASH "c1499cc8d8c5edda0ba9e3c082b0cc470ea3d1e1babf896af0b8fa21c62e4b2a"
+#define ASSET_PACK_LAYOUT_HASH "9aab83b7ad61ff2ed197c0cf6b153425226ce8616fcf077be83e1abe9d7657c2"
 
 /* Populates every asset_family_* array from embedded_assets[], which
  * must already be populated (see eb_runtime_assets_load()). */

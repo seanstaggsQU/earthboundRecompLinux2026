@@ -49,6 +49,8 @@ const char *platform_get_version_string(void) {
 #ifdef EB_RUNTIME_ASSETS
 #include "data/runtime_assets.h"
 #include "data/rom_extract.h"
+#else
+#include "data/pak_export.h"
 #endif
 
 /* Unix-specific: set save file path (defined in sdl2_save.c) */
@@ -270,6 +272,8 @@ int main(int argc, char *argv[]) {
 #endif
 #ifdef EB_RUNTIME_ASSETS
     const char *assets_path = NULL;
+#else
+    const char *export_pak_path = NULL; /* --export-pak PATH: write this binary's own compiled-in assets out as a pak, then exit */
 #endif
 
     for (int i = 1; i < argc; i++) {
@@ -278,6 +282,9 @@ int main(int argc, char *argv[]) {
 #ifdef EB_RUNTIME_ASSETS
         } else if (strcmp(argv[i], "--assets") == 0 && i + 1 < argc) {
             assets_path = argv[++i];
+#else
+        } else if (strcmp(argv[i], "--export-pak") == 0 && i + 1 < argc) {
+            export_pak_path = argv[++i];
 #endif
         } else if (strcmp(argv[i], "--selftest-savestate") == 0) {
             /* Run the savestate save->load->save round-trip self-test and exit.
@@ -330,12 +337,28 @@ int main(int argc, char *argv[]) {
                             " [--verbose] [--verify ROM]"
 #ifdef EB_RUNTIME_ASSETS
                             " [--assets FILE]"
+#else
+                            " [--export-pak FILE]"
 #endif
                             " [--selftest-savestate] [--selftest-keyitems]\n",
                     argv[0]);
             return 1;
         }
     }
+
+#ifndef EB_RUNTIME_ASSETS
+    /* Writes this binary's own compiled-in assets out as a pak, byte-for-byte
+     * identical to one built from a matching ROM (same source bytes, same
+     * layout order -- see rom_extract_build_pak()), then exits. Used by
+     * the self-updater to hand a runtime-assets build everything it needs
+     * with no ROM required, and available by hand for anyone updating via
+     * a fresh download instead of "Check for Updates". */
+    if (export_pak_path) {
+        bool ok = pak_export_write(export_pak_path);
+        fprintf(stderr, "%s %s\n", ok ? "Wrote" : "Failed to write", export_pak_path);
+        return ok ? 0 : 1;
+    }
+#endif
 
     /* --log-file: redirect stdout+stderr to a file. Mainly for launches with
      * no attached terminal (desktop icon, Steam shortcut) -- without this,

@@ -414,6 +414,25 @@ def embed_registry(
     incbin_path = incbin_dir.resolve().as_posix()
     const_kw = "" if runtime else "const "
 
+    # --- asset_pack_hash.h: the layout hash, in both modes. Only depends on
+    # (manifest, exclude, locale) -- not on runtime vs compile-time-embed --
+    # so a compile-time-embed build (which has every asset's bytes on hand
+    # already) can export a valid assets.pak for a runtime-mode build to
+    # read later, as long as both were generated from the same inputs. See
+    # src/data/pak_export.c. ---
+    layout_hash_hex = _compute_layout_hash(enum_entries).hex()
+    hash_hdr_lines = [
+        header,
+        "#ifndef ASSET_PACK_HASH_H",
+        "#define ASSET_PACK_HASH_H",
+        "",
+        f'#define ASSET_PACK_LAYOUT_HASH "{layout_hash_hex}"',
+        "",
+        "#endif /* ASSET_PACK_HASH_H */",
+        "",
+    ]
+    (output_dir / "asset_pack_hash.h").write_text("\n".join(hash_hdr_lines))
+
     if not runtime:
         # --- embedded_assets.inc.c (INCBIN definitions) ---
         inc_path = output_dir / "embedded_assets.inc.c"
@@ -706,6 +725,14 @@ def embed_registry(
             "",
             "extern const RomExtractEntry rom_extract_table[ASSET_COUNT];",
             "",
+            "/* Source .arr.lzhal ranges for the 34 PSI arrangements (see",
+            " * ebtools/parsers/psi_arrangements.py). These never appear in",
+            " * rom_extract_table[] -- the final asset is the *bundled* form,",
+            " * built from these at runtime by rom_extract.c (decompress, split",
+            " * into 8-frame chunks, re-encode each chunk). */",
+            "#define PSI_ARRANGEMENT_COUNT 34",
+            "extern const RomExtractEntry psi_arrangement_source[PSI_ARRANGEMENT_COUNT];",
+            "",
             "#endif /* ROM_EXTRACT_TABLE_H */",
             "",
         ]
@@ -729,7 +756,23 @@ def embed_registry(
                 table_src_lines.append(f"    [{enum_name}] = {{ {off}u, {size}u }}, /* {path} */")
         table_src_lines.append("};")
         table_src_lines.append("")
+
+        table_src_lines.append("const RomExtractEntry psi_arrangement_source[PSI_ARRANGEMENT_COUNT] = {")
+        psi_missing = 0
+        for i in range(34):
+            src_path = f"psianims/arrangements/{i}.arr.lzhal"
+            entry = offset_table.get(src_path)
+            if entry is None:
+                psi_missing += 1
+                table_src_lines.append(f"    [{i}] = {{ 0, 0 }},")
+            else:
+                off, size = entry
+                table_src_lines.append(f"    [{i}] = {{ {off}u, {size}u }}, /* {src_path} */")
+        table_src_lines.append("};")
+        table_src_lines.append("")
         (output_dir / "rom_extract_table.c").write_text("\n".join(table_src_lines))
+        if psi_missing:
+            print(f"Note: {psi_missing} PSI arrangement source(s) missing from earthbound.yml.", file=sys.stderr)
         if missing:
             print(
                 f"Note: {missing} asset(s) have no ROM-derived byte range in rom_extract_table.c "

@@ -16,4 +16,12 @@ typedef struct {
 
 extern const RomExtractEntry rom_extract_table[ASSET_COUNT];
 
+/* Source .arr.lzhal ranges for the 34 PSI arrangements (see
+ * ebtools/parsers/psi_arrangements.py). These never appear in
+ * rom_extract_table[] -- the final asset is the *bundled* form,
+ * built from these at runtime by rom_extract.c (decompress, split
+ * into 8-frame chunks, re-encode each chunk). */
+#define PSI_ARRANGEMENT_COUNT 34
+extern const RomExtractEntry psi_arrangement_source[PSI_ARRANGEMENT_COUNT];
+
 #endif /* ROM_EXTRACT_TABLE_H */
