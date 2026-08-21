@@ -1,5 +1,5 @@
 /*
- * Sprite loading infrastructure — VRAM allocation, tile upload, spritemap management.
+ * Sprite loading infrastructure, VRAM allocation, tile upload, spritemap management.
  *
  * Ports of:
  *   LOAD_SPRITE_GROUP_PROPERTIES   (asm/overworld/entity/load_sprite_group_properties.asm)
@@ -17,7 +17,7 @@
 #include "core/log.h"
 #include <string.h>
 
-/* ---- Runtime state ---- */
+/* Runtime state */
 
 uint8_t sprite_vram_table[SPRITE_VRAM_TABLE_SIZE];
 uint8_t overworld_spritemaps[OVERWORLD_SPRITEMAPS_SIZE];
@@ -41,7 +41,7 @@ static const uint8_t *spr_grouping_data_raw = NULL;
 static const uint8_t *spr_config_buf = NULL;
 static const uint8_t *spr_bank_bufs[SPRITE_BANK_COUNT];
 
-/* ---- Data Loading ---- */
+/* Data Loading */
 
 void load_sprite_data(void) {
     size_t size;
@@ -65,8 +65,8 @@ void load_sprite_data(void) {
     spritemap_config_size = (uint32_t)size;
 
     /* Sprite graphics banks 11-15 ($D1-$D5).
-     * Bank files are named by their hex SNES bank number: 11.bin–15.bin.
-     * These are decimal 11–15 in the asset family index. */
+     * Bank files are named by their hex SNES bank number: 11.bin-15.bin.
+     * These are decimal 11-15 in the asset family index. */
     for (int i = 0; i < SPRITE_BANK_COUNT; i++) {
         int bank_file = 11 + i;  /* decimal file number, not SPRITE_BANK_FIRST (0x11) */
         size = ASSET_SIZE(ASSET_OVERWORLD_SPRITES_BANKS(bank_file));
@@ -90,7 +90,7 @@ void clear_overworld_spritemaps(void) {
            (0x380 < OVERWORLD_SPRITEMAPS_SIZE) ? 0x380 : OVERWORLD_SPRITEMAPS_SIZE);
 }
 
-/* ---- Sprite Group Properties ---- */
+/* Sprite Group Properties */
 
 /*
  * LOAD_SPRITE_GROUP_PROPERTIES (C01DED)
@@ -138,7 +138,7 @@ uint8_t load_sprite_group_properties(uint16_t sprite_id, uint32_t *out_grouping_
     return sg[2];  /* size */
 }
 
-/* ---- VRAM Allocation ---- */
+/* VRAM Allocation */
 
 /*
  * ALLOCATE_SPRITE_VRAM (C01B96)
@@ -164,7 +164,7 @@ uint16_t allocate_sprite_vram(uint16_t num_tiles, uint16_t entity_hint) {
         }
 
         if (count == num_tiles) {
-            /* Found space — mark as allocated */
+            /* Found space, mark as allocated */
             uint8_t mark = (uint8_t)(entity_hint | 0x80);
             for (i = 0; i < num_tiles; i++) {
                 sprite_vram_table[y + i] = mark;
@@ -296,7 +296,7 @@ uint16_t load_sprite_tiles_to_vram(uint16_t sprite_id, uint16_t sub_palette_idx,
     return vram_base + raw_width;
 }
 
-/* ---- Spritemap Buffer Allocation ---- */
+/* Spritemap Buffer Allocation */
 
 /*
  * FIND_FREE_7E4682 (find_free_space_7E4682.asm)
@@ -315,13 +315,13 @@ uint16_t find_free_spritemap_space(uint16_t num_entries_bytes) {
         /* Check if this entry is free */
         if (x + 4 >= OVERWORLD_SPRITEMAPS_SIZE ||
             overworld_spritemaps[x + 4] != SPRITEMAP_FREE_MARKER) {
-            /* Occupied — skip past and reset search */
+            /* Occupied, skip past and reset search */
             x += SPRITEMAP_ENTRY_SIZE;
             start = x;
             continue;
         }
 
-        /* Free entry found — check if we have enough contiguous space */
+        /* Free entry found, check if we have enough contiguous space */
         if (x + num_entries_bytes >= 0x380) {
             return 0x7FFF;  /* Not enough space at end */
         }
@@ -331,7 +331,7 @@ uint16_t find_free_spritemap_space(uint16_t num_entries_bytes) {
         bool all_free = true;
         while (scan < start + num_entries_bytes) {
             if (overworld_spritemaps[scan + 4] != SPRITEMAP_FREE_MARKER) {
-                /* Not free — skip past */
+                /* Not free, skip past */
                 start = scan + SPRITEMAP_ENTRY_SIZE;
                 x = start;
                 all_free = false;
@@ -348,7 +348,7 @@ uint16_t find_free_spritemap_space(uint16_t num_entries_bytes) {
     return 0x7FFF;
 }
 
-/* ---- Spritemap Loading ---- */
+/* Spritemap Loading */
 
 /*
  * LOAD_OVERWORLD_SPRITEMAPS (C01D38)
@@ -361,7 +361,7 @@ uint16_t find_free_spritemap_space(uint16_t num_entries_bytes) {
  *   byte[1]: (unused here)
  *   Then for each sprite entry (5 bytes):
  *     [0] y_offset
- *     [1] tile (unused — overwritten by SPRITE_TILE_INDEX_TABLE lookup)
+ *     [1] tile (unused, overwritten by SPRITE_TILE_INDEX_TABLE lookup)
  *     [2] flags (ORed with palette and tile high byte)
  *     [3] x_offset
  *     [4] special_flags
@@ -423,10 +423,10 @@ void load_overworld_spritemaps(uint16_t buf_offset, uint16_t vram_index,
     }
 }
 
-/* ---- Per-Frame Sprite Tile Upload ---- */
+/* Per-Frame Sprite Tile Upload */
 
 /*
- * PREPARE_VRAM_COPY_ROW_SAFE (C0A56E) — helper for OBJ VRAM tile upload.
+ * PREPARE_VRAM_COPY_ROW_SAFE (C0A56E), helper for OBJ VRAM tile upload.
  *
  * SNES OBJ tiles are arranged in 0x100-word (512 byte) groups where:
  *   - Words 0x??00-0x??FF hold the upper 8-pixel rows of a tile row
@@ -452,7 +452,7 @@ uint16_t vram_copy_row_safe(uint16_t dest, const uint8_t *src, uint16_t size) {
     uint16_t end_word = dest + word_count - 1;
 
     if ((end_word ^ dest) & 0x0100) {
-        /* Row crosses 0x100-word boundary — split into two copies.
+        /* Row crosses 0x100-word boundary, split into two copies.
          * ASM lines 10-49: save state, copy first part, copy second part
          * at boundary + 0x100, restore state. */
         uint16_t boundary = (dest + 0x0100) & 0xFF00;
@@ -473,7 +473,7 @@ uint16_t vram_copy_row_safe(uint16_t dest, const uint8_t *src, uint16_t size) {
             memcpy(&ppu.vram[byte_addr2], src + first_bytes, second_bytes);
         }
     } else {
-        /* No split needed — contiguous copy */
+        /* No split needed, contiguous copy */
         uint32_t byte_addr = (uint32_t)dest * 2;
         if (byte_addr + size <= sizeof(ppu.vram)) {
             memcpy(&ppu.vram[byte_addr], src, size);
@@ -575,8 +575,8 @@ void render_entity_sprite(int16_t ent) {
      * (bit 3), pre-fill 1-2 rows of blank tiles to hide lower body in water.
      * This uses fixed-source DMA (mode 3) from BLANK_TILE_DATA (all zeros).
      *
-     * SHALLOW_WATER (0x08): 1 blank row — lower body hidden (wading)
-     * DEEP_WATER (0x0C = SHALLOW_WATER | CAUSES_SUNSTROKE): 2 blank rows —
+     * SHALLOW_WATER (0x08): 1 blank row, lower body hidden (wading)
+     * DEEP_WATER (0x0C = SHALLOW_WATER | CAUSES_SUNSTROKE): 2 blank rows, 
      *   only head visible (e.g. Deep Darkness deep water) */
     if (!(tile_data_offset & 0x0002)) {
         uint16_t sf = entities.surface_flags[ent];
@@ -587,7 +587,7 @@ void render_entity_sprite(int16_t ent) {
             if (tile_height == 0)
                 return;
 
-            if (sf & 0x0004) {  /* CAUSES_SUNSTROKE (bit 2) — present in DEEP_WATER */
+            if (sf & 0x0004) {  /* CAUSES_SUNSTROKE (bit 2), present in DEEP_WATER */
                 /* Upload another blank row */
                 vram_dest = vram_copy_row_safe(vram_dest, blank_tile_row, byte_width);
                 tile_height--;

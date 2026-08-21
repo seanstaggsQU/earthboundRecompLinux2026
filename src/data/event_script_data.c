@@ -65,7 +65,7 @@ static const uint8_t *naming_entities_buf = NULL;
 #define SPRITEMAP_PTR_ENTRIES 9
 #define SPRITEMAP_WITHIN_BANK_BASE 0xCE08
 
-/* ---- Script Bank API ---- */
+/* Script Bank API */
 
 int register_script_bank(const uint8_t *data, uint32_t size,
                          uint16_t rom_base_addr, uint8_t rom_bank) {
@@ -139,7 +139,7 @@ bool resolve_script_id(uint16_t script_id, int *out_bank_idx, uint16_t *out_offs
     return false;
 }
 
-/* ---- Title Screen Data ---- */
+/* Title Screen Data */
 
 void load_title_screen_script_data(void) {
     /* Guard against double-loading */
@@ -147,7 +147,7 @@ void load_title_screen_script_data(void) {
 
     size_t size;
 
-    /* ---- Load script bytecode ---- */
+    /* Load script bytecode */
     size = ASSET_SIZE(ASSET_INTRO_TITLE_SCREEN_SCRIPTS_BIN);
     script_bank_buf = ASSET_DATA(ASSET_INTRO_TITLE_SCREEN_SCRIPTS_BIN);
     if (script_bank_buf) {
@@ -164,7 +164,7 @@ void load_title_screen_script_data(void) {
         title_script_bank_size = 0;
     }
 
-    /* ---- Load and parse script pointer table ---- */
+    /* Load and parse script pointer table */
     size = ASSET_SIZE(ASSET_INTRO_TITLE_SCREEN_SCRIPT_POINTERS_BIN);
     script_ptrs_buf = ASSET_DATA(ASSET_INTRO_TITLE_SCREEN_SCRIPT_POINTERS_BIN);
     if (script_ptrs_buf && size >= TITLE_SCREEN_SCRIPT_COUNT * 3) {
@@ -177,7 +177,7 @@ void load_title_screen_script_data(void) {
         memset(title_script_pointers, 0, sizeof(title_script_pointers));
     }
 
-    /* ---- Load spritemap data ---- */
+    /* Load spritemap data */
     size = ASSET_SIZE(ASSET_INTRO_TITLE_SCREEN_SPRITEMAPS_BIN);
     spritemap_buf = ASSET_DATA(ASSET_INTRO_TITLE_SCREEN_SPRITEMAPS_BIN);
     if (spritemap_buf && size >= SPRITEMAP_DATA_SIZE + SPRITEMAP_PTR_ENTRIES * 2) {
@@ -205,7 +205,7 @@ void free_title_screen_script_data(void) {
     title_spritemap_data = NULL;
 }
 
-/* ---- General Event Script Data ---- */
+/* General Event Script Data */
 
 void load_event_script_data(void) {
     /* Guard against double-loading (init_intro loads early,
@@ -239,7 +239,7 @@ void load_event_script_data(void) {
     /* Load bank C3 as a single pre-combined asset.
      * On real SNES hardware this is one contiguous ROM bank. The asset
      * is extracted as a single region so asset_load_locale() returns a
-     * direct pointer — no RAM copy needed. SHORTCALLs between early
+     * direct pointer, no RAM copy needed. SHORTCALLs between early
      * and late script regions work because it's one contiguous buffer. */
     {
         size_t c3_size = ASSET_SIZE(ASSET_EVENTS_BANK_C3_SCRIPTS_COMBINED_BIN);

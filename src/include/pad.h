@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-/* SNES joypad bitmask — matches PAD enum from enums.asm.
+/* SNES joypad bitmask, matches PAD enum from enums.asm.
  *
  *   Bit 15: B      Bit 14: Y      Bit 13: Select  Bit 12: Start
  *   Bit 11: Up     Bit 10: Down   Bit  9: Left    Bit  8: Right
@@ -22,7 +22,7 @@
 #define PAD_L      (1 <<  5)
 #define PAD_R      (1 <<  4)
 
-/* Functional button groups — used throughout game logic.
+/* Functional button groups, used throughout game logic.
  * Ports with fewer buttons should ensure at minimum:
  *   - PAD_A or PAD_L is mapped (confirm/interact)
  *   - PAD_B or PAD_SELECT is mapped (cancel/HP-PP display)

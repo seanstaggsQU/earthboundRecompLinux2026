@@ -1,4 +1,4 @@
-/* door.c — Door system for the C port.
+/* door.c, Door system for the C port.
  *
  * Ports the following assembly routines:
  *   FIND_DOOR_AT_POSITION     (asm/overworld/door/find_door_at_position.asm)
@@ -42,7 +42,7 @@
 #include "game/position_buffer.h"
 #include "snes/ppu.h"
 
-/* ---- Data buffers — compile-time linked ---- */
+/* Data buffers, compile-time linked */
 #define door_pointer_table       ASSET_DATA(ASSET_MAPS_DOOR_POINTER_TABLE_BIN)
 #define door_pointer_table_size  ASSET_SIZE(ASSET_MAPS_DOOR_POINTER_TABLE_BIN)
 #define door_config_data         ASSET_DATA(ASSET_MAPS_DOOR_CONFIG_TABLE_BIN)
@@ -52,7 +52,7 @@
 #define screen_transition_config ((const ScreenTransitionConfig *)ASSET_DATA(ASSET_MAPS_SCREEN_TRANSITION_CONFIG_BIN))
 #define screen_transition_config_size ASSET_SIZE(ASSET_MAPS_SCREEN_TRANSITION_CONFIG_BIN)
 
-/* ROM address of DOOR_CONFIG_ENTRY_0 — needed to convert ROM pointers
+/* ROM address of DOOR_CONFIG_ENTRY_0, needed to convert ROM pointers
  * in door_pointer_table to offsets into door_config_data. */
 #define DOOR_CONFIG_BASE_ADDR  0xCF264Fu
 
@@ -61,7 +61,7 @@
  * i.e. offsets from $CF0000. */
 #define DOOR_DATA_BANK_BASE    0xCF0000u
 
-/* (SCREEN_TRANSITION_ENTRY_SIZE removed — ScreenTransitionConfig struct used instead) */
+/* (SCREEN_TRANSITION_ENTRY_SIZE removed, ScreenTransitionConfig struct used instead) */
 
 /* ---- Door direction offset tables ----
  * Port of DIRECTION_X_OFFSET_TABLE / DIRECTION_Y_OFFSET_TABLE
@@ -81,12 +81,12 @@ static const uint16_t door_dest_direction_table[4] = { 4, 0, 2, 6 };
 
 #include "game_main.h"
 
-/* ---- Globals ---- */
+/* Globals */
 DoorState dr;
 
 /* Transition scroll state and door interactions now in DoorState dr (door.h). */
 
-/* ---- Data loading ---- */
+/* Data loading */
 
 
 const uint8_t *get_door_data_entry(uint16_t door_found_offset) {
@@ -97,7 +97,7 @@ const uint8_t *get_door_data_entry(uint16_t door_found_offset) {
     return door_data_buf + door_found_offset;
 }
 
-/* ---- FIND_DOOR_AT_POSITION (C07477) ---- */
+/* FIND_DOOR_AT_POSITION (C07477) */
 
 uint8_t find_door_at_position(uint16_t x_tile, uint16_t y_tile) {
     /* Assembly lines 14-29: calculate sector index and look up pointer.
@@ -147,7 +147,7 @@ uint8_t find_door_at_position(uint16_t x_tile, uint16_t y_tile) {
     return 0xFF;
 }
 
-/* ---- CHECK_DOOR_EVENT_FLAG (C06A1B) ---- */
+/* CHECK_DOOR_EVENT_FLAG (C06A1B) */
 
 static void check_door_event_flag(uint16_t door_offset) {
     const uint8_t *door = get_door_data_entry(door_offset & 0x7FFF);
@@ -175,11 +175,11 @@ static void check_door_event_flag(uint16_t door_offset) {
     }
 }
 
-/* ---- TRY_ACTIVATE_DOOR (C06ACA) ---- */
+/* TRY_ACTIVATE_DOOR (C06ACA) */
 
 static void try_activate_door(uint16_t door_offset) {
     /* Assembly lines 10-19: guard conditions.
-     * LOG_WARN'd on each bail-out -- diagnostic added while chasing a
+     * LOG_WARN'd on each bail-out, diagnostic added while chasing a
      * report of a specific door being completely unresponsive (walking
      * into it does nothing, not even a "locked" message). Pinned the
      * report down to this first guard via live reproduction (not just
@@ -188,10 +188,10 @@ static void try_activate_door(uint16_t door_offset) {
      * line-for-line identical (update_joypad_state.asm: increments on a
      * fresh button-press edge; update_overworld_frame.asm: set to 1 if
      * leader_moved was true; door_transition.asm: zeroed when a door
-     * transition finishes) -- so this isn't a transcription bug. The
+     * transition finishes), so this isn't a transcription bug. The
      * deadlock is structural: PROCESS_DOOR_AT_TILE always returns 0 for a
      * DOOR_TYPE_2 door regardless of whether activation succeeds (by
-     * design -- the player's sprite never walks *into* a door, the screen
+     * design, the player's sprite never walks *into* a door, the screen
      * transition handles "through" separately), which forces
      * leader_moved back to 0 the instant the player touches one. If the
      * player is boxed in tightly enough that literally no movement can
@@ -199,13 +199,13 @@ static void try_activate_door(uint16_t door_offset) {
      * leader_moved never gets a true reading to propagate, and holding a
      * direction generates no further button-press *edges* to fall back
      * on (SDL's key-repeat and a real controller's poll both look like a
-     * continuous hold, not repeated fresh presses) -- so the flag can get
+     * continuous hold, not repeated fresh presses), so the flag can get
      * stuck at 0 indefinitely for exactly as long as the player holds
      * still against the door. Reproduced live against multiple doors this
      * way, 100% of attempts, for as long as the direction was held.
      *
      * This is a genuine deadlock in a mechanism the original ROM also
-     * has, not a C-port-introduced divergence -- but it's also a real,
+     * has, not a C-port-introduced divergence, but it's also a real,
      * reported, reproducible bug at a specific in-game door, so rather
      * than leave it as "faithful but broken," widen this ONE guard site
      * (verified the only reader of this flag anywhere in the codebase --
@@ -250,7 +250,7 @@ static void try_activate_door(uint16_t door_offset) {
     clear_party_sprite_hide_flags();
 }
 
-/* ---- SET_WALKING_STYLE_STAIRS (C070CB) ---- */
+/* SET_WALKING_STYLE_STAIRS (C070CB) */
 
 static void set_walking_style_stairs(uint16_t door_offset) {
     /* Assembly lines 6-10: if already on stairs (7 or 8), skip */
@@ -284,20 +284,20 @@ static void set_walking_style_stairs(uint16_t door_offset) {
  *   ESCALATOR_OFFSET_TABLE      (asm/data/unknown/C06E02.asm)
  * ==================================================================== */
 
-/* ESCALATOR_OFFSET_TABLE — 4 escalator types × 3 parameter groups.
+/* ESCALATOR_OFFSET_TABLE: 4 escalator types × 3 parameter groups.
  * [0-3]: entry X offsets, [4-7]: exit X offsets, [8-11]: movement directions.
  * Indexed by (high byte of DOOR_FOUND, after XBA+AND+ASL). */
 static const uint16_t escalator_entry_x_offsets[4] = { 0x08, 0x00, 0x00, 0x08 };
 static const uint16_t escalator_exit_x_offsets[4]  = { 0x00, 0x08, 0x00, 0x08 };
 static const uint16_t escalator_directions[4]      = { 0x06, 0x02, 0x06, 0x02 };
 
-/* Escalator target coordinates — saved for callback use */
+/* Escalator target coordinates, saved for callback use */
 static uint16_t escalator_new_x;
 static uint16_t escalator_new_y;
 /* Flag set when entering/exiting escalator (assembly: UNREAD_7E5DBA) */
 static uint16_t escalator_stair_active;
 
-/* START_ESCALATOR_MOVEMENT callback — port of C06E2C.asm.
+/* START_ESCALATOR_MOVEMENT callback, port of C06E2C.asm.
  * Sets walking_style to ESCALATOR, snaps leader to target coords. */
 static void start_escalator_movement_callback(void) {
     game_state.walking_style = 12;  /* WALKING_STYLE::ESCALATOR */
@@ -308,7 +308,7 @@ static void start_escalator_movement_callback(void) {
     game_state.leader_x_frac = 0;
 }
 
-/* FINISH_ESCALATOR_MOVEMENT callback — port of C06E4A.asm.
+/* FINISH_ESCALATOR_MOVEMENT callback, port of C06E4A.asm.
  * Clears escalator state and snaps leader to target coords. */
 static void finish_escalator_movement_callback(void) {
     ow.stairs_direction = 0xFFFF;
@@ -321,7 +321,7 @@ static void finish_escalator_movement_callback(void) {
     game_state.leader_x_frac = 0;
 }
 
-/* HANDLE_ESCALATOR_MOVEMENT — port of C06E6E.asm.
+/* HANDLE_ESCALATOR_MOVEMENT: port of C06E6E.asm.
  * Called when stepping onto a DOOR_TYPE_3 tile.
  * door_val: DOOR_FOUND value (bit 15 = exit, bits 8-9 = escalator variant).
  * tile_x, tile_y: door tile coordinates. */
@@ -335,7 +335,7 @@ static void handle_escalator_movement(uint16_t door_val,
     uint16_t tile_y_px = tile_y << 3;
 
     if (door_val & 0x8000) {
-        /* ---- EXIT ESCALATOR ---- */
+        /* EXIT ESCALATOR */
         /* Assembly lines 37-40: check if on escalator */
         if (game_state.walking_style != 12)  /* ESCALATOR */
             return;
@@ -370,7 +370,7 @@ static void handle_escalator_movement(uint16_t door_val,
         ow.escalator_entrance_direction = 0;
         escalator_stair_active = 1;
     } else {
-        /* ---- ENTER ESCALATOR ---- */
+        /* ENTER ESCALATOR */
         if (game_state.walking_style == 12)  /* already on escalator */
             return;
 
@@ -417,10 +417,10 @@ static void handle_escalator_movement(uint16_t door_val,
  *   HANDLE_STAIRS_LEAVE          (asm/overworld/door/handle_stairs_leave.asm)
  *
  * Stair data tables (from asm/data/unknown/C3E200-C3E228):
- *   STAIRS_DIRECTION_TABLE       — diagonal movement direction per variant
- *   STAIRS_FACING_DIRECTION_TABLE— exit facing direction
- *   STAIRS_ENTER_Y/X_OFFSET_TABLE— entry pixel offsets
- *   STAIRS_EXIT_Y/X_OFFSET_TABLE — exit pixel offsets
+ *   STAIRS_DIRECTION_TABLE: diagonal movement direction per variant
+ *   STAIRS_FACING_DIRECTION_TABLE, exit facing direction
+ *   STAIRS_ENTER_Y/X_OFFSET_TABLE, entry pixel offsets
+ *   STAIRS_EXIT_Y/X_OFFSET_TABLE, exit pixel offsets
  * ==================================================================== */
 
 /* 4 stair variants, indexed by variant byte (0-3).
@@ -440,11 +440,11 @@ static const uint16_t stairs_exit_x_adj[4]            = { 8, 0, 8, 0 };
 /* Assembly STAIRS_EXIT_X_OFFSET → added to tile_y_px → STAIRS_NEW_Y */
 static const uint16_t stairs_exit_y_adj[4]            = { 8, 8, 0, 0 };
 
-/* Stairs target coordinates — saved for callback use */
+/* Stairs target coordinates, saved for callback use */
 static uint16_t stairs_new_x;
 static uint16_t stairs_new_y;
 
-/* ---- Savestate snapshot (see DoorTransitionSaveState in door.h) ---- */
+/* Savestate snapshot (see DoorTransitionSaveState in door.h) */
 void door_transition_savestate_pack(void *out) {
     DoorTransitionSaveState *s = (DoorTransitionSaveState *)out;
     s->escalator_new_x = escalator_new_x;
@@ -461,7 +461,7 @@ void door_transition_savestate_unpack(const void *in) {
     stairs_new_y    = s->stairs_new_y;
 }
 
-/* GET_STAIRS_MOVEMENT_DIRECTION — port of C0705F.asm.
+/* GET_STAIRS_MOVEMENT_DIRECTION: port of C0705F.asm.
  * Checks if the leader is facing a valid direction to enter stairs.
  * Sets ow.auto_movement_direction.
  * Returns 0 if allowed (proceed with entry), non-zero if blocked. */
@@ -499,7 +499,7 @@ static uint16_t get_stairs_movement_direction(uint16_t door_val) {
         ow.auto_movement_direction = 2;
         break;
     default:
-        return 1;  /* unknown variant — blocked */
+        return 1;  /* unknown variant, blocked */
     }
 
     return result;
@@ -509,7 +509,7 @@ static uint16_t get_stairs_movement_direction(uint16_t door_val) {
 static void handle_stairs_enter_callback(void);
 static void handle_stairs_leave_callback(void);
 
-/* HANDLE_STAIRS_MOVEMENT — port of C070CB.asm.
+/* HANDLE_STAIRS_MOVEMENT: port of C070CB.asm.
  * Called when stepping onto a DOOR_TYPE_4 tile.
  * door_val: DOOR_FOUND value (high byte = variant 0-3).
  * tile_x, tile_y: door tile coordinates. */
@@ -527,13 +527,13 @@ static void handle_stairs_movement(uint16_t door_val,
     uint16_t tile_y_px = tile_y << 3;
 
     if (game_state.walking_style == 0) {
-        /* ---- ENTERING STAIRS ---- */
+        /* ENTERING STAIRS */
 
         /* Check if leader direction allows entering.
          * Assembly passes full door_val (TXA) to GET_STAIRS_MOVEMENT_DIRECTION. */
         uint16_t result = get_stairs_movement_direction(door_val);
         if (result != 0)
-            return;  /* blocked — wrong direction */
+            return;  /* blocked, wrong direction */
 
         /* Set leader to auto-movement direction */
         game_state.leader_direction = ow.auto_movement_direction;
@@ -568,7 +568,7 @@ static void handle_stairs_movement(uint16_t door_val,
         /* Schedule enter callback */
         schedule_overworld_task(handle_stairs_enter_callback, steps);
     } else {
-        /* ---- LEAVING STAIRS ---- */
+        /* LEAVING STAIRS */
 
         /* Calculate exit target position.
          * Same pattern: EXIT_Y_OFFSET → tile_x, EXIT_X_OFFSET → tile_y */
@@ -595,7 +595,7 @@ static void handle_stairs_movement(uint16_t door_val,
     queue_auto_movement_step();
 }
 
-/* HANDLE_STAIRS_ENTER callback — port of C06F82.asm.
+/* HANDLE_STAIRS_ENTER callback, port of C06F82.asm.
  * Checks if leader has reached the stair entry point.
  * If yes, sets walking_style to STAIRS and snaps coords.
  * If no, reschedules for 1 more frame. */
@@ -623,12 +623,12 @@ static void handle_stairs_enter_callback(void) {
         game_state.leader_y_frac = 0;
         game_state.leader_x_frac = 0;
     } else {
-        /* Not reached — try again next frame */
+        /* Not reached, try again next frame */
         schedule_overworld_task(handle_stairs_enter_callback, 1);
     }
 }
 
-/* HANDLE_STAIRS_LEAVE callback — port of C06FED.asm.
+/* HANDLE_STAIRS_LEAVE callback, port of C06FED.asm.
  * Checks if leader has reached the stair exit point.
  * If yes, clears stairs state and snaps coords.
  * If no, reschedules for 1 more frame. */
@@ -663,15 +663,15 @@ static void handle_stairs_leave_callback(void) {
     }
 }
 
-/* ---- PROCESS_DOOR_AT_TILE (C07526) ---- */
+/* PROCESS_DOOR_AT_TILE (C07526) */
 
 uint16_t process_door_at_tile(uint16_t x_tile, uint16_t y_tile) {
     uint8_t door_type = find_door_at_position(x_tile, y_tile);
 
     /* Diagnostic added while chasing a report of a specific door being
-     * completely unresponsive -- see try_activate_door()'s doc comment.
+     * completely unresponsive, see try_activate_door()'s doc comment.
      * Logs the resolved door_type/offset for every actual door hit (not
-     * every ladder-tile scan -- find_door_at_position() already returns
+     * every ladder-tile scan, find_door_at_position() already returns
      * 0xFF for "no door here", the overwhelmingly common case, which this
      * skips) so a tester's log pinpoints whether a "dead" door is even
      * being *found* with the expected type, vs. found-but-blocked inside
@@ -707,11 +707,11 @@ uint16_t process_door_at_tile(uint16_t x_tile, uint16_t y_tile) {
         break;
     case DOOR_TYPE_5:
     case DOOR_TYPE_7:
-        /* DOOR_HANDLER_NOP — no-op */
+        /* DOOR_HANDLER_NOP: no-op */
         result = 0;
         break;
     case DOOR_TYPE_6:
-        /* DOOR_HANDLER_TYPE6 — no-op */
+        /* DOOR_HANDLER_TYPE6: no-op */
         result = 0;
         break;
     default:
@@ -722,7 +722,7 @@ uint16_t process_door_at_tile(uint16_t x_tile, uint16_t y_tile) {
     return result;
 }
 
-/* ---- CHECK_DOOR_IN_DIRECTION (C065C2) ---- */
+/* CHECK_DOOR_IN_DIRECTION (C065C2) */
 
 void check_door_in_direction(uint16_t direction) {
     /* Assembly lines 9-19: compute tile position with direction offset */
@@ -732,7 +732,7 @@ void check_door_in_direction(uint16_t direction) {
     uint16_t tile_y = (game_state.leader_y_coord >> 3)
                      + door_dir_y_offsets[dir_idx];
 
-    /* Assembly lines 28-31: special case for LEFT (direction 6) — decrement x */
+    /* Assembly lines 28-31: special case for LEFT (direction 6), decrement x */
     if (direction == 6) {
         tile_x--;
     }
@@ -759,7 +759,7 @@ void check_door_in_direction(uint16_t direction) {
     }
 }
 
-/* ---- CHECK_DOOR_NEAR_LEADER (C4334A) ---- */
+/* CHECK_DOOR_NEAR_LEADER (C4334A) */
 
 void check_door_near_leader(uint16_t direction) {
     /* Assembly lines 16-45: compute tile position */
@@ -826,7 +826,7 @@ static void init_transition_scroll_velocity(uint16_t speed,
     dr.transition_y_velocity = 0;
 
     if (speed != 0) {
-        /* Assembly: ADC #$0080 / AND #$00FF — add 128 (180°) to byte angle */
+        /* Assembly: ADC #$0080 / AND #$00FF, add 128 (180°) to byte angle */
         uint8_t angle = (uint8_t)((direction_x4 + 0x80) & 0xFF);
 
         /* COSINE_SINE returns speed * sin(angle) in 8.8 fixed point.
@@ -934,7 +934,7 @@ StepResult mode_step_screen_transition(ModeState *st) {
         case ST_ENTER_BODY:
             if (s->frame >= s->duration) {
                 /* asm lines 228-230: finalize palette fade (palette mode only),
-                 * then done — no extra yield (matches the loop falling through). */
+                 * then done, no extra yield (matches the loop falling through). */
                 if (s->enter_mode == 0) {
                     finalize_palette_fade();
                 }
@@ -1103,13 +1103,13 @@ static void screen_transition_finalize(void) {
     ow.ladder_stairs_tile_x = 0;
 }
 
-/* The blocking screen_transition() pump bridge was deleted in D4b. Its callers —
+/* The blocking screen_transition() pump bridge was deleted in D4b. Its callers, 
  * door transitions (mode_step_door_transition) and the script/debug teleport
- * sequence (mode_step_teleport_to) — sequence screen_transition_prepare / STEP_PUSH
+ * sequence (mode_step_teleport_to), sequence screen_transition_prepare / STEP_PUSH
  * GAME_MODE_SCREEN_TRANSITION / screen_transition_finalize() themselves so the
  * transition lives on the mode stack. */
 
-/* ---- GET_SCREEN_TRANSITION_SOUND_EFFECT ---- */
+/* GET_SCREEN_TRANSITION_SOUND_EFFECT */
 
 uint16_t get_screen_transition_sound_effect(uint16_t transition_id,
                                              uint16_t get_start) {
@@ -1118,7 +1118,7 @@ uint16_t get_screen_transition_sound_effect(uint16_t transition_id,
     return get_start ? cfg->start_sound_effect : cfg->ending_sound_effect;
 }
 
-/* ---- PROCESS_DOOR_INTERACTIONS (C06B3D) ---- */
+/* PROCESS_DOOR_INTERACTIONS (C06B3D) */
 
 void process_door_interactions(void) {
     /* Phase 1: drain current interaction queue, saving type-10 (door text)
@@ -1155,15 +1155,15 @@ void process_door_interactions(void) {
     }
 }
 
-/* ---- DOOR_TRANSITION (door_transition.asm) ---- */
+/* DOOR_TRANSITION (door_transition.asm) */
 
-/* GAME_MODE_DOOR_TRANSITION step — run-to-completion port of door_transition().
+/* GAME_MODE_DOOR_TRANSITION step, run-to-completion port of door_transition().
  * The door-data scalars are hoisted at DTR_BEGIN so no ROM pointer crosses a
  * yield; the optional door text and the two screen_transition() calls are
  * STEP_PUSHed (the latter via screen_transition_prepare/_finalize). The internal
  * for(;;) lets the no-push branches fall through with no extra yield, matching
  * the blocking original's zero-yield gaps between sections. load_map_at_position()
- * runs inline — in the normal path the preceding screen_transition already
+ * runs inline, in the normal path the preceding screen_transition already
  * completed the fade so its wait_for_fade_complete() returns without yielding;
  * the disabled_transitions branch leaves it as a deferred blocking helper. */
 StepResult mode_step_door_transition(ModeState *ms) {
@@ -1245,7 +1245,7 @@ StepResult mode_step_door_transition(ModeState *ms) {
              * render runs as GAME_MODE_WAIT_FRAMES; the transition setup + push
              * happen at DTR_EXIT_PREPARE on its pop. The validity check matches
              * screen_transition_prepare()'s early return, which originally ran
-             * BEFORE the disable — an invalid type must not strand entities
+             * BEFORE the disable, an invalid type must not strand entities
              * disabled (no transition would re-enable them). */
             if (st->transition_type >= SCREEN_TRANSITION_CONFIG_COUNT)
                 continue;  /* invalid type: no disable, no wait (phase = DTR_AFTER_OUT) */
@@ -1300,7 +1300,7 @@ StepResult mode_step_door_transition(ModeState *ms) {
             flush_entity_creation_queue();
 
             /* Assembly lines 172-181: play transition-in sound effect.
-             * SFX 0 means "no ending SFX" — skip play_sfx(0) to avoid stopping the
+             * SFX 0 means "no ending SFX", skip play_sfx(0) to avoid stopping the
              * start SFX prematurely. */
             uint16_t sfx_out = get_screen_transition_sound_effect(st->transition_type, 0);
             if (sfx_out != 0)
@@ -1353,16 +1353,16 @@ StepResult mode_step_door_transition(ModeState *ms) {
     }
 }
 
-/* ---- TELEPORT (teleport.asm) ---- */
+/* TELEPORT (teleport.asm) */
 
-/* GAME_MODE_TELEPORT_TO step — run-to-completion port of the TELEPORT sequence used
+/* GAME_MODE_TELEPORT_TO step, run-to-completion port of the TELEPORT sequence used
  * by CC_1F_21 (the display_text TELEPORT_TO command) and the debug menu's CAST/STAFF
  * teleport-back. It mirrors mode_step_door_transition's structure: only the
  * destination id is carried (re-resolved each step via get_teleport_dest, so no ROM
  * pointer crosses a yield), the two screen_transition() calls are STEP_PUSHed via
  * screen_transition_prepare/_finalize, and spawn_buzz_buzz's check text is a
  * DISPLAY_TEXT push (the spawns run at TT_BUZZ_DONE). load_map_at_position() runs
- * inline — the preceding transition's fade has completed so its wait returns without
+ * inline, the preceding transition's fade has completed so its wait returns without
  * yielding (the disabled_transitions branch leaves it a deferred blocking helper).
  * The for(;;) lets the no-push branches fall through with no extra yield, matching
  * the blocking original's zero-yield gaps. */
@@ -1480,7 +1480,7 @@ StepResult mode_step_teleport_to(ModeState *ms) {
             continue;
 
         case TT_FINALIZE: {
-            /* Reset stairs direction (line 145); SPAWN_BUZZ_BUZZ (line 146) — its
+            /* Reset stairs direction (line 145); SPAWN_BUZZ_BUZZ (line 146), its
              * check text is a DISPLAY_TEXT push, the delivery spawns run at
              * TT_BUZZ_DONE (matches mode_step_door_transition's DTR_FINALIZE split).
              * An unresolvable address warns + falls through, as display_text_from_addr

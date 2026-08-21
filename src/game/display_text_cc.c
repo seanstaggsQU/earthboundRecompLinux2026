@@ -1,7 +1,7 @@
 /*
  * Display text control code handlers.
  *
- * Extracted from display_text.c — all cc_* functions that handle
+ * Extracted from display_text.c, all cc_* functions that handle
  * text script control codes (0x03-0x1F dispatchers and sub-handlers).
  */
 #include "game/display_text.h"
@@ -68,9 +68,9 @@ void cc_clear_event_flag(ScriptReader *r) {
  * mode_step_text_delay) still live below. */
 
 
-/* --- CC 0x1F tree handlers (attract mode) --- */
+/* CC 0x1F tree handlers (attract mode) */
 
-/* CC_1F_11: ADD_PARTY_MEMBER — 1 arg byte
+/* CC_1F_11: ADD_PARTY_MEMBER, 1 arg byte
  *
  * Port of CC_1F_11 (asm/text/ccs/party_member_add.asm).
  * Reads char_id arg (0 → argument_memory).
@@ -88,7 +88,7 @@ static void cc_1f_add_party_member(ScriptReader *r) {
 }
 
 
-/* CC_1F_15: GENERATE_ACTIVE_SPRITE — 5 arg bytes (word, word, byte)
+/* CC_1F_15: GENERATE_ACTIVE_SPRITE, 5 arg bytes (word, word, byte)
  *
  * Port of CC_1F_15 (asm/text/ccs/create_entity_sprite.asm).
  * Gathers 5 argument bytes: sprite_id (word), script_id (word), param (byte).
@@ -127,7 +127,7 @@ static void cc_1f_generate_active_sprite(ScriptReader *r) {
 }
 
 
-/* CC_1F_16: CHANGE_TPT_ENTRY_DIRECTION — 3 arg bytes (word, byte)
+/* CC_1F_16: CHANGE_TPT_ENTRY_DIRECTION, 3 arg bytes (word, byte)
  *
  * Port of CC_1F_16 (asm/text/ccs/set_tpt_direction.asm) →
  * SET_NPC_DIRECTION (C462FF).
@@ -148,7 +148,7 @@ static void cc_1f_change_tpt_direction(ScriptReader *r) {
 
 
 
-/* CC_1F_E5: SET_PLAYER_LOCK — 1 arg byte
+/* CC_1F_E5: SET_PLAYER_LOCK, 1 arg byte
  * Port of CC_1F_E5 (asm/text/ccs/set_player_movement_lock.asm).
  * Calls DISABLE_CHARACTER_MOVEMENT with the arg byte as char_id.
  * 0xFF = all party + init entity. */
@@ -158,7 +158,7 @@ static void cc_1f_set_player_lock(ScriptReader *r) {
 }
 
 
-/* CC_1F_E8: RESTRICT_PLAYER_MOVEMENT — 1 arg byte
+/* CC_1F_E8: RESTRICT_PLAYER_MOVEMENT, 1 arg byte
  * Port of CC_1F_E8 (asm/text/ccs/set_player_movement_lock_if_camera_refocused.asm).
  * Calls ENABLE_CHARACTER_MOVEMENT with the arg byte as char_id.
  * 0xFF = all party + init entity. */
@@ -168,7 +168,7 @@ static void cc_1f_restrict_player_movement(ScriptReader *r) {
 }
 
 
-/* CC_1F_EB: MAKE_INVISIBLE — 2 arg bytes (char_id, fade_param)
+/* CC_1F_EB: MAKE_INVISIBLE, 2 arg bytes (char_id, fade_param)
  *
  * Port of CC_1F_EB (asm/text/ccs/set_character_invisibility.asm) →
  * HIDE_ENTITY_SPRITES (asm/overworld/entity/hide_entity_sprites.asm).
@@ -213,7 +213,7 @@ static void cc_1f_make_visible(ScriptReader *r) {
 }
 
 
-/* CC_1F_EF: SET_CAMERA_FOCUS_BY_SPRITE_ID — 2 arg bytes (word)
+/* CC_1F_EF: SET_CAMERA_FOCUS_BY_SPRITE_ID, 2 arg bytes (word)
  *
  * Port of CC_1F_EF (asm/text/ccs/unknown_1F_EF.asm) →
  * SET_CAMERA_FOCUS_BY_SPRITE_ID (C466A8).
@@ -235,7 +235,7 @@ static void cc_1f_set_camera_focus(ScriptReader *r) {
 }
 
 
-/* CC_1F_F0: RIDE_BICYCLE — 0 arg bytes
+/* CC_1F_F0: RIDE_BICYCLE, 0 arg bytes
  * Port of tree_1F.asm @UNKNOWN145 → GET_ON_BICYCLE (asm/overworld/get_on_bicycle.asm).
  * Mounts the bicycle for the party leader. */
 static void cc_1f_ride_bicycle(ScriptReader *r) {
@@ -244,7 +244,7 @@ static void cc_1f_ride_bicycle(ScriptReader *r) {
 }
 
 
-/* CC_1F_F1: SET_TPT_MOVEMENT_CODE — 4 arg bytes (word, word)
+/* CC_1F_F1: SET_TPT_MOVEMENT_CODE, 4 arg bytes (word, word)
  *
  * Port of CC_1F_F1 (asm/text/ccs/set_tpt_entity_movement.asm) →
  * SET_TPT_ENTITY_SCRIPT.
@@ -259,7 +259,7 @@ static void cc_1f_set_tpt_movement(ScriptReader *r) {
 }
 
 
-/* CC_1F_F2: SET_SPRITE_MOVEMENT_CODE — 4 arg bytes (word, word) */
+/* CC_1F_F2: SET_SPRITE_MOVEMENT_CODE, 4 arg bytes (word, word) */
 static void cc_1f_set_sprite_movement(ScriptReader *r) {
     uint16_t sprite_id = script_read_word(r);
     uint16_t script_id = script_read_word(r);
@@ -278,14 +278,14 @@ static void cc_1f_set_sprite_movement(ScriptReader *r) {
  *   Teleport (0x20-0x21), Window/font (0x30-0x31), Event/input (0x41, 0x50-0x52),
  *   Map/movement (0x60-0x69), Combat (0x23), E-range (0xE1-0xF4). */
 /* ---------------------------------------------------------------------------
- * GAME_MODE_NUMBER_SELECT — interactive multi-digit number entry.
+ * GAME_MODE_NUMBER_SELECT: interactive multi-digit number entry.
  *
  * Run-to-completion port of the former blocking loop in CC 0x52 (NUM_SELECT_
  * PROMPT). The two-level render/input loop becomes a three-phase state machine
  * (see NumberSelectPhase): one render frame, one "prime" frame, then per-frame
  * input handling. pump_mode owns the single yield. The phase split reproduces
- * the original's exact input timing (a render is followed by two yields — the
- * window_tick yield and the first input-loop yield — before the first read).
+ * the original's exact input timing (a render is followed by two yields, the
+ * window_tick yield and the first input-loop yield, before the first read).
  * ------------------------------------------------------------------------- */
 
 /* NS_RENDER body (drawing only): draw the digits at the saved cursor position.
@@ -321,7 +321,7 @@ static void ns_draw_digits(NumberSelectState *st) {
 /* Draw the digits and run the one window_tick frame, then advance to NS_PRIME.
  * On a parked actionscript frame, flush=1 + STEP_PUSH ACTIONSCRIPT_FRAME (the
  * mode resumes the render at the flush handler). Shared by NS_RENDER and every
- * input branch that re-renders — the head of the former outer loop. */
+ * input branch that re-renders, the head of the former outer loop. */
 static StepResult ns_render_tick(NumberSelectState *st) {
     ns_draw_digits(st);
     if (window_tick_work_step()) {
@@ -427,7 +427,7 @@ StepResult mode_step_number_select(ModeState *ms) {
 }
 
 /* ---------------------------------------------------------------------------
- * GAME_MODE_TEXT_DELAY — fixed frame-count typing pause (CC 0x1F 0x60).
+ * GAME_MODE_TEXT_DELAY: fixed frame-count typing pause (CC 0x1F 0x60).
  *
  * Run-to-completion port of the TEXT_SPEED_DELAY loop: render
  * dt.text_speed_based_wait frames via update_hppp_meter_work(), breaking early
@@ -476,7 +476,7 @@ StepResult mode_step_text_delay(ModeState *ms) {
 }
 
 /* ---------------------------------------------------------------------------
- * GAME_MODE_ACTIONSCRIPT_WAIT — wait for an entity actionscript (CC 0x1F 0x61).
+ * GAME_MODE_ACTIONSCRIPT_WAIT: wait for an entity actionscript (CC 0x1F 0x61).
  *
  * Run-to-completion port of WAIT_FOR_ACTIONSCRIPT: an initial window_tick_work()
  * frame renders open windows, then render_frame_tick_work() runs each frame until
@@ -525,7 +525,7 @@ StepResult mode_step_actionscript_wait(ModeState *ms) {
 }
 
 /* ---------------------------------------------------------------------------
- * GAME_MODE_TEXT_PROMPT — text-advance wait with optional blinking triangle.
+ * GAME_MODE_TEXT_PROMPT: text-advance wait with optional blinking triangle.
  *
  * Run-to-completion port of cc_halt (halt.asm). See TextPromptPhase /
  * TextPromptState in mode_stack.h for the phase breakdown and the `primed`
@@ -540,7 +540,7 @@ StepResult mode_step_actionscript_wait(ModeState *ms) {
  * wait branch. Split out so a parked window_tick frame can run it on resume. */
 static StepResult tp_decide(TextPromptState *st) {
     /* Text-speed auto-advance shortcut (halt.asm 31-39): returns WITHOUT the
-     * resume-music teardown — it never set those flags. */
+     * resume-music teardown, it never set those flags. */
     if (!st->skip_text_speed && dt.blinking_triangle_flag && dt.text_speed_based_wait) {
         st->remaining = dt.text_speed_based_wait;
         st->primed = 0;
@@ -702,7 +702,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
     uint8_t sub = script_read_byte(r);
 
     switch (sub) {
-    /* --- Audio commands --- */
+    /* Audio commands */
     case 0x00: {
         /* PLAY_MUSIC: 2 args (slot, track_id).
          * Port of CC_1F_00 (asm/text/ccs/play_music.asm) → SET_MAP_MUSIC.
@@ -774,7 +774,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         break;
     }
 
-    /* --- Party/character commands --- */
+    /* Party/character commands */
     case 0x11: cc_1f_add_party_member(r); break;          /* ADD_PARTY_MEMBER: 1 arg */
     case 0x12: {
         /* REMOVE_PARTY_MEMBER: 1 arg byte (char_id).
@@ -840,7 +840,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         break;
     }
 
-    /* --- Entity/sprite commands --- */
+    /* Entity/sprite commands */
     case 0x15: cc_1f_generate_active_sprite(r); break;    /* GENERATE_ACTIVE_SPRITE: 5 args */
     case 0x16: cc_1f_change_tpt_direction(r); break;      /* CHANGE_TPT_ENTRY_DIRECTION: 3 args */
     case 0x17: {
@@ -970,7 +970,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         return true;
     }
 
-    /* --- Misc commands (0x40, 0x81, 0x90) --- */
+    /* Misc commands (0x40, 0x81, 0x90) */
     case 0x40: script_read_byte(r); script_read_byte(r); break; /* NOP_1F_40: 2 args (intentional no-op, asm/text/ccs/nop_1f_40.asm) */
     case 0x81: {
         /* TEST_CHARACTER_CAN_EQUIP_ITEM: 2 args (char_id, item_id).
@@ -999,7 +999,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         return true;
     }
 
-    /* --- Font commands --- */
+    /* Font commands */
     case 0x30:
     case 0x31: {
         /* USE_NORMAL_FONT / USE_MR_SATURN_FONT: 0 args each.
@@ -1014,7 +1014,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         break;
     }
 
-    /* --- Event/input commands --- */
+    /* Event/input commands */
     case 0x41: {
         /* TRIGGER_SPECIAL_EVENT: 1 arg byte (event_id).
          * Port of CC_1F_41 (asm/text/ccs/trigger_special_event.asm). The 18-case
@@ -1080,7 +1080,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         return true;
     }
 
-    /* --- Map/movement commands --- */
+    /* Map/movement commands */
     case 0x60: {
         /* TEXT_SPEED_DELAY: 0 args.
          * Port of CC_1F_60 (asm/text/ccs/unknown_1F_60.asm) → TEXT_SPEED_DELAY
@@ -1127,7 +1127,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         break;
     }
     case 0x63: {
-        /* SCREEN_RELOAD_PTR: 4 args — pointer to screen reload data.
+        /* SCREEN_RELOAD_PTR: 4 args, pointer to screen reload data.
          * Port of CC_1F_63 (asm/text/ccs/screen_reload_pointer.asm).
          * Disables all party+init entity movement, then queues a type-10
          * interaction (screen reload) with the given data pointer. */
@@ -1162,7 +1162,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         remove_char_from_party((uint16_t)game_state.party_npc_1);
         remove_char_from_party((uint16_t)game_state.party_npc_2);
         /* Restore NPC 1 if saved (assembly lines 18-28).
-         * NPC2 is nested inside NPC1 check — if npc_1_copy == 0, both skip. */
+         * NPC2 is nested inside NPC1 check, if npc_1_copy == 0, both skip. */
         if (game_state.party_npc_1_id_copy != 0) {
             game_state.party_npc_1 = game_state.party_npc_1_id_copy;
             add_char_to_party((uint16_t)game_state.party_npc_1);
@@ -1243,7 +1243,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         break;
     }
 
-    /* --- Misc commands --- */
+    /* Misc commands */
     case 0x71: {
         /* LEARN_SPECIAL_PSI: 2 args (unused, psi_type).
          * Port of CC_1F_71 (asm/text/ccs/learn_special_psi.asm).
@@ -1273,7 +1273,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
     case 0xA0:
         /* SET_INTERACTING_EVENT_FLAG_ON: 0 args.
          * Port of tree_1F.asm @UNKNOWN122.
-         * SET_CURRENT_INTERACTING_EVENT_FLAG(1) — sets the event flag
+         * SET_CURRENT_INTERACTING_EVENT_FLAG(1): sets the event flag
          * identified by dt.current_interacting_event_flag to 1.
          * Assembly also calls SET_NPC_DIRECTION_FROM_EVENT_FLAG(INTERACTING_NPC_ENTITY). */
         if (dt.current_interacting_event_flag != 0) {
@@ -1290,7 +1290,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
     case 0xA1:
         /* SET_INTERACTING_EVENT_FLAG_OFF: 0 args.
          * Port of tree_1F.asm @UNKNOWN123.
-         * SET_CURRENT_INTERACTING_EVENT_FLAG(0) — clears the event flag
+         * SET_CURRENT_INTERACTING_EVENT_FLAG(0): clears the event flag
          * identified by dt.current_interacting_event_flag.
          * Assembly also calls SET_NPC_DIRECTION_FROM_EVENT_FLAG(INTERACTING_NPC_ENTITY). */
         if (dt.current_interacting_event_flag != 0) {
@@ -1323,7 +1323,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         save_game(current_save_slot - 1);
         break;
 
-    /* --- JUMP_MULTI2: variable length (1 byte count + N * 4 bytes) --- */
+    /* JUMP_MULTI2: variable length (1 byte count + N * 4 bytes) */
     case 0xC0: {
         /* Port of CC_1F_C0 (asm/text/ccs/jump_multi2.asm).
          * Like JUMP_MULTI (CC_09) but performs a gosub: calls DISPLAY_TEXT
@@ -1354,7 +1354,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         break;
     }
 
-    /* --- D-range commands --- */
+    /* D-range commands */
     case 0xD0: {
         /* TRY_FIX_ITEM: 1 arg (fix_probability, 0 → argument_memory).
          * Port of CC_1F_D0 (asm/text/ccs/try_fixing_items.asm).
@@ -1410,7 +1410,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
                 set_working_memory(10);
                 break;
             }
-            /* Close enough — compute direction from leader to truffle */
+            /* Close enough, compute direction from leader to truffle */
             int16_t dir = calculate_direction_8(leader_x, leader_y,
                                                  truffle_x, truffle_y);
             set_working_memory((uint32_t)(dir + 2));
@@ -1423,7 +1423,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
          * the prework (hide-flag clear, intangibility, spawning id) runs
          * inline, the camera-guy text is a DISPLAY_TEXT child push, and
          * save_photo_state(photo_id) runs in DT_RESUME_CC1F_PHOTO after it
-         * pops — the blocking order. Unresolvable address: warn + run the
+         * pops, the blocking order. Unresolvable address: warn + run the
          * whole blocking form inline (display_text_from_addr idiom). */
         uint8_t arg = script_read_byte(r);
         uint16_t photo_id = arg;
@@ -1452,7 +1452,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         break;
     }
 
-    /* --- E-range commands --- */
+    /* E-range commands */
     case 0xE1: {
         /* CHANGE_MAP_PALETTE: 3 args (tileset_combo, palette_index, fade_frames).
          * Port of CC_1F_E1 (asm/text/ccs/set_map_palette.asm) → LOAD_MAP_PALETTE.
@@ -1564,7 +1564,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
 
     default:
         /* Sub-codes 0xE2, 0xE3, 0xED are unused gaps in the assembly dispatch
-         * (tree_1F.asm).  They fall through to JMP @RETURN_NULL — no args consumed,
+         * (tree_1F.asm).  They fall through to JMP @RETURN_NULL, no args consumed,
          * no side-effects.  Any other unhandled code is a real bug. */
         if (sub != 0xE2 && sub != 0xE3 && sub != 0xED) {
             FATAL("display_text: unknown CC 1F %02X\n", sub);
@@ -1695,7 +1695,7 @@ bool cc_18_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         /* SELECTION_MENU_NO_CANCEL (despite confusing label in tree_18.asm): 4 args (dword).
          * Port of CC_18_08 (asm/text/ccs/selection_menu_allow_cancel.asm).
          * Assembly: TXA (window_id byte from stream); LDX #0 (allow_cancel=0);
-         *   JSR SELECTION_MENU_WITH_FOCUS — so NO cancel allowed.
+         *   JSR SELECTION_MENU_WITH_FOCUS, so NO cancel allowed.
          * Note: tree_18.asm labels it @SELECTION_MENU_ALLOW_CANCEL but code uses LDX #0.
          * The dword arg per textmacro EBTEXT_SELECTION_MENU_NO_CANCEL; handler only uses 1 byte
          * via gather mechanism but textmacro declares DWORD (4 bytes in stream).
@@ -1723,7 +1723,7 @@ bool cc_18_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         /* SELECTION_MENU_ALLOW_CANCEL (despite confusing label in tree_18.asm): 1 arg byte.
          * Port of CC_18_09 (asm/text/ccs/selection_menu_no_cancel.asm).
          * Assembly: TXA (window_id byte from stream); LDX #1 (allow_cancel=1);
-         *   JSR SELECTION_MENU_WITH_FOCUS — so ALLOW cancel (B button exits).
+         *   JSR SELECTION_MENU_WITH_FOCUS, so ALLOW cancel (B button exits).
          * SELECTION_MENU_WITH_FOCUS saves/restores text attributes and
          * temporarily sets focus to the specified window. */
         uint8_t window_id = script_read_byte(r);
@@ -1775,18 +1775,18 @@ bool cc_18_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
 /* Key Items pool feature, not part of the original ROM/assembly. Several
  * CC opcodes below inline the exact same raw
  * party_characters[char_id-1].items[slot-1] access that get_character_item()
- * (inventory.c) also implements, rather than calling that function -- so
+ * (inventory.c) also implements, rather than calling that function, so
  * they never picked up its KEY_ITEMS_POOL_USE_SLOT_SENTINEL handling (see
  * that constant's doc comment for the full rationale). Found live: "Key
  * to the Cabin"'s mid-script possession re-check (CC 0x19 sub 0x19,
  * ADD_ITEM_ID_TO_WORK_MEMORY, immediately below) always failed for a
- * pool-sourced item because of exactly this -- mode_step_use_item()
+ * pool-sourced item because of exactly this, mode_step_use_item()
  * (text.c) set the sentinel up correctly, but this opcode's own inline
  * copy of the lookup never checked for it.
  *
  * This wrapper just delegates to get_character_item(), which already
  * handles the sentinel *and* bounds-checks char_id/slot for the real-slot
- * case -- an earlier version of this wrapper hand-rolled its own
+ * case, an earlier version of this wrapper hand-rolled its own
  * duplicate bounds-checked array access instead of calling it, which
  * both duplicated that logic and left get_character_item()'s own
  * real-slot path unguarded for its *other*, non-wrapped callers. */
@@ -1834,7 +1834,7 @@ void cc_19_dispatch(ScriptReader *r) {
                 }
                 break;
             } else if (b == 0x02) {
-                /* Terminator without callback — ADD_MENU_OPTION(text, NULL) */
+                /* Terminator without callback, ADD_MENU_OPTION(text, NULL) */
                 label_buf[pos] = '\0';
                 WindowInfo *w = get_focus_window_info();
                 if (w) {
@@ -1843,7 +1843,7 @@ void cc_19_dispatch(ScriptReader *r) {
                 }
                 break;
             } else {
-                /* EB-encoded text byte — convert to ASCII for display */
+                /* EB-encoded text byte, convert to ASCII for display */
                 label_buf[pos++] = eb_char_to_ascii(b);
             }
         }
@@ -2130,7 +2130,7 @@ void cc_19_dispatch(ScriptReader *r) {
          * Computes direction from a sprite entity to any entity.
          * Calls GET_DIRECTION_BETWEEN_SPRITE_ENTITIES.
          * Result + 1 (1-8 direction) → argument_memory.
-         * NOTE: Fixed byte count — was incorrectly 4 in the stub, actually 5. */
+         * NOTE: Fixed byte count, was incorrectly 4 in the stub, actually 5. */
         uint16_t sprite_id_raw = script_read_word(r);
         uint8_t entity_type_arg = script_read_byte(r);
         uint16_t entity_id_raw = script_read_word(r);
@@ -2233,7 +2233,7 @@ bool cc_1a_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
          * Arguments: 4 x uint32_t text script pointers (one per party member,
          * used in battle mode for displaying character-specific text), followed
          * by 1 byte mode (1 = overworld selection menu, else = battle HPPP column
-         * selection — see party_character_selector's CMP #1; BNEL @BATTLE_MODE_PATH).
+         * selection, see party_character_selector's CMP #1; BNEL @BATTLE_MODE_PATH).
          *
          * Calls PARTY_CHARACTER_SELECTOR (C1244C.asm) with:
          *   A = pointer to script_ptrs, X = mode, Y = allow_cancel (0 or 1). */
@@ -2257,7 +2257,7 @@ bool cc_1a_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         /* Battle path (mode != 1): prepare the GAME_MODE_CHAR_SELECT init and
          * request a STEP_PUSH. The per-member text scripts are shown via the
          * char_select on_change (CS_ONCHANGE_PARTY_SELECT_SCRIPT), which itself
-         * STEP_PUSHes a DISPLAY_TEXT child — no C-stack pump remains. The chosen
+         * STEP_PUSHes a DISPLAY_TEXT child, no C-stack pump remains. The chosen
          * member id is stored to working memory in DT_RESUME_CC1A_BATTLE_SEL on POP
          * (CHAR_SELECT does its own argument_memory restore, so no window cleanup
          * here). */
@@ -2271,7 +2271,7 @@ bool cc_1a_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
          * Port of tree_1A.asm @SELECTION_MENU_NO_CANCEL.
          * STEP_PUSHes GAME_MODE_SELECTION_MENU (allow_cancel=0); the result store
          * + focus-menu clear run in DT_RESUME_CC1A_SEL_CLEAR on POP. selection_menu()
-         * returns 0 without pumping for a null/empty menu — replicate inline. */
+         * returns 0 without pumping for a null/empty menu, replicate inline. */
         WindowInfo *w = get_window(win.current_focus_window);
         if (!w || w->menu_count == 0) {
             set_working_memory(0);
@@ -2331,7 +2331,7 @@ bool cc_1a_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
     case 0x08: {
         /* SELECTION_MENU_NO_CANCEL (variant): 0 args.
          * Port of tree_1A.asm @SELECTION_MENU_NO_CANCEL_2.
-         * Same as 0x04 but does NOT clear menu options afterward — STEP_PUSHes
+         * Same as 0x04 but does NOT clear menu options afterward, STEP_PUSHes
          * GAME_MODE_SELECTION_MENU (allow_cancel=0), result store in
          * DT_RESUME_CC1A_SEL on POP. Empty/null menu returns 0 inline. */
         WindowInfo *w = get_window(win.current_focus_window);
@@ -2396,13 +2396,13 @@ bool cc_1a_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
  *
  * These manage the text script's per-window memory registers used for
  * conditional logic and branching.
- *   0x00: COPY_ACTIVE_MEMORY_TO_STORAGE — save working/arg/secondary to backups
- *   0x01: COPY_STORAGE_MEMORY_TO_ACTIVE — restore from backups
- *   0x02: JUMP_IF_FALSE(addr) — branch if working memory is 0
- *   0x03: JUMP_IF_TRUE(addr) — branch if working memory is non-zero
- *   0x04: SWAP_WORKING_AND_ARG_MEMORY — exchange working and argument registers
- *   0x05: COPY_ACTIVE_TO_WORKING — save all 3 registers to global backups
- *   0x06: COPY_WORKING_TO_ACTIVE — restore all 3 from global backups */
+ *   0x00: COPY_ACTIVE_MEMORY_TO_STORAGE, save working/arg/secondary to backups
+ *   0x01: COPY_STORAGE_MEMORY_TO_ACTIVE, restore from backups
+ *   0x02: JUMP_IF_FALSE(addr), branch if working memory is 0
+ *   0x03: JUMP_IF_TRUE(addr), branch if working memory is non-zero
+ *   0x04: SWAP_WORKING_AND_ARG_MEMORY, exchange working and argument registers
+ *   0x05: COPY_ACTIVE_TO_WORKING, save all 3 registers to global backups
+ *   0x06: COPY_WORKING_TO_ACTIVE, restore all 3 from global backups */
 void cc_1b_dispatch(ScriptReader *r) {
     uint8_t sub = script_read_byte(r);
 
@@ -2513,7 +2513,7 @@ bool cc_1c_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode) {
          * Characters 1-4 = party members (name from char_struct).
          * Characters 5-6 = King/Buzz Buzz (name from game_state.pet_name).
          * NOTE: $FF reads working_memory_STORAGE (asm: window_stats::
-         * working_memory_storage), not working_memory — used by the Goods Give
+         * working_memory_storage), not working_memory, used by the Goods Give
          * messages to print the recipient (set via set_working_memory_storage). */
         uint8_t arg = script_read_byte(r);
         uint16_t char_id;
@@ -3167,7 +3167,7 @@ void cc_1d_dispatch(ScriptReader *r) {
         uint16_t result_char = deliver_escargo_express_item(char_id, escargo_slot);
         /* Note: escargo_express_move() (the only way an item gets into
          * Escargo Express storage) can no longer place a key item there
-         * post-migration -- key items never occupy items[] to move from
+         * post-migration, key items never occupy items[] to move from
          * -- so this can't hit the "reused empty-slot" issue
          * GIVE_ITEM_TO_CHARACTER_B has (see its comment); a pre-existing
          * key item already sitting in an old save's escargo storage is a
@@ -3334,7 +3334,7 @@ bool cc_1e_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
     uint8_t sub = script_read_byte(r);
 
     switch (sub) {
-    /* --- HP recovery/depletion --- */
+    /* HP recovery/depletion */
     case 0x00:   /* RECOVER_HP_PERCENT */
     case 0x01:   /* DEPLETE_HP_PERCENT */
     case 0x02:   /* RECOVER_HP_AMOUNT */
@@ -3349,7 +3349,7 @@ bool cc_1e_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
             reduce_hp_amtpercent(char_id, (uint16_t)value, mode);
         break;
     }
-    /* --- PP recovery/depletion --- */
+    /* PP recovery/depletion */
     case 0x04:   /* RECOVER_PP_PERCENT */
     case 0x05:   /* DEPLETE_PP_PERCENT */
     case 0x06:   /* RECOVER_PP_AMOUNT */
@@ -3401,7 +3401,7 @@ bool cc_1e_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         }
         break;
     }
-    /* --- Stat boosts: 1 byte char_id + 1 byte amount --- */
+    /* Stat boosts: 1 byte char_id + 1 byte amount */
     case 0x0A:   /* BOOST_IQ */
     case 0x0B:   /* BOOST_GUTS */
     case 0x0C:   /* BOOST_SPEED */

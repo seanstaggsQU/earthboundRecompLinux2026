@@ -4,7 +4,7 @@
 #include "core/types.h"
 #include "embedded_assets.h"
 
-/* Direct access macros — no branch, no out-pointer overhead.
+/* Direct access macros, no branch, no out-pointer overhead.
  * Use ASSET_DATA(ASSET_FOO) and ASSET_SIZE(ASSET_FOO) instead of asset_get().
  * For parameterized families: ASSET_DATA(ASSET_FAMILY(n)) / ASSET_SIZE(ASSET_FAMILY(n)).
  */

@@ -1,5 +1,5 @@
 /*
- * Entity callbacks — movement, screen position, draw, and sprite rendering.
+ * Entity callbacks, movement, screen position, draw, and sprite rendering.
  *
  * Ports of:
  *   APPLY_ENTITY_DELTA_POSITION_ENTRY2 (asm/overworld/entity/apply_entity_delta_position_entry2.asm)
@@ -36,7 +36,7 @@
 #define SMAP_BANK_OVERLAY   2
 #define SMAP_BANK_TOWNMAP   3
 
-/* ---- Entity overlay data (entity_overlays.asm) ---- */
+/* Entity overlay data (entity_overlays.asm) */
 
 /* Base within-bank ROM address of the overlay data blob in bank $C4.
  * All script bytecode pointers are within-bank addresses that must be
@@ -53,7 +53,7 @@
 /* VRAM base address for overlay sprite tiles (VRAM::OVERLAY_BASE) */
 #define VRAM_OVERLAY_BASE 0x5600
 
-/* Overlay and town map spritemap data — compile-time linked, always available */
+/* Overlay and town map spritemap data, compile-time linked, always available */
 #define overlay_data       ASSET_DATA(ASSET_OVERWORLD_SPRITES_ENTITY_OVERLAY_DATA_BIN)
 #define overlay_data_size  ASSET_SIZE(ASSET_OVERWORLD_SPRITES_ENTITY_OVERLAY_DATA_BIN)
 #define town_map_spritemap_data       ASSET_DATA(ASSET_TOWN_MAPS_ICON_SPRITEMAPS_BIN)
@@ -217,7 +217,7 @@ void call_move_callback(int16_t entity_offset) {
         break;
     case CB_MOVE_PARTY_SPRITE:
         /* UPDATE_PARTY_SPRITE_POSITION (C0A26B):
-         * Party follower move callback — does NOT apply delta position.
+         * Party follower move callback, does NOT apply delta position.
          * Instead computes screen coords from abs coords (screen = abs - bg_scroll).
          * The actual position update is done by UPDATE_FOLLOWER_STATE (tick callback)
          * which reads from PLAYER_POSITION_BUFFER.
@@ -429,7 +429,7 @@ void queue_sprite_draw(uint16_t smap_id, int16_t x, int16_t y,
     q->offset = off + 1;
 }
 
-/* ---- Entity Overlay System ---- */
+/* Entity Overlay System */
 
 
 /*
@@ -489,9 +489,9 @@ void load_overlay_sprites(void) {
  *
  * Bytecode interpreter for overlay animation scripts.
  * Commands (each 4 bytes: opcode:2LE + arg:2LE):
- *   $0001 SHOWFRAME arg  — store frame data offset to spritemaps array
- *   $0002 DELAY arg      — return delay, advance script pointer
- *   $0003 JUMPTO arg     — jump to script offset (loop)
+ *   $0001 SHOWFRAME arg, store frame data offset to spritemaps array
+ *   $0002 DELAY arg, return delay, advance script pointer
+ *   $0003 JUMPTO arg, jump to script offset (loop)
  *
  * Parameters:
  *   script_offset: ert.buffer offset of current script position in overlay_data
@@ -666,7 +666,7 @@ after_sweat:
 }
 
 /*
- * DRAW_ENTITY_SPRITE — general overworld entity draw callback.
+ * DRAW_ENTITY_SPRITE: general overworld entity draw callback.
  *
  * Reads the entity's spritemap data from the OVERWORLD_SPRITEMAPS ert.buffer
  * and queues it for OAM rendering. Also triggers per-frame VRAM tile
@@ -676,7 +676,7 @@ after_sweat:
  * for general entities with direction-based spritemaps.
  *
  * The entity's spritemap_ptr_lo stores the byte offset into overworld_spritemaps[].
- * The spritemap_sizes stores (sprites_per_frame × 5) — bytes per direction.
+ * The spritemap_sizes stores (sprites_per_frame × 5), bytes per direction.
  * Direction selects which chunk of spritemaps to use:
  *   offset = spritemap_ptr_lo + direction_index × spritemap_sizes
  */
@@ -759,7 +759,7 @@ static void draw_entity_sprite(int16_t entity_offset) {
 }
 
 /*
- * DRAW_TITLE_LETTER — title screen letter draw callback.
+ * DRAW_TITLE_LETTER: title screen letter draw callback.
  *
  * Reads the animation pointer table to find the spritemap for the current
  * animation frame, then dispatches to the priority sprite draw queue.
@@ -858,7 +858,7 @@ static void call_entity_draw(int16_t entity_offset) {
      * larger-than-SNES viewport, the camera follows a scripted sprite over areas
      * framed for the 256x224 screen. A wandering PERSON NPC can drift into the
      * viewport gutter (outside the SNES-visible rectangle) and "pop" at a corner
-     * — e.g. the Onett bulletin-board reader (NPC 166) during the opening pan.
+     *, e.g. the Onett bulletin-board reader (NPC 166) during the opening pan.
      * Skip drawing PERSON NPCs whose origin is outside the SNES rectangle, so they
      * stay hidden exactly as on real hardware. OBJECT scenery (streetlights,
      * signs) and ITEM_BOXes still scroll through the gutter naturally, and normal
@@ -895,7 +895,7 @@ static void call_entity_draw(int16_t entity_offset) {
  *   collected into a singly-linked sorting list (via draw_sorting[], mirroring
  *   ENTITY_DRAW_SORTING in RAM). All other priorities are drawn immediately.
  *
- * Pass 2: Selection sort — repeatedly find the entity with the highest ABS_Y,
+ * Pass 2: Selection sort, repeatedly find the entity with the highest ABS_Y,
  *   draw it (giving it the lowest OAM index = highest SNES sprite priority =
  *   drawn on top), then remove it from the list. The >= comparison means that
  *   for equal Y, the entity found later in the list wins.
@@ -922,7 +922,7 @@ void build_entity_draw_list(void) {
         /* Screen bounds check (assembly lines 23-41).
          * Assembly uses unsigned CMP + BCC, so we must use uint16_t.
          * On-screen range: [0, EB_VIEWPORT_HEIGHT) ∪ [0xFFC0, 0xFFFF] (y < VH or y >= -64).
-         * Off-screen: [EB_VIEWPORT_HEIGHT, 0xFFBF] — entities in this range are skipped.
+         * Off-screen: [EB_VIEWPORT_HEIGHT, 0xFFBF], entities in this range are skipped.
          * Same logic for X with threshold EB_VIEWPORT_WIDTH+64. */
         uint16_t sy = (uint16_t)entities.screen_y[ent];
         uint16_t sx = (uint16_t)entities.screen_x[ent];
@@ -981,7 +981,7 @@ void build_entity_draw_list(void) {
 }
 
 /* ==================================================================
- * Entity fade state system — wipe/dissolve effects on entity spawn/despawn.
+ * Entity fade state system, wipe/dissolve effects on entity spawn/despawn.
  *
  * Ports of:
  *   INIT_ENTITY_FADE_STATE         (asm/overworld/entity/init_entity_fade_state.asm)
@@ -1000,7 +1000,7 @@ static const uint16_t entity_tile_byte_width_table[ENTITY_SIZE_COUNT] = {
     0x0040
 };
 
-/* Fade state entries — derived from ert.buffer, reconstructed at init */
+/* Fade state entries, derived from ert.buffer, reconstructed at init */
 static EntityFadeEntry *entity_fade_entries;  /* Pointer to fade entry array at ert.buffer[0x7C00] */
 
 /*
@@ -1407,7 +1407,7 @@ static void upload_entity_sprite_to_vram(uint16_t entity_slot,
 }
 
 /* ==================================================================
- * Entity fade animation callroutines — called from EVENT_ENTITY_WIPE (859) script.
+ * Entity fade animation callroutines, called from EVENT_ENTITY_WIPE (859) script.
  *
  * Ports of:
  *   CLEAR_FADE_ENTITY_FLAGS    (asm/overworld/entity/clear_fade_entity_flags.asm)

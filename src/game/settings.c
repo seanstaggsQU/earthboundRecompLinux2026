@@ -1,16 +1,16 @@
 /*
- * Engine settings persistence -- this port's own addition, not a ROM port.
+ * Engine settings persistence, this port's own addition, not a ROM port.
  * See settings.h. Storage is a tiny versioned blob via platform_settings_*
  * (platform.h), deliberately separate from the SRAM save-file format
  * (platform_save_*) since these are engine/device preferences, not game
- * save data -- they should survive independent of which save slot is
+ * save data, they should survive independent of which save slot is
  * active, and never touch the byte-for-byte SRAM mirror.
  */
 #include "game/settings.h"
 #include "platform/platform.h"
 #include <string.h>
 
-/* 'EBST' -- sentinel so a garbage/foreign settings.dat is rejected instead
+/* 'EBST', sentinel so a garbage/foreign settings.dat is rejected instead
  * of silently misinterpreted (same defensive intent as assets.pak's magic,
  * just far simpler since this blob is tiny and local-only). */
 #define SETTINGS_MAGIC   0x54534245u
@@ -18,19 +18,19 @@
  * (a version-1 file's zeroed reserved byte was indistinguishable from an
  * explicit Off, which broke HQ_AUDIO_ON's intended default for pre-
  * existing files). Bumped 2 -> 3 when Bloom/Depth of Field/Light Shafts/
- * Color Grading -- four separate bytes at this point in the layout --
+ * Color Grading, four separate bytes at this point in the layout --
  * were collapsed into the single experimental_visuals byte below: same
  * byte position, different meaning, which is exactly the "old file reads
  * as something it didn't mean" trap the 1->2 bump above already fixed
  * once. Bumped 3 -> 4 when experimental_visuals's Off/On toggle became the
  * 3-way alternative_visuals Off/Classic/Modern mode (same byte position,
- * new meaning/range -- same trap as the 2->3 bump). Unlike the earlier
+ * new meaning/range, same trap as the 2->3 bump). Unlike the earlier
  * bumps, this one keeps a narrow, explicit migration path in
  * settings_load() below (see the `blob.version == 3` branch) instead of
  * just falling back to defaults, since collapsing an existing On/Off
  * preference into "reset to Off" would silently drop something the player
  * had actively chosen; the mapping is simple enough (old On -> Modern) to
- * be worth preserving. `auto_save` is new in this version too -- it has no
+ * be worth preserving. `auto_save` is new in this version too, it has no
  * old-byte position to migrate from, so it just defaults to Off for a
  * migrated v3 file, same as it would for a fresh install. */
 #define SETTINGS_VERSION 4
@@ -59,7 +59,7 @@ void settings_load(void) {
 
     /* Accept either the current version or exactly the prior version (3),
      * so a pre-existing file's experimental_visuals On/Off preference can
-     * be migrated below rather than discarded -- see the SETTINGS_VERSION
+     * be migrated below rather than discarded, see the SETTINGS_VERSION
      * comment above. Both versions currently happen to produce the same
      * sizeof(EngineSettingsBlob) (the new auto_save byte fills what was
      * trailing struct padding in the old layout), so the size check alone
@@ -81,13 +81,13 @@ void settings_load(void) {
         } else {
             /* version == 3: blob.alternative_visuals actually holds the
              * old experimental_visuals byte at this same offset (0=Off,
-             * 1=On) -- map On to the closest new equivalent, Modern.
+             * 1=On), map On to the closest new equivalent, Modern.
              * auto_save didn't exist yet; defaults to Off. */
             engine_alternative_visuals = (blob.alternative_visuals == 1) ? ALT_VISUALS_MODERN : ALT_VISUALS_OFF;
             engine_auto_save = AUTO_SAVE_OFF;
         }
     } else {
-        /* No settings file, or unreadable/foreign/stale -- fall back to
+        /* No settings file, or unreadable/foreign/stale, fall back to
          * defaults rather than leaving partially-read garbage in place. */
         engine_sprint_speed = SPRINT_SPEED_MEDIUM;
         engine_hq_audio = HQ_AUDIO_ON;

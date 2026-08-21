@@ -2,18 +2,17 @@
  * Map sector loading system.
  *
  * Port of:
- *   LOAD_MAP_AT_POSITION  — asm/overworld/load_map_at_position.asm
- *   LOAD_MAP_AT_SECTOR    — asm/overworld/load_map_at_sector.asm
- *   GET_MAP_BLOCK_CACHED  — asm/overworld/map/get_map_block_cached.asm (block ID lookup)
- *   LOAD_MAP_ROW_TO_VRAM  — asm/overworld/map/load_map_row_to_vram.asm (tilemap fill)
+ *   LOAD_MAP_AT_POSITION: asm/overworld/load_map_at_position.asm
+ *   LOAD_MAP_AT_SECTOR: asm/overworld/load_map_at_sector.asm
+ *   GET_MAP_BLOCK_CACHED: asm/overworld/map/get_map_block_cached.asm (block ID lookup)
+ *   LOAD_MAP_ROW_TO_VRAM: asm/overworld/map/load_map_row_to_vram.asm (tilemap fill)
  *
- * The overworld map pipeline:
- *   1. Chunk files (maps/tiles/chunk_XX.bin) contain the spatial layout
- *   2. Chunks 9/10 are meta-chunks with 2-bit high block ID fields
- *   3. Chunks 1-8 hold the low 8 bits of block IDs
- *   4. block_id = (high_2bits << 8) | low_byte  (10-bit, 0-1023)
- *   5. Arrangement data is a lookup table: block_id → 4×4 tile entries
- *   6. BG1 gets tile as-is; BG2 gets tile|$2000 if tile_index < 384, else 0
+ * Overworld map pipeline: chunk files (maps/tiles/chunk_XX.bin) hold the
+ * spatial layout. Chunks 9/10 are meta-chunks with 2-bit high block ID
+ * fields, chunks 1-8 hold the low 8 bits. block_id = (high_2bits << 8) |
+ * low_byte (10-bit, 0-1023). Arrangement data is a lookup table mapping
+ * block_id to a 4x4 grid of tile entries. BG1 gets the tile as-is; BG2
+ * gets tile|$2000 if tile_index < 384, else 0.
  */
 
 #include "game/map_loader.h"
@@ -43,7 +42,7 @@ extern uint16_t photograph_map_loading_mode;
 static uint16_t get_tileset_id(uint16_t tileset_combo);
 static size_t load_and_decompress(AssetId id, uint8_t *dst, size_t dst_max);
 
-/* --- Data tables loaded from assets --- */
+/* Data tables loaded from assets */
 
 /* GLOBAL_MAP_TILESETPALETTE_DATA: 2560 bytes (32 columns × 80 rows).
  * Each byte: bits 7-3 = tileset_combo, bits 2-0 = palette_index.
@@ -56,7 +55,7 @@ static size_t tilesetpalette_size = 0;
 static const uint8_t *tileset_table_data = NULL;
 static size_t tileset_table_size = 0;
 
-/* --- NPC placement data tables loaded from assets --- */
+/* NPC placement data tables loaded from assets */
 
 /* SPRITE_PLACEMENT_PTR_TABLE: 32×40 row-major grid of 16-bit within-bank pointers.
  * 32 columns (X, horizontal, 0-31) × 40 rows (Y, vertical, 0-39).
@@ -90,7 +89,7 @@ static size_t tile_event_data_size = 0;
 
 /* NpcConfig struct defined in map_loader.h (17 bytes) */
 
-/* --- Collision tile data tables loaded from assets --- */
+/* Collision tile data tables loaded from assets */
 
 /* MAP_DATA_TILE_COLLISION_ARRANGEMENT_TABLE: 2293 entries × 16 bytes.
  * Each entry is a 4×4 grid of collision flags for one arrangement type.
@@ -148,7 +147,7 @@ static const uint8_t *entity_collision_width = NULL;
 static const uint8_t *entity_collision_tile_count = NULL;
 static const uint8_t *entity_collision_height_offset = NULL;
 
-/* --- Map music data tables loaded from assets --- */
+/* Map music data tables loaded from assets */
 
 /* MAP_DATA_PER_SECTOR_MUSIC: 2560 bytes (80 rows × 32 columns).
  * Each byte is a music zone ID that indexes OVERWORLD_EVENT_MUSIC_PTR_TABLE.
@@ -222,7 +221,7 @@ static bool load_chunks(void) {
         chunk_data[i] = ASSET_DATA(chunk_asset_ids[i]);
         chunk_size[i] = ASSET_SIZE(chunk_asset_ids[i]);
         if (!chunk_data[i]) {
-            /* Non-fatal — some chunks may not exist for all scenes */
+            /* Non-fatal, some chunks may not exist for all scenes */
             chunk_size[i] = 0;
         }
     }
@@ -235,7 +234,7 @@ static bool load_chunks(void) {
  * bx = tile_x / 4 (0-255), by = tile_y / 4 (0-319).
  *
  * Port of GET_MAP_BLOCK_CACHED (asm/overworld/map/get_map_block_cached.asm):
- *   1. Y = (by >> 3) << 8 | bx — 2D index into chunk data
+ *   1. Y = (by >> 3) << 8 | bx, 2D index into chunk data
  *   2. Meta chunk = (by & 4) ? chunk_10 : chunk_9
  *   3. High 2 bits = (meta_byte >> ((by & 3) * 2)) & 3
  *   4. Data chunk = chunks_table[by & 7] (chunks 1-8)
@@ -523,7 +522,7 @@ void load_current_map_block_events(void) {
  * "street loops as you walk" symptom). Re-derive them here from the restored
  * tileset combo. Everything rebuilt is deterministic from restored state (combo +
  * event flags), so this is idempotent and safe whether the prior state was a live
- * session or a fresh boot. The tileset GFX (VRAM) is intentionally NOT reloaded —
+ * session or a fresh boot. The tileset GFX (VRAM) is intentionally NOT reloaded , 
  * it is restored by the PPU section, and load_map_at_sector only reloads it on a
  * combo change anyway. */
 void map_loader_savestate_rebind(void) {
@@ -539,7 +538,7 @@ void map_loader_savestate_rebind(void) {
 
     /* Rebuild the collision pointer buffer, then re-apply event-driven block
      * swaps (same order as load_map_at_sector) so both the arrangement and the
-     * collision data match what was saved — deterministic from restored flags. */
+     * collision data match what was saved, deterministic from restored flags. */
     load_tile_collision(tileset_id);
     load_map_block_event_changes(tileset_id);
 }
@@ -593,7 +592,7 @@ static void fill_collision_tiles(int16_t view_x_tile, int16_t view_y_tile) {
      * view_x/y_tile is the viewport's top-left corner. The viewport is
      * 32×28 tiles (256×224 px). The SNES assembly streams columns/rows from
      * both edges as the camera scrolls, giving equal coverage on all sides.
-     * The C port refills all 64 tiles at once — centering gives 16 tiles of
+     * The C port refills all 64 tiles at once, centering gives 16 tiles of
      * padding on each side of the 32-tile viewport, matching the assembly's
      * effective coverage and ensuring nearby off-screen entities (like NPCs
      * behind counters) have valid collision data. */
@@ -682,24 +681,24 @@ uint16_t lookup_surface_flags(int16_t x, int16_t y, uint16_t size_code) {
     /* ml.loaded_collision_tiles is a 64x64 grid indexed by (world_tile & 63)
      * (see fill_collision_tiles()), fully refilled every scroll step but only
      * covering the range [ml.screen_left_x-16, ml.screen_left_x+47] x
-     * [ml.screen_top_y-16, ml.screen_top_y+47] -- 64 tiles, centered on the
+     * [ml.screen_top_y-16, ml.screen_top_y+47], 64 tiles, centered on the
      * camera with 16 tiles of padding on each side of the 32-tile viewport.
      * A sample tile outside that range still wraps via & 63 onto SOME grid
      * cell, but that cell holds whatever was last written there for a
-     * completely different world position -- stale/wrong data, not a valid
+     * completely different world position, stale/wrong data, not a valid
      * answer. Two distinct failure modes came from this:
      *   - A MOVING entity re-samples every frame, so an aliased read only
-     *     ever lasted one frame before self-correcting -- reported live as
+     *     ever lasted one frame before self-correcting, reported live as
      *     random-looking sprite priority glitches ("Shark gang" enemies in
      *     Onett) whenever the entity strayed a few tiles past the padded
      *     edge (player standing still while it paces, camera not yet
      *     caught up).
      *   - A STATIC entity (move_callback CB_MOVE_NOP, e.g. a one-shot
-     *     EVENT_UPDATE_ENTITY_SURFACE_FLAGS in its spawn script -- see
+     *     EVENT_UPDATE_ENTITY_SURFACE_FLAGS in its spawn script, see
      *     Frankystein Mk. II's event script 008) samples surface_flags
      *     exactly ONCE at creation and never again. If that one sample
      *     happened to land outside the window valid at spawn time, the
-     *     wrong answer is frozen forever -- reported live as a boss
+     *     wrong answer is frozen forever, reported live as a boss
      *     encounter's overworld sprite permanently rendering in front of a
      *     tree it should draw behind, regardless of where the camera goes
      *     afterward.
@@ -710,7 +709,7 @@ uint16_t lookup_surface_flags(int16_t x, int16_t y, uint16_t size_code) {
      * actual fix: compute an out-of-window sample directly from the source
      * tables (compute_collision_tile_flags(), same per-tile computation
      * fill_collision_tiles() does for its whole-grid refill) instead of
-     * either reading the alias or giving up -- correct regardless of
+     * either reading the alias or giving up, correct regardless of
      * whether the cached window happens to cover the position, for both
      * moving and static entities. */
     int16_t win_x0 = ml.screen_left_x - 16, win_x1 = ml.screen_left_x + 47;
@@ -923,7 +922,7 @@ static void reload_sprite_group_palettes(void) {
  *      LOAD_SPECIAL_SPRITE_PALETTE).
  *
  * Used by CC_1F_E1 (SET_MAP_PALETTE script command). Does NOT check
- * event flag overrides — scripts provide the final palette index directly. */
+ * event flag overrides, scripts provide the final palette index directly. */
 bool load_map_palette_prepare(uint16_t tileset_combo, uint16_t palette_index,
                               uint16_t fade_frames, ModeState *out_init) {
     /* Assembly line 21: clear palette animation flag */
@@ -956,7 +955,7 @@ bool load_map_palette_prepare(uint16_t tileset_combo, uint16_t palette_index,
      * to target palette over fade_frames frames using 8.8 fixed-point. */
 
     /* Parse target palette (96 colors for sub-ert.palettes 2-7).
-     * Use ert.buffer as scratch — it's free during palette fades (the
+     * Use ert.buffer as scratch, it's free during palette fades (the
      * tileset decompress that last used it is complete by this point,
      * and the blocking fade loop doesn't run game logic). */
     uint16_t *target  = (uint16_t *)&ert.buffer[BUF_FLASH_TARGET];    /* 192 bytes */
@@ -994,7 +993,7 @@ bool load_map_palette_prepare(uint16_t tileset_combo, uint16_t palette_index,
         b_incr[i] = ((tgt_b - cur_b) * 256) / div;
     }
 
-    /* UPDATE_MAP_PALETTE_FADE each frame (assembly lines 60-89) — the per-frame
+    /* UPDATE_MAP_PALETTE_FADE each frame (assembly lines 60-89), the per-frame
      * accumulate loop and the post-fade finalize run to completion as
      * GAME_MODE_MAP_PALETTE_FADE (the accumulators/slopes computed above live in
      * ert.buffer scratch, which the step re-derives each frame). The caller
@@ -1123,7 +1122,7 @@ static void load_map_palette_overworld(uint16_t tileset_combo,
     ert.palette_upload_mode = PALETTE_UPLOAD_FULL;
 }
 
-/* animate_palette_fade_to_map removed — its logic is now inside load_map_palette's
+/* animate_palette_fade_to_map removed, its logic is now inside load_map_palette's
  * fade path (assembly LOAD_MAP_PALETTE handles both instant and fade). */
 
 /* Fill BG1/BG2 tilemaps from chunk data + arrangement table.
@@ -1150,7 +1149,7 @@ static void fill_tilemaps(int16_t view_x_tile, int16_t view_y_tile) {
      * (camera_mode != 0, e.g. the Tessie ride's pan over Lake Tess) the camera
      * deliberately frames terrain that should continue, so fall back to the
      * loaded tileset's block 0 (the assembly's out-of-bounds behavior) to extend
-     * the current terrain — open water on the lake map — instead of a black void. */
+     * the current terrain, open water on the lake map, instead of a black void. */
     bool fill_empty_with_block0 = (game_state.camera_mode != 0);
 
     /* BG1 tilemap at VRAM byte $7000 (word $3800), 64×32 entries.
@@ -1171,9 +1170,9 @@ static void fill_tilemaps(int16_t view_x_tile, int16_t view_y_tile) {
              * tileset combo renders its real block; anything else is "empty"
              * (off the map, or an adjacent sector with a different tileset).
              * Empty tiles are either left transparent (black gutter, normal play)
-             * or filled with the loaded tileset's block 0 — the assembly's
+             * or filled with the loaded tileset's block 0, the assembly's
              * out-of-bounds behavior (LOAD_MAP_ROW uses block 0 when its
-             * block_row < 320 bounds check fails) — during scripted camera moves. */
+             * block_row < 320 bounds check fails), during scripted camera moves. */
             uint16_t block_id = 0;
             bool render_empty = false;
             if (world_tx < 0 || world_ty < 0) {
@@ -1269,7 +1268,7 @@ void load_bg_palette(uint16_t index) {
 void animate_palette(void) {
     if (--ml.overworld_palette_anim.timer != 0) return;
 
-    /* Timer expired — check for wrap (bounds check before array access) */
+    /* Timer expired, check for wrap (bounds check before array access) */
     if (ml.overworld_palette_anim.index >= 9)
         FATAL("animate_palette: index=%u out of bounds\n", ml.overworld_palette_anim.index);
     if (ml.overworld_palette_anim.delays[ml.overworld_palette_anim.index] == 0) {
@@ -1299,7 +1298,7 @@ void animate_tileset(void) {
 
         if (--anim->frames_until_update != 0) continue;
 
-        /* Timer expired — reset delay */
+        /* Timer expired, reset delay */
         anim->frames_until_update = anim->frame_delay;
 
         /* Check for frame wrap */
@@ -1311,7 +1310,7 @@ void animate_tileset(void) {
         /* Copy tile data from animation ert.buffer to VRAM.
          * Assembly uses PREPARE_VRAM_COPY (mode=0, i.e. word-sequential)
          * which queues a DMA to the VRAM destination address.
-         * destination_address is a VRAM word address — multiply by 2 for byte offset. */
+         * destination_address is a VRAM word address, multiply by 2 for byte offset. */
         uint32_t vram_byte_offset = (uint32_t)anim->destination_address * 2;
         uint32_t src_offset = anim->current_source_offset;
         uint16_t size = anim->copy_size;
@@ -1370,11 +1369,11 @@ static void load_tileset_anim(uint16_t tileset_id) {
 
     /* Parse properties into ml.overworld_tileset_anim[] entries.
      * Each entry in the properties file (overworld_tileset_anim_entry):
-     *   unknown0 (.byte) — animation frame limit
-     *   frame_delay (.byte) — frames between updates
-     *   copy_size (.word) — bytes per frame
-     *   source_offset (.word) — initial source offset in ert.buffer
-     *   destination_address (.word) — VRAM word destination */
+     *   unknown0 (.byte), animation frame limit
+     *   frame_delay (.byte), frames between updates
+     *   copy_size (.word), bytes per frame
+     *   source_offset (.word), initial source offset in ert.buffer
+     *   destination_address (.word), VRAM word destination */
     ml.loaded_animated_tile_count = count;
     const uint8_t *p = props + 1;
     for (int i = 0; i < count; i++) {
@@ -1407,7 +1406,7 @@ static void load_palette_anim(void) {
     ml.map_palette_animation_loaded = 0;
     memset(&ml.overworld_palette_anim, 0, sizeof(ml.overworld_palette_anim));
 
-    /* Check ert.palettes[80] — first color of sub-palette 5.
+    /* Check ert.palettes[80], first color of sub-palette 5.
      * This serves as the palette animation index (1-based). */
     uint16_t anim_index = ert.palettes[80];
     if (anim_index == 0) return;
@@ -1461,10 +1460,10 @@ static void load_palette_anim(void) {
 /* --- Sprite palette lighting adjustment ---
  *
  * Port of:
- *   PREPARE_AVERAGE_FOR_SPRITE_PALETTES  — asm/overworld/prepare_average_for_sprite_palettes.asm
- *   ADJUST_SPRITE_PALETTES_BY_AVERAGE    — asm/overworld/adjust_sprite_palettes_by_average.asm
- *   LOAD_SPECIAL_SPRITE_PALETTE          — asm/overworld/load_special_sprite_palette.asm
- *   GET_COLOUR_AVERAGE                   — asm/system/get_colour_average.asm
+ *   PREPARE_AVERAGE_FOR_SPRITE_PALETTES: asm/overworld/prepare_average_for_sprite_palettes.asm
+ *   ADJUST_SPRITE_PALETTES_BY_AVERAGE: asm/overworld/adjust_sprite_palettes_by_average.asm
+ *   LOAD_SPECIAL_SPRITE_PALETTE: asm/overworld/load_special_sprite_palette.asm
+ *   GET_COLOUR_AVERAGE: asm/system/get_colour_average.asm
  *
  * Also uses ADJUST_SINGLE_COLOUR (already ported in overworld.c).
  *
@@ -1538,7 +1537,7 @@ static void prepare_average_for_sprite_palettes(void) {
  *
  * Computes the ratio between the current map palette's average color
  * and the saved reference average, then scales every sprite palette
- * color (ert.palettes[128..255]) by that ratio.  Only darkens — if any
+ * color (ert.palettes[128..255]) by that ratio.  Only darkens, if any
  * channel ratio exceeds 1.0, the adjustment is skipped entirely. */
 static void adjust_sprite_palettes_by_average(void) {
     uint16_t avg_r, avg_g, avg_b;
@@ -1596,7 +1595,7 @@ static void adjust_sprite_palettes_by_average(void) {
 /* Port of LOAD_SPECIAL_SPRITE_PALETTE
  * (asm/overworld/load_special_sprite_palette.asm).
  *
- * Checks ert.palettes[64] (sub-palette 4, color 0 — normally transparent).
+ * Checks ert.palettes[64] (sub-palette 4, color 0, normally transparent).
  * If non-zero, treats it as a sub-palette index and copies that
  * sub-palette's 16 colors into sprite sub-palette 4 (ert.palettes[192..207]). */
 static void load_special_sprite_palette(void) {
@@ -1637,7 +1636,7 @@ void load_map_at_sector(uint16_t sector_x, uint16_t sector_y) {
     uint16_t tileset_combo = sector_byte >> 3;
     uint16_t tileset_id = get_tileset_id(tileset_combo);
 
-    /* Load tile arrangement data (always reload — different tilesets may share IDs). */
+    /* Load tile arrangement data (always reload, different tilesets may share IDs). */
     arrangement_size = load_and_decompress(ASSET_MAPS_ARRANGEMENTS(tileset_id),
                                            arrangement_buffer, SHARED_SCRATCH_SIZE);
     arrangement_loaded = (arrangement_size > 0);
@@ -1655,7 +1654,7 @@ void load_map_at_sector(uint16_t sector_x, uint16_t sector_y) {
 
     /* Load tileset GFX if changed.
      * Assembly decompresses into BUFFER then DMA's the first 0x7000 bytes
-     * to VRAM $0000. We decompress directly to ppu.vram — the first 0x7000
+     * to VRAM $0000. We decompress directly to ppu.vram, the first 0x7000
      * bytes land at the correct position, and any overflow into higher VRAM
      * is harmless (overwritten by tilemaps). Intentional divergence from
      * assembly to avoid ert.buffer dependency. */
@@ -1709,7 +1708,7 @@ void load_map_at_sector(uint16_t sector_x, uint16_t sector_y) {
         ert.palette_upload_mode = PALETTE_UPLOAD_NONE;
     }
 
-    /* Save sub-ert.palettes 2–15 to MAP_PALETTE_BACKUP.
+    /* Save sub-ert.palettes 2-15 to MAP_PALETTE_BACKUP.
      * Assembly (load_map_at_sector.asm:136-147): copies 14 sub-ert.palettes
      * (BPP4PALETTE_SIZE*14 = 448 bytes) from PALETTES+64 (skipping sub-pals 0-1)
      * into MAP_PALETTE_BACKUP starting at offset 0.
@@ -1828,7 +1827,7 @@ void load_your_sanctuary_location(uint16_t sanctuary_idx) {
     ert.palette_upload_mode = PALETTE_UPLOAD_NONE;
 
     /* Copy 8 BG sub-palettes (= BPP4PALETTE_SIZE * 8 = 256 bytes) to sanctuary palette slot.
-     * Always uses slot 0 — sanctuaries are loaded on demand, not pre-cached.
+     * Always uses slot 0, sanctuaries are loaded on demand, not pre-cached.
      * Intentional divergence from assembly, which caches all 8 in BUFFER. */
     {
         size_t pal_dst_offset = BUF_SANCTUARY_PALETTES;
@@ -1883,7 +1882,7 @@ void load_your_sanctuary_location(uint16_t sanctuary_idx) {
     int16_t start_tile_y = (int16_t)v1 - 14;
 
     /* Tilemap destination: 30 rows × 32 cols × 2 bytes.
-     * Always slot 0 — sanctuaries loaded on demand, not pre-cached. */
+     * Always slot 0, sanctuaries loaded on demand, not pre-cached. */
     size_t tilemap_base = BUF_SANCTUARY_TILEMAPS;
 
     /* Ensure chunk data is loaded (needed for get_block_id lookups) */
@@ -2107,7 +2106,7 @@ void spawn_npcs_at_sector(uint16_t sector_x, uint16_t sector_y) {
         int16_t world_x = (int16_t)(sector_x * 256 + local_x);
         int16_t world_y = (int16_t)(sector_y * 256 + local_y);
 
-        /* --- Screen bounds check (C0222B.asm lines 144-199) --- */
+        /* Screen bounds check (C0222B.asm lines 144-199) */
         {
             int16_t screen_rel_x = (int16_t)((uint16_t)world_x - ppu.bg_hofs[0]);
             int16_t screen_rel_y = (int16_t)((uint16_t)world_y - ppu.bg_vofs[0]);
@@ -2139,7 +2138,7 @@ void spawn_npcs_at_sector(uint16_t sector_x, uint16_t sector_y) {
             }
         }
 
-        /* --- NPC config lookup (C0222B.asm lines 200-206) --- */
+        /* NPC config lookup (C0222B.asm lines 200-206) */
         const NpcConfig *cfg = get_npc_config(npc_id);
         if (!cfg) continue;
 
@@ -2159,11 +2158,11 @@ void spawn_npcs_at_sector(uint16_t sector_x, uint16_t sector_y) {
         uint16_t script_id = cfg->event_script;
         uint8_t direction = cfg->direction;
 
-        /* --- Create entity (C0222B.asm lines 293-310) --- */
+        /* Create entity (C0222B.asm lines 293-310) */
         int16_t created_slot = create_entity(sprite_id, script_id, -1,
                                              world_x, world_y);
 
-        /* --- Set direction and NPC ID (C0222B.asm lines 333-348) --- */
+        /* Set direction and NPC ID (C0222B.asm lines 333-348) */
         if (created_slot >= 0) {
             int16_t ent_offset = created_slot;
             entities.directions[ent_offset] = direction;
@@ -2195,7 +2194,7 @@ void load_map_at_position(uint16_t x_pixels, uint16_t y_pixels) {
     /* Load sector data (tileset GFX, arrangement, palette) */
     load_map_at_sector(sector_x, sector_y);
 
-    /* Set up VRAM display settings — assembly skips in photograph mode */
+    /* Set up VRAM display settings, assembly skips in photograph mode */
     if (!photograph_map_loading_mode)
         overworld_setup_vram();
 
@@ -2288,7 +2287,7 @@ void reload_map_at_position(uint16_t x_pixels, uint16_t y_pixels) {
     if (!map_loader_init()) return;
 
     /* Assembly lines 12-15: set screen position */
-    /* (SCREEN_X/Y_PIXELS — used internally for BG scroll calc below) */
+    /* (SCREEN_X/Y_PIXELS, used internally for BG scroll calc below) */
 
     /* Assembly lines 16-25: convert to tile coordinates */
     uint16_t x_tile = x_pixels >> 3;
@@ -2341,7 +2340,7 @@ void load_initial_map_data(void) {
     fill_collision_tiles(view_x_tile, view_y_tile);
     /* Every other fill_collision_tiles() caller (load_map_at_position,
      * reload_map_at_position, the incremental scroll path) syncs
-     * ml.screen_left_x/ml.screen_top_y to the view it just filled -- this
+     * ml.screen_left_x/ml.screen_top_y to the view it just filled, this
      * one didn't, which was harmless while lookup_surface_flags() read the
      * grid unconditionally, but now matters: that function's window-bounds
      * check (see its doc comment) derives the currently-valid window FROM
@@ -2435,7 +2434,7 @@ void map_refresh_tilemaps(uint16_t cam_x_pixels, uint16_t cam_y_pixels) {
     int16_t target_x_tile = scroll_x >> 3;
     int16_t target_y_tile = scroll_y >> 3;
 
-    /* Step 3: X-axis scroll — move ml.screen_left_x toward target one tile
+    /* Step 3: X-axis scroll, move ml.screen_left_x toward target one tile
      * at a time, spawning NPCs in newly visible columns.
      * Assembly lines 55-142: @UNKNOWN3..@UNKNOWN5 loop. */
     while (ml.screen_left_x != target_x_tile) {
@@ -2458,7 +2457,7 @@ void map_refresh_tilemaps(uint16_t cam_x_pixels, uint16_t cam_y_pixels) {
         }
     }
 
-    /* Step 4: Y-axis scroll — move ml.screen_top_y toward target one tile
+    /* Step 4: Y-axis scroll, move ml.screen_top_y toward target one tile
      * at a time, spawning NPCs in newly visible rows.
      * Assembly lines 144-233: @UNKNOWN7..@UNKNOWN9 loop. */
     while (ml.screen_top_y != target_y_tile) {
@@ -2494,14 +2493,14 @@ void map_refresh_tilemaps(uint16_t cam_x_pixels, uint16_t cam_y_pixels) {
  * Tile collision system
  *
  * Port of:
- *   GET_COLLISION_TILE_AND_CHECK_LADDER  — asm/overworld/collision/get_collision_tile_and_check_ladder.asm
- *   CHECK_COLLISION_TILE_PATTERN         — asm/overworld/collision/check_collision_tile_pattern.asm
- *   TEST_COLLISION_NORTH                 — asm/overworld/collision/test_collision_north.asm
- *   TEST_COLLISION_SOUTH                 — asm/overworld/collision/test_collision_south.asm
- *   TEST_COLLISION_WEST                  — asm/overworld/collision/test_collision_west.asm
- *   TEST_COLLISION_EAST                  — asm/overworld/collision/test_collision_east.asm
- *   TEST_COLLISION_DIAGONAL              — asm/overworld/collision/test_collision_diagonal.asm
- *   CHECK_DIRECTIONAL_COLLISION          — asm/overworld/collision/check_directional_collision.asm
+ *   GET_COLLISION_TILE_AND_CHECK_LADDER: asm/overworld/collision/get_collision_tile_and_check_ladder.asm
+ *   CHECK_COLLISION_TILE_PATTERN: asm/overworld/collision/check_collision_tile_pattern.asm
+ *   TEST_COLLISION_NORTH: asm/overworld/collision/test_collision_north.asm
+ *   TEST_COLLISION_SOUTH: asm/overworld/collision/test_collision_south.asm
+ *   TEST_COLLISION_WEST: asm/overworld/collision/test_collision_west.asm
+ *   TEST_COLLISION_EAST: asm/overworld/collision/test_collision_east.asm
+ *   TEST_COLLISION_DIAGONAL: asm/overworld/collision/test_collision_diagonal.asm
+ *   CHECK_DIRECTIONAL_COLLISION: asm/overworld/collision/check_directional_collision.asm
  *
  * The collision grid (ml.loaded_collision_tiles[64*64]) stores per-tile flags.
  * Bits 6-7 (0xC0) indicate solid wall.  Bit 4 (0x10) indicates ladder/stairs.
@@ -2513,7 +2512,7 @@ void map_refresh_tilemaps(uint16_t cam_x_pixels, uint16_t cam_y_pixels) {
 static uint16_t set_temp_entity_surface_flags;
 static uint16_t temp_entity_surface_flags;
 
-/* Collision check point offsets — 6 points in a 2×3 grid (from C200B9/C200C5).
+/* Collision check point offsets, 6 points in a 2×3 grid (from C200B9/C200C5).
  * Point layout (relative to CHECKED_COLLISION_LEFT_X, CHECKED_COLLISION_TOP_Y):
  *   0(-8,0)  1(0,0)  2(+7,0)
  *   3(-8,7)  4(0,7)  5(+7,7)
@@ -2526,7 +2525,7 @@ static const int16_t collision_y_offsets[6] = { 0, 0, 0, 7, 7, 7 };
 static const uint16_t diagonal_masks[4] = { 0x1E, 0x33, 0x1E, 0x33 };
 
 /*
- * get_collision_tile_and_check_ladder — look up collision byte at tile coords.
+ * get_collision_tile_and_check_ladder, look up collision byte at tile coords.
  *
  * Port of GET_COLLISION_TILE_AND_CHECK_LADDER (C054C9).
  * If the tile has bit 4 (ladder), records the tile position in
@@ -2539,10 +2538,10 @@ static uint8_t get_collision_tile_and_check_ladder(int16_t tile_x, int16_t tile_
 
 #ifdef EB_DOOR_COLLISION_PROFILE
     /* Diagnostic added while chasing a report of a door that's never even
-     * detected (process_door_at_tile never fires -- no door TYPE logged at
+     * detected (process_door_at_tile never fires, no door TYPE logged at
      * all, not just blocked). Logs every collision-tile sample so a tester
      * walking directly into the door shows exactly which tiles the 6-point
-     * pattern actually checked and their raw flag bytes -- if the door's
+     * pattern actually checked and their raw flag bytes, if the door's
      * own tile (bit 0x10) never appears in this log while standing right
      * next to it, that confirms the sample points are missing its row/col
      * entirely rather than finding it but failing some later guard. */
@@ -2559,7 +2558,7 @@ static uint8_t get_collision_tile_and_check_ladder(int16_t tile_x, int16_t tile_
 }
 
 /*
- * check_collision_tile_pattern — check 6 collision points against a bitmask.
+ * check_collision_tile_pattern, check 6 collision points against a bitmask.
  *
  * Port of CHECK_COLLISION_TILE_PATTERN (C05769).
  * mask: 6-bit bitmask, each bit enables checking of one of the 6 points.
@@ -2598,7 +2597,7 @@ static uint16_t check_collision_tile_pattern(uint16_t mask) {
 }
 
 /*
- * test_collision_north — check collision for northward movement.
+ * test_collision_north, check collision for northward movement.
  *
  * Port of TEST_COLLISION_NORTH (C057E8).
  * Checks top 3 points (mask=0x07).
@@ -2631,7 +2630,7 @@ static int16_t test_collision_north(void) {
 }
 
 /*
- * test_collision_south — check collision for southward movement.
+ * test_collision_south, check collision for southward movement.
  *
  * Port of TEST_COLLISION_SOUTH (C0583C).
  * Checks bottom 3 points (mask=0x38).
@@ -2664,7 +2663,7 @@ static int16_t test_collision_south(void) {
 }
 
 /*
- * test_collision_west — check collision for westward movement.
+ * test_collision_west, check collision for westward movement.
  *
  * Port of TEST_COLLISION_WEST (C05890).
  * Checks left 2 points (mask=0x09), with extended check and corner analysis.
@@ -2681,7 +2680,7 @@ static int16_t test_collision_west(void) {
     uint16_t result = check_collision_tile_pattern(0x09);
 
     if (result == 0) {
-        /* No collision at primary check — try 4px further left */
+        /* No collision at primary check, try 4px further left */
         ow.checked_collision_left_x -= 4;
         result = check_collision_tile_pattern(0x09);
         if (result == 0) {
@@ -2731,7 +2730,7 @@ static int16_t test_collision_west(void) {
         } else if (corner_flags == 2) {
             nudge_dir = 7;  /* nudge UP_LEFT */
         } else if (corner_flags == 0) {
-            /* Neither corner has wall — nudge based on Y position */
+            /* Neither corner has wall, nudge based on Y position */
             if ((ow.checked_collision_top_y & 0x07) >= 4) {
                 nudge_dir = 5;  /* nudge DOWN_LEFT */
             } else {
@@ -2759,7 +2758,7 @@ static int16_t test_collision_west(void) {
 }
 
 /*
- * test_collision_east — check collision for eastward movement.
+ * test_collision_east, check collision for eastward movement.
  *
  * Port of TEST_COLLISION_EAST (C059EF).
  * Checks right 2 points (mask=0x24), with extended check and corner analysis.
@@ -2776,7 +2775,7 @@ static int16_t test_collision_east(void) {
     uint16_t result = check_collision_tile_pattern(0x24);
 
     if (result == 0) {
-        /* No collision at primary check — try 4px further right */
+        /* No collision at primary check, try 4px further right */
         ow.checked_collision_left_x += 4;
         result = check_collision_tile_pattern(0x24);
         if (result == 0) {
@@ -2826,7 +2825,7 @@ static int16_t test_collision_east(void) {
         } else if (corner_flags == 2) {
             nudge_dir = 1;  /* nudge UP_RIGHT */
         } else if (corner_flags == 0) {
-            /* Neither corner has wall — nudge based on Y position */
+            /* Neither corner has wall, nudge based on Y position */
             if ((ow.checked_collision_top_y & 0x07) >= 4) {
                 nudge_dir = 3;  /* nudge DOWN_RIGHT */
             } else {
@@ -2854,7 +2853,7 @@ static int16_t test_collision_east(void) {
 }
 
 /*
- * test_collision_diagonal — check collision for diagonal movement.
+ * test_collision_diagonal, check collision for diagonal movement.
  *
  * Port of TEST_COLLISION_DIAGONAL (C05B4E).
  * Uses direction-specific bitmask from diagonal_masks table.
@@ -2876,7 +2875,7 @@ static int16_t test_collision_diagonal(int16_t direction) {
 }
 
 /*
- * check_directional_collision — main directional collision dispatcher.
+ * check_directional_collision, main directional collision dispatcher.
  *
  * Port of CHECK_DIRECTIONAL_COLLISION (C05B7B).
  * Checks tile collision at position (x, y) for the given movement direction.
@@ -2955,7 +2954,7 @@ uint16_t check_directional_collision(int16_t x, int16_t y, int16_t direction) {
     case 7: /* UP_LEFT */
         test_result = test_collision_diagonal(direction);
         if ((uint16_t)test_result != 0xFF00) {
-            /* Diagonal clear — override test_result with direction */
+            /* Diagonal clear, override test_result with direction */
             test_result = direction;
         }
         break;
@@ -2972,7 +2971,7 @@ process_result:
 
     /* Interpret test result */
     if (test_result == -1 || (uint16_t)test_result == 0xFF00) {
-        /* No collision, or fully blocked — return surface flags as-is */
+        /* No collision, or fully blocked, return surface flags as-is */
         return temp_entity_surface_flags;
     }
 
@@ -2983,7 +2982,7 @@ process_result:
 }
 
 /*
- * get_collision_at_pixel — simple single-point collision lookup.
+ * get_collision_at_pixel, simple single-point collision lookup.
  *
  * Port of GET_COLLISION_AT_PIXEL (asm/overworld/collision/get_collision_at_pixel.asm).
  * Looks up the collision tile at position (x, y+4) and returns
@@ -3008,25 +3007,25 @@ uint16_t get_collision_at_pixel(int16_t x, int16_t y) {
  * Entity tile collision system.
  *
  * Port of CHECK_ENTITY_COLLISION (asm/overworld/collision/check_entity_collision.asm) and helpers:
- *   CHECK_COLLISION_TILES_HORIZONTAL  — C05503.asm — top edge check
- *   CHECK_COLLISION_TILES_VERTICAL    — C0559C.asm — bottom edge check
- *   ACCUMULATE_COLLISION_FLAGS_HORIZONTAL — C056D0.asm — right edge check
- *   ACCUMULATE_COLLISION_FLAGS_VERTICAL   — C05639.asm — left edge check
- *   CHECK_ENTITY_OBSTACLE_FLAGS       — C05E3B.asm
- *   CHECK_CURRENT_ENTITY_OBSTACLES    — C05E76.asm
+ *   CHECK_COLLISION_TILES_HORIZONTAL: C05503.asm, top edge check
+ *   CHECK_COLLISION_TILES_VERTICAL: C0559C.asm, bottom edge check
+ *   ACCUMULATE_COLLISION_FLAGS_HORIZONTAL, C056D0.asm, right edge check
+ *   ACCUMULATE_COLLISION_FLAGS_VERTICAL: C05639.asm, left edge check
+ *   CHECK_ENTITY_OBSTACLE_FLAGS: C05E3B.asm
+ *   CHECK_CURRENT_ENTITY_OBSTACLES: C05E76.asm
  *
  * Each function samples collision bytes from ml.loaded_collision_tiles[] along
  * the entity's bounding box edges, ORing them together to accumulate flags.
  *
  * Data tables (from asm/data/unknown/):
- *   ENTITY_COLLISION_X_OFFSET[17]  — C42A1F.asm — X offset from center to left edge
- *   ENTITY_COLLISION_Y_OFFSET[17]  — C42A41.asm — Y offset from center to top
- *   SPRITE_HITBOX_ENABLE_TABLE[17] — C42AEB.asm — Y adjustment for hitbox
- *   ENTITY_COLLISION_WIDTH_TABLE[17]             — horizontal tile count for loop
- *   ENTITY_COLLISION_HEIGHT_TABLE[17]             — vertical tile count for loop
+ *   ENTITY_COLLISION_X_OFFSET[17]: C42A1F.asm, X offset from center to left edge
+ *   ENTITY_COLLISION_Y_OFFSET[17]: C42A41.asm, Y offset from center to top
+ *   SPRITE_HITBOX_ENABLE_TABLE[17], C42AEB.asm, Y adjustment for hitbox
+ *   ENTITY_COLLISION_WIDTH_TABLE[17]: horizontal tile count for loop
+ *   ENTITY_COLLISION_HEIGHT_TABLE[17]: vertical tile count for loop
  */
 
-/* ENTITY_COLLISION_X_OFFSET — center-to-left-edge offset per size code */
+/* ENTITY_COLLISION_X_OFFSET, center-to-left-edge offset per size code */
 const int16_t entity_collision_x_offset[ENTITY_SIZE_COUNT] = {
     0x0008, 0x0008, 0x000C, 0x0010, 0x0018,
     0x0008, 0x000C, 0x0008, 0x0010, 0x0018,
@@ -3034,7 +3033,7 @@ const int16_t entity_collision_x_offset[ENTITY_SIZE_COUNT] = {
     0x0020, 0x0020,
 };
 
-/* ENTITY_COLLISION_Y_OFFSET — center-to-top offset per size code */
+/* ENTITY_COLLISION_Y_OFFSET, center-to-top offset per size code */
 const int16_t entity_collision_y_offset[ENTITY_SIZE_COUNT] = {
     0x0008, 0x0008, 0x0008, 0x0008, 0x0008,
     0x0018, 0x0018, 0x0018, 0x0018, 0x0018,
@@ -3042,7 +3041,7 @@ const int16_t entity_collision_y_offset[ENTITY_SIZE_COUNT] = {
     0x0038, 0x0048,
 };
 
-/* SPRITE_HITBOX_ENABLE_TABLE — Y hitbox adjustment per size code */
+/* SPRITE_HITBOX_ENABLE_TABLE, Y hitbox adjustment per size code */
 const int16_t sprite_hitbox_enable[ENTITY_SIZE_COUNT] = {
     0x000A, 0x0000, 0x000A, 0x000A, 0x000A,
     0x0018, 0x0018, 0x0018, 0x0010, 0x0010,
@@ -3050,7 +3049,7 @@ const int16_t sprite_hitbox_enable[ENTITY_SIZE_COUNT] = {
     0x0000, 0x0041,
 };
 
-/* ENTITY_COLLISION_WIDTH_TABLE — horizontal tile count for collision loops */
+/* ENTITY_COLLISION_WIDTH_TABLE, horizontal tile count for collision loops */
 static const int16_t entity_coll_h_count[ENTITY_SIZE_COUNT] = {
     0x0002, 0x0000, 0x0002, 0x0004, 0x0006,
     0x0002, 0x0003, 0x0002, 0x0004, 0x0006,
@@ -3058,7 +3057,7 @@ static const int16_t entity_coll_h_count[ENTITY_SIZE_COUNT] = {
     0x0000, 0x0006,
 };
 
-/* ENTITY_COLLISION_HEIGHT_TABLE — vertical tile count for collision loops */
+/* ENTITY_COLLISION_HEIGHT_TABLE, vertical tile count for collision loops */
 static const int16_t entity_coll_v_count[ENTITY_SIZE_COUNT] = {
     0x0001, 0x0000, 0x0001, 0x0001, 0x0001,
     0x0001, 0x0001, 0x0001, 0x0002, 0x0002,
@@ -3067,7 +3066,7 @@ static const int16_t entity_coll_v_count[ENTITY_SIZE_COUNT] = {
 };
 
 /*
- * check_top_edge — check collision tiles along the top horizontal edge.
+ * check_top_edge, check collision tiles along the top horizontal edge.
  * Port of CHECK_COLLISION_TILES_HORIZONTAL (C05503).
  *
  * Checks the tile at (left_x/8, top_y/8) then iterates rightward
@@ -3096,7 +3095,7 @@ static void check_top_edge(int16_t left_x, int16_t size_code) {
 }
 
 /*
- * check_bottom_edge — check collision tiles along the bottom horizontal edge.
+ * check_bottom_edge, check collision tiles along the bottom horizontal edge.
  * Port of CHECK_COLLISION_TILES_VERTICAL (C0559C).
  *
  * Computes the bottom row from top_y + v_count*8 - 1, then checks tiles
@@ -3127,7 +3126,7 @@ static void check_bottom_edge(int16_t left_x, int16_t size_code) {
 }
 
 /*
- * check_right_edge — check collision tiles along the right vertical edge.
+ * check_right_edge, check collision tiles along the right vertical edge.
  * Port of ACCUMULATE_COLLISION_FLAGS_HORIZONTAL (C056D0).
  *
  * Computes the right column from left_x + h_count*8 - 1, then checks tiles
@@ -3159,7 +3158,7 @@ static void check_right_edge(int16_t top_y, int16_t size_code) {
 }
 
 /*
- * check_left_edge — check collision tiles along the left vertical edge.
+ * check_left_edge, check collision tiles along the left vertical edge.
  * Port of ACCUMULATE_COLLISION_FLAGS_VERTICAL (C05639).
  *
  * Checks tiles at left_x column from top_y downward for v_count tiles,
@@ -3188,15 +3187,15 @@ static void check_left_edge(int16_t top_y, int16_t size_code) {
 }
 
 /*
- * check_entity_collision — check tile collision for an entity moving in a direction.
+ * check_entity_collision, check tile collision for an entity moving in a direction.
  *
  * Port of CHECK_ENTITY_COLLISION (asm/overworld/collision/check_entity_collision.asm).
  *
  * Parameters:
- *   x         — entity X position (world pixels)
- *   y         — entity Y position (world pixels)
- *   entity_slot — entity slot number (indexes ENTITY_SIZES)
- *   direction — movement direction (0-7, SNES convention)
+ *   x: entity X position (world pixels)
+ *   y: entity Y position (world pixels)
+ *   entity_slot, entity slot number (indexes ENTITY_SIZES)
+ *   direction, movement direction (0-7, SNES convention)
  *
  * Returns accumulated collision flags (ORed from all checked tiles).
  * Sets ow.checked_collision_left_x and ow.checked_collision_top_y globals.
@@ -3302,9 +3301,9 @@ static const uint8_t direction_quantize_table[63] = {
  * or 0 if path is clear.
  *
  * Parameters:
- *   entity_slot    — entity slot number
- *   collision_mask — collision bits to test (AND with tile flags)
- *   max_steps      — maximum number of steps to check (up to 63)
+ *   entity_slot: entity slot number
+ *   collision_mask, collision bits to test (AND with tile flags)
+ *   max_steps: maximum number of steps to check (up to 63)
  *
  * Side effects on collision:
  *   entities.var[6][entity_offset] = collision X pixel
@@ -3337,7 +3336,7 @@ int16_t check_entity_collision_path(int16_t entity_slot, uint8_t collision_mask,
             uint16_t idx = (uint16_t)((tile_y_masked & 0x3F) * 64
                                       + (tile_x_masked & 0x3F));
             if ((collision_mask & ml.loaded_collision_tiles[idx]) != 0) {
-                /* Collision found — compute pixel coordinates */
+                /* Collision found, compute pixel coordinates */
                 int16_t coll_x = tile_x_unmasked * 8
                                  + entity_collision_x_offset[entity_size];
                 int16_t coll_y = tile_y_unmasked * 8
@@ -3422,7 +3421,7 @@ void resolve_map_sector_music(uint16_t x_coord, uint16_t y_coord) {
         uint16_t flag_word = read_u16_le(&event_music_table[offset]);
 
         if (flag_word == 0) {
-            /* NULL terminator — default entry, use its music */
+            /* NULL terminator, default entry, use its music */
             ml.loaded_map_music_entry_offset = offset;
             ml.next_map_music_track = event_music_table[offset + 2];
             break;
@@ -3438,7 +3437,7 @@ void resolve_map_sector_music(uint16_t x_coord, uint16_t y_coord) {
         int expected = (flag_word == 0x8000) ? 0 : 1;
 
         if (flag_state == expected) {
-            /* Condition met — use this entry */
+            /* Condition met, use this entry */
             ml.loaded_map_music_entry_offset = offset;
             ml.next_map_music_track = event_music_table[offset + 2];
             break;

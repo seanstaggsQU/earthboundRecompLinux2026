@@ -155,11 +155,11 @@ enum CharacterMode {
 /* Total party count (4 PCs + 2 NPCs) */
 #define TOTAL_PARTY_COUNT 6
 
-/* Key Items pool — a global storage array for quest/key items
+/* Key Items pool, a global storage array for quest/key items
  * (ITEM_TYPE_KEY_ITEM/KEY_AREA/KEY_SOMEONE, see inventory.h), separate from
  * any character's regular 14-slot items[] inventory. Deliberately has NO
  * association with any character or with player_controlled_party_count/
- * party_members[] — that's what makes it immune to the "key item vanishes
+ * party_members[], that's what makes it immune to the "key item vanishes
  * when you bench the character holding it" bug a fan mod (ShrineFox's
  * EarthBound Mod Menu) has, where lookups only scan the currently
  * controlled party. 44 key items exist in the current item table; 48
@@ -174,7 +174,7 @@ typedef struct {
     CharStruct party_characters[TOTAL_PARTY_COUNT]; /* 505: 570 bytes */
     uint8_t    event_flags[EVENT_FLAG_COUNT / 8];   /* 1075: 128 bytes */
     /* key_items_pool carved out of what used to be unused padding (was 77
-     * bytes) -- this keeps SaveBlock's total size and the checksum
+     * bytes), this keeps SaveBlock's total size and the checksum
      * algorithm's byte range unchanged, so a save written before this field
      * existed still passes its checksum: those bytes were already being
      * written/checksummed as zeroed padding, they just have a name now.
@@ -207,7 +207,7 @@ void event_flag_clear(uint16_t flag);
  * Port of CLEAR_ALL_STATUS_EFFECTS (asm/misc/clear_all_status_effects.asm). */
 void clear_all_status_effects(void);
 
-/* --- Party query functions --- */
+/* Party query functions */
 
 /* CHECK_CHARACTER_IN_PARTY: Port of asm/battle/check_character_in_party.asm.
  * Returns char_id if found in party_members, 0 otherwise. */
@@ -240,7 +240,7 @@ uint16_t check_if_psi_known(uint16_t char_id, uint16_t psi_ability_id);
  * Sets fastest_hppp_meter_speed = 1. */
 void reset_hppp_rolling(void);
 
-/* --- HP/PP target modification functions --- */
+/* HP/PP target modification functions */
 
 /* HEAL_CHARACTER_HP: Port of asm/battle/heal_character_hp.asm.
  * Adds heal amount to current_hp_target, clamps to max_hp.
@@ -286,14 +286,14 @@ bool save_game(int slot);
 bool load_game(int slot);
 bool erase_save(int slot);
 
-/* Auto Save (settings.h) -- this port's own addition, not a ROM routine.
+/* Auto Save (settings.h), this port's own addition, not a ROM routine.
  * Call from the terminal phase of any mode-step that represents "the
  * player has finished transitioning into a new area" (door.c's
  * DTR_BUZZ_DONE/TT_BUZZ_DONE, overworld_teleport.c's TP_CLEANUP,
- * display_text_cc.c's Exit Mouse/Escape Rope handler) -- once
+ * display_text_cc.c's Exit Mouse/Escape Rope handler), once
  * entities/party position are finalized, right before that mode pops back
  * to the root. No-ops silently when Auto Save is off (engine_auto_save,
- * settings.h) or when current_save_slot isn't valid yet (0 -- shouldn't
+ * settings.h) or when current_save_slot isn't valid yet (0, shouldn't
  * happen at any of the call sites above, since they're all only reachable
  * once a save slot is active, but guarded the same way the manual Save
  * menu item guards it, text.c). Deliberately NOT called from Game Over
@@ -306,7 +306,7 @@ void auto_save_if_enabled(void);
  * simulates a pre-feature save (a key item still sitting in a character's
  * items[] slot, pool empty), round-trips it through save_game()/load_game(),
  * and confirms the migration sweep moves it into key_items_pool and clears
- * the items[] slot -- then confirms the pool survives its own save/load
+ * the items[] slot, then confirms the pool survives its own save/load
  * round-trip, and that find_item_in_inventory2() still finds a pooled key
  * item after the character who originally "had" it is removed from the
  * active party (the specific bug class this feature avoids vs. the

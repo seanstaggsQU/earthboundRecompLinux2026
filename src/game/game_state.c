@@ -181,7 +181,7 @@ uint16_t check_if_psi_known(uint16_t char_id, uint16_t psi_ability_id) {
     return 0;
 }
 
-/* --- HP/PP target modification functions --- */
+/* HP/PP target modification functions */
 
 /* HEAL_CHARACTER_HP: Port of asm/battle/heal_character_hp.asm (73 lines).
  * A=char_id, X=amount, Y=mode (0=percent, nonzero=absolute).
@@ -365,7 +365,7 @@ void reset_hppp_rolling(void) {
 /* On-cartridge SRAM signature stamped into every valid block header. Real
  * EarthBound's CHECK_BLOCK_SIGNATURE (asm/system/saves/check_block_signature.asm)
  * STRCMPs the 28-byte header against this; a mismatch makes it ERASE the block.
- * From asm/data/sram_signature.asm — ASCIIZ, the remaining bytes stay zero. */
+ * From asm/data/sram_signature.asm, ASCIIZ, the remaining bytes stay zero. */
 static const char SRAM_BLOCK_SIGNATURE[] = "HAL Laboratory, inc.";
 
 /* Byte offset (within the SRAM image / .srm file) of the 16-bit SRAM version
@@ -434,10 +434,10 @@ bool save_game(int slot) {
     /* Stamp the on-cartridge block signature so real EarthBound's
      * CHECK_BLOCK_SIGNATURE accepts the slot instead of erasing it. The checksums
      * below cover only game_state onward (header excluded), so this does not
-     * affect them — matching the assembly, which signs during format/erase. */
+     * affect them, matching the assembly, which signs during format/erase. */
     memcpy(block->header.signature, SRAM_BLOCK_SIGNATURE, sizeof(SRAM_BLOCK_SIGNATURE));
 
-    /* Compute checksums — assembly uses ADD + XOR, NOT ADD + ~ADD.
+    /* Compute checksums, assembly uses ADD + XOR, NOT ADD + ~ADD.
      * See validate_save_block_checksums.asm: checksum = ADD, checksum_complement = XOR. */
     block->header.checksum = compute_add_checksum(block);
     block->header.checksum_complement = compute_xor_checksum(block);
@@ -502,7 +502,7 @@ bool load_game(int slot) {
      * all-zero, since those bytes used to be unused padding). Move any
      * key-item-typed entries found there into the pool now, freeing their
      * inventory slots. Runs unconditionally on every load and is
-     * idempotent -- an already-migrated save has no key items left in any
+     * idempotent, an already-migrated save has no key items left in any
      * items[] to find, so this is a no-op for it. Uses
      * remove_item_from_inventory() (not a hand-rolled shift) so equipment
      * indices for that character's other items stay correct. */
@@ -514,7 +514,7 @@ bool load_game(int slot) {
                 key_items_give(item_id);
                 remove_item_from_inventory(char_id, slot + 1); /* 1-based slot */
                 /* Slot has been refilled by the shift-left compaction (or
-                 * cleared to 0 if this was the last item) -- re-check the
+                 * cleared to 0 if this was the last item), re-check the
                  * same index rather than advancing. */
                 continue;
             }
@@ -562,7 +562,7 @@ bool key_items_selftest(void) {
      * file_select.c uses) and refuse the destructive part of this test if
      * it looks like a real save, rather than silently clobbering it. This
      * is a backstop, not a substitute for actually running this in a
-     * scratch directory with no real save data -- it only catches the
+     * scratch directory with no real save data, it only catches the
      * "occupied" case; an empty/never-played slot 0 still gets
      * overwritten with test data, which is fine for a scratch dir but NOT
      * fine if that's meant to become someone's actual first save later. */
@@ -581,7 +581,7 @@ bool key_items_selftest(void) {
 
     /* --- 1. Simulate a pre-feature save: write the key item directly into
      * Jeff's regular inventory, bypassing every choke point (exactly what
-     * an old save's raw bytes look like -- key_items_pool stays empty,
+     * an old save's raw bytes look like, key_items_pool stays empty,
      * matching what those bytes read as before this field existed). */
     party_characters[JEFF - 1].items[0] = (uint8_t)TEST_ITEM;
 
@@ -628,7 +628,7 @@ bool key_items_selftest(void) {
 
     /* --- 4. Core acceptance criterion: bench the character who originally
      * "had" the item (remove Jeff from the controlled party) and confirm
-     * find_item_in_inventory2()/CHAR_ID_ANY still finds it -- this is the
+     * find_item_in_inventory2()/CHAR_ID_ANY still finds it, this is the
      * exact bug class the ShrineFox EarthBound Mod Menu has (their key
      * items are still tied to whichever character holds them, so lookups
      * that only scan the currently-controlled party miss it). Our pool has
@@ -652,7 +652,7 @@ bool key_items_selftest(void) {
     game_state.player_controlled_party_count = saved_count;
     memcpy(game_state.party_members, saved_members, sizeof(saved_members));
 
-    /* --- 5. Direct CRUD round-trip on a second item. --- */
+    /* 5. Direct CRUD round-trip on a second item. */
     const uint16_t TEST_ITEM_2 = 176; /* Bicycle (ITEM_TYPE_KEY_AREA) */
     if (key_items_give(TEST_ITEM_2) == 0) {
         fprintf(stderr, "key_items_selftest: FAIL -- key_items_give() failed on an "
@@ -683,7 +683,7 @@ bool key_items_selftest(void) {
      * key_items_set_use_in_progress() first. Exercise that contract
      * directly (no mode-stack pump needed) rather than only the CRUD
      * layer underneath it, which is what let this regress silently the
-     * first time -- the CRUD self-test above passed the whole time this
+     * first time, the CRUD self-test above passed the whole time this
      * was broken live. */
     key_items_set_use_in_progress(TEST_ITEM);
     uint16_t sentinel_result = get_character_item(1, KEY_ITEMS_POOL_USE_SLOT_SENTINEL);

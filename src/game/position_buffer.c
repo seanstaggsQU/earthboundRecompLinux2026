@@ -1,5 +1,5 @@
 /*
- * PLAYER_POSITION_BUFFER — circular history buffer for follow-the-leader.
+ * PLAYER_POSITION_BUFFER: circular history buffer for follow-the-leader.
  *
  * See position_buffer.h for overview.
  *
@@ -42,11 +42,11 @@ int16_t map_input_to_direction(uint16_t walking_style);
 static int32_t adjust_position(int16_t direction, uint16_t surface_flags,
                                int32_t pos, const int32_t *speeds);
 
-/* CHARACTER_SIZES — loaded from ROM via asset pipeline.
+/* CHARACTER_SIZES: loaded from ROM via asset pipeline.
  * 17 entries × 2 bytes (uint16_t LE), indexed by char_id. */
 #define CHARACTER_SIZES_COUNT 17
 
-/* PLAYABLE_CHAR_GFX_TABLE — loaded from ROM via asset pipeline.
+/* PLAYABLE_CHAR_GFX_TABLE: loaded from ROM via asset pipeline.
  * 17 rows × 8 columns × 2 bytes (uint16_t LE).
  * Maps (char_id, mode) to OVERWORLD_SPRITE ID. */
 #define PLAYABLE_CHAR_ROW_COUNT 17
@@ -65,7 +65,7 @@ uint16_t lookup_playable_char_sprite(uint16_t char_id, uint16_t mode) {
 /* Status constants: use enums from battle.h (StatusGroup, Status0, Status1) */
 
 /*
- * get_party_member_sprite_id — determine which sprite to show for a party member.
+ * get_party_member_sprite_id, determine which sprite to show for a party member.
  *
  * Port of GET_PARTY_MEMBER_SPRITE_ID (C0780F).
  * Returns the OVERWORLD_SPRITE ID, or -1 (0xFFFF) to hide the entity.
@@ -75,7 +75,7 @@ int16_t get_party_member_sprite_id(
     int16_t char_id, uint16_t walking_style,
     int16_t entity_offset, int16_t party_idx)
 {
-    uint16_t mode = 0;  /* Y register in assembly — visual mode index */
+    uint16_t mode = 0;  /* Y register in assembly, visual mode index */
 
     /* Pajamas check (assembly lines 16-26).
      * If char_id == 0 (Ness), DISABLED_TRANSITIONS == 0, PAJAMA_FLAG != 0:
@@ -180,7 +180,7 @@ int16_t get_party_member_sprite_id(
             }
         }
 
-        /* Paralyzed override — very slow animation (assembly @UNKNOWN26-28) */
+        /* Paralyzed override, very slow animation (assembly @UNKNOWN26-28) */
         if (party_idx >= 0 && party_idx < TOTAL_PARTY_COUNT &&
             party_characters[party_idx].afflictions[STATUS_GROUP_PERSISTENT_EASYHEAL]
                 == STATUS_0_PARALYZED) {
@@ -199,7 +199,7 @@ int16_t get_party_member_sprite_id(
 }
 
 /*
- * update_party_entity_graphics — update sprite graphics and flags for a party entity.
+ * update_party_entity_graphics, update sprite graphics and flags for a party entity.
  *
  * Port of UPDATE_PARTY_ENTITY_GRAPHICS (C07A56).
  * Determines the correct sprite for the character based on status, walking style,
@@ -209,14 +209,14 @@ void update_party_entity_graphics(
     int16_t char_id, uint16_t walking_style,
     int16_t entity_offset, int16_t party_idx)
 {
-    /* Determine sprite ID — may return -1 to hide entity */
+    /* Determine sprite ID, may return -1 to hide entity */
     int16_t sprite_id = get_party_member_sprite_id(
         char_id, walking_style, entity_offset, party_idx);
 
     if (sprite_id == (int16_t)0xFFFF || sprite_id < 0) {
         /* Sprite ID == -1: hide entity (assembly @HIDE_ENTITY branch).
          * Assembly: stores -1 to animation_frame, then JMPs to @CHECK_CAMERA_MODE
-         * (does NOT return early — still checks camera_mode for var7 bit 12). */
+         * (does NOT return early, still checks camera_mode for var7 bit 12). */
         entities.animation_frame[entity_offset] = -1;
         goto check_camera_mode;
     }
@@ -224,7 +224,7 @@ void update_party_entity_graphics(
     /* Look up sprite_grouping for this sprite_id and update graphics pointers.
      * Assembly lines 33-55: dereference SPRITE_GROUPING_PTR_TABLE[sprite_id],
      * set ENTITY_GRAPHICS_PTR_HIGH/LOW and ENTITY_GRAPHICS_SPRITE_BANK.
-     * Only graphics pointers change — VRAM allocation, dimensions, and hitboxes
+     * Only graphics pointers change, VRAM allocation, dimensions, and hitboxes
      * remain from the original CREATE_ENTITY call. */
     uint32_t grouping_offset = 0;
     load_sprite_group_properties((uint16_t)sprite_id, &grouping_offset);
@@ -256,9 +256,9 @@ void update_party_entity_graphics(
      *
      * Assembly checks game_state.leader_moved:
      * - If leader_moved != 0 AND walking_style != ESCALATOR(12):
-     *     CLEAR var7 bits 13, 14, 15 — normal animation cycling
+     *     CLEAR var7 bits 13, 14, 15, normal animation cycling
      * - Else:
-     *     SET var7 bits 13, 14 — static pose (animation_frame forced to 0) */
+     *     SET var7 bits 13, 14, static pose (animation_frame forced to 0) */
     if (game_state.leader_moved && walking_style != WALKING_STYLE_ESCALATOR) {
         entities.var[7][entity_offset] &=
             (int16_t)(~(uint16_t)((1 << 15) | (1 << 14) | (1 << 13)));
@@ -269,7 +269,7 @@ void update_party_entity_graphics(
 
 check_camera_mode:
     /* Assembly @CHECK_CAMERA_MODE: if camera_mode == 2 (camera follow mode),
-     * SET var7 bit 12 — entity hide/show controlled by spacing logic.
+     * SET var7 bit 12, entity hide/show controlled by spacing logic.
      * This runs even when sprite_id == -1 (entity hidden). */
     if (game_state.camera_mode == 2) {
         entities.var[7][entity_offset] |= (int16_t)(1 << 12);
@@ -277,7 +277,7 @@ check_camera_mode:
 }
 
 /*
- * update_follower_visuals — initialize follower entity visuals from position ert.buffer.
+ * update_follower_visuals, initialize follower entity visuals from position ert.buffer.
  *
  * Port of UPDATE_FOLLOWER_VISUALS (C04EF0).
  * Called once during EVENT_002 (party follower) initialization (not per-frame).
@@ -309,10 +309,10 @@ void update_follower_visuals(int16_t entity_offset) {
 }
 
 /*
- * get_previous_position_index — Port of GET_PREVIOUS_POSITION_INDEX (C03E5A).
+ * get_previous_position_index, Port of GET_PREVIOUS_POSITION_INDEX (C03E5A).
  *
  * Finds char_id+1 in game_state.party_order[] (party ordering table).
- * If found at index 0, this char IS the leader — returns -1 (0xFFFF).
+ * If found at index 0, this char IS the leader, returns -1 (0xFFFF).
  * Otherwise, looks up the previous member's entity via party_entity_slots and returns
  * their position_index from their char_struct.
  *
@@ -352,7 +352,7 @@ static uint16_t get_previous_position_index(int16_t char_id) {
 }
 
 /*
- * get_distance_to_party_member — Port of GET_DISTANCE_TO_PARTY_MEMBER (C03E9D).
+ * get_distance_to_party_member, Port of GET_DISTANCE_TO_PARTY_MEMBER (C03E9D).
  *
  * Returns circular distance (in ert.buffer entries) between the previous
  * party member's position_index and this member's position_index.
@@ -375,7 +375,7 @@ uint16_t get_distance_to_party_member(int16_t char_id,
 }
 
 /*
- * adjust_party_member_visibility — Port of ADJUST_PARTY_MEMBER_VISIBILITY (C03EC3).
+ * adjust_party_member_visibility, Port of ADJUST_PARTY_MEMBER_VISIBILITY (C03EC3).
  *
  * Adjusts the follower's position_index based on distance to the previous
  * party member compared to the desired spacing.
@@ -413,7 +413,7 @@ uint16_t adjust_party_member_visibility(int16_t entity_offset,
 }
 
 /*
- * init_party_position_buffer — Port of C03F1E.
+ * init_party_position_buffer, Port of C03F1E.
  *
  * Fill all 256 entries with the leader's current state, then set each
  * party member's position_index to 0 and place their entity at the
@@ -459,7 +459,7 @@ void init_party_position_buffer(void) {
 }
 
 /*
- * fill_party_position_buffer — Port of FILL_PARTY_POSITION_BUFFER
+ * fill_party_position_buffer, Port of FILL_PARTY_POSITION_BUFFER
  * (asm/overworld/party/fill_party_position_buffer.asm).
  *
  * Fills all 256 position ert.buffer entries with positions trailing behind
@@ -539,14 +539,14 @@ void fill_party_position_buffer(uint16_t direction) {
 }
 
 /*
- * position_buffer_write — write leader state to the circular ert.buffer.
+ * position_buffer_write, write leader state to the circular ert.buffer.
  *
  * Port of UPDATE_LEADER_MOVEMENT's ert.buffer write logic (lines 61-119).
  * Must be called AFTER game_state leader_x/y_coord, leader_direction,
  * trodden_tile_type, and walking_style are up to date for this frame.
  */
 void position_buffer_write(int16_t source_entity) {
-    (void)source_entity;  /* No longer used — reads from game_state */
+    (void)source_entity;  /* No longer used, reads from game_state */
     uint16_t idx = game_state.position_buffer_index;
     PositionBufferEntry *entry = &pb.player_position_buffer[idx];
 
@@ -560,14 +560,14 @@ void position_buffer_write(int16_t source_entity) {
     }
 
     /* tile_flags, walking_style, direction are always written
-     * (even when the leader hasn't moved) — assembly lines 110-119 */
+     * (even when the leader hasn't moved), assembly lines 110-119 */
     entry->tile_flags    = game_state.trodden_tile_type;
     entry->walking_style = game_state.walking_style;
     entry->direction     = game_state.leader_direction;
 }
 
 /*
- * sync_camera_to_entity — Port of SYNC_CAMERA_TO_ENTITY (C0476D).
+ * sync_camera_to_entity, Port of SYNC_CAMERA_TO_ENTITY (C0476D).
  *
  * Copies the camera focus entity's position and direction to game_state
  * leader fields. Sets leader_moved = 1 if position changed (including
@@ -610,7 +610,7 @@ static void sync_camera_to_entity(void) {
 }
 
 /*
- * restore_camera_mode — Port of RESTORE_CAMERA_MODE (C04A7B).
+ * restore_camera_mode, Port of RESTORE_CAMERA_MODE (C04A7B).
  *
  * Restores camera_mode from backup saved by start_camera_shake().
  * Then calls INITIATE_ENEMY_ENCOUNTER to begin the battle transition.
@@ -621,7 +621,7 @@ static void restore_camera_mode(void) {
 }
 
 /*
- * start_camera_shake — Port of START_CAMERA_SHAKE (C04A88).
+ * start_camera_shake, Port of START_CAMERA_SHAKE (C04A88).
  *
  * Called when an enemy entity touches the party. Saves the current camera_mode,
  * switches to mode 3 with a 12-frame timer, plays a collision SFX via APU
@@ -636,7 +636,7 @@ void start_camera_shake(void) {
 }
 
 /*
- * update_camera_mode_3 — Port of UPDATE_CAMERA_MODE_3 (C04AAD).
+ * update_camera_mode_3, Port of UPDATE_CAMERA_MODE_3 (C04AAD).
  *
  * Called each frame while camera_mode == 3 (screen shake on enemy contact).
  * Decrements the frame counter; when it reaches 0, restores camera mode.
@@ -698,7 +698,7 @@ static void update_camera_mode_3(void) {
 #define NUM_DIRECTIONS 8
 
 /*
- * update_special_camera_mode — Port of UPDATE_SPECIAL_CAMERA_MODE (C04B53).
+ * update_special_camera_mode, Port of UPDATE_SPECIAL_CAMERA_MODE (C04B53).
  *
  * Dispatches on game_state.camera_mode:
  *   Mode 1: Auto-movement using speed tables (camera dolly along a direction).
@@ -772,7 +772,7 @@ static void update_special_camera_mode(void) {
  *   UPDATE_OVERWORLD_PLAYER_INPUT (asm/overworld/update_overworld_player_input.asm)
  * ==================================================================== */
 
-/* MOVEMENT_SPEEDS — cardinal speed per walking style (16.16 fixed-point).
+/* MOVEMENT_SPEEDS: cardinal speed per walking style (16.16 fixed-point).
  * From asm/data/map/movement_speeds.asm. */
 static const int32_t movement_speeds_cardinal[NUM_WALKING_STYLES] = {
     0x00016000, /* 0  NORMAL:   1.375 */
@@ -791,7 +791,7 @@ static const int32_t movement_speeds_cardinal[NUM_WALKING_STYLES] = {
     0x0000CCCC, /* 13 STAIRS:   0.8   */
 };
 
-/* MOVEMENT_SPEEDS_DIAGONAL — diagonal speed (cardinal * sqrt(2)/2).
+/* MOVEMENT_SPEEDS_DIAGONAL: diagonal speed (cardinal * sqrt(2)/2).
  * From asm/data/map/movement_speeds.asm. */
 static const int32_t movement_speeds_diag[NUM_WALKING_STYLES] = {
     0x0000F8E6, /* 0  NORMAL:   0.972 */
@@ -815,10 +815,10 @@ static const int32_t movement_speeds_diag[NUM_WALKING_STYLES] = {
 #define DEEP_WATER_SPEED     0x0000547A  /* 0.33x */
 #define SKIP_SANDWICH_SPEED  0x00018000  /* 1.5x */
 
-/* Sprint speed multipliers — this port's own addition, not from the ROM
+/* Sprint speed multipliers, this port's own addition, not from the ROM
  * (16.16 fixed-point, same format as the modifiers above). Applied while
  * holding PAD_Y (mapped to the West/Square controller button in
- * sdl2_input.c, otherwise unused in normal gameplay -- see platform.h), at
+ * sdl2_input.c, otherwise unused in normal gameplay, see platform.h), at
  * the level chosen in Settings (game/settings.h, engine_sprint_speed).
  * Indexed by SprintSpeedSetting; SPRINT_SPEED_OFF's entry is never read
  * (that case skips the multiply entirely, see adjust_position() below). */
@@ -832,7 +832,7 @@ static const int32_t sprint_speed_multipliers[SPRINT_SPEED_COUNT] = {
 #define SURFACE_SHALLOW_WATER 0x08
 #define SURFACE_DEEP_WATER    0x0C  /* SHALLOW_WATER | CAUSES_SUNSTROKE */
 
-/* ALLOWED_INPUT_DIRECTIONS — bitmask of allowed directions per walking style.
+/* ALLOWED_INPUT_DIRECTIONS: bitmask of allowed directions per walking style.
  * From asm/data/map/allowed_input_directions.asm. */
 static const uint16_t allowed_input_directions[NUM_WALKING_STYLES] = {
     0xFF, /* 0  NORMAL:   all */
@@ -851,7 +851,7 @@ static const uint16_t allowed_input_directions[NUM_WALKING_STYLES] = {
     0xFF, /* 13 STAIRS:   all */
 };
 
-/* MUSHROOMIZATION_DIRECTION_REMAP_TABLES — 3 tables x 16 entries.
+/* MUSHROOMIZATION_DIRECTION_REMAP_TABLES: 3 tables x 16 entries.
  * From asm/data/map/mushroomization_direction_remap_tables.asm.
  * Each table remaps the 4-bit d-pad combination (UP|DOWN|LEFT|RIGHT in
  * bits 8-11 of PAD_STATE) to a rotated version.
@@ -942,7 +942,7 @@ static const uint16_t mushroom_remap[3][16] = {
 #define TIME_BETWEEN_DIRECTION_SWAPS 1800
 
 /*
- * velocity_store — precompute horizontal/vertical speed lookup tables.
+ * velocity_store, precompute horizontal/vertical speed lookup tables.
  *
  * Port of VELOCITY_STORE (asm/overworld/velocity_store.asm).
  * For each of 14 walking styles, distributes the cardinal and diagonal
@@ -981,7 +981,7 @@ void velocity_store(void) {
 }
 
 /*
- * map_input_to_direction — convert d-pad input to direction 0-7.
+ * map_input_to_direction, convert d-pad input to direction 0-7.
  *
  * Port of MAP_INPUT_TO_DIRECTION (asm/overworld/map_input_to_direction.asm).
  * Checks the d-pad state against the allowed directions for the current
@@ -1010,7 +1010,7 @@ int16_t map_input_to_direction(uint16_t walking_style) {
 }
 
 /*
- * adjust_position — apply movement speed to a position component.
+ * adjust_position, apply movement speed to a position component.
  *
  * Port of ADJUST_POSITION_HORIZONTAL / ADJUST_POSITION_VERTICAL
  * (asm/overworld/adjust_position_horizontal.asm, adjust_position_vertical.asm).
@@ -1047,7 +1047,7 @@ static int32_t adjust_position(int16_t direction, uint16_t surface_flags,
         delta = speed;
     }
 
-    /* Sprint -- this port's own addition, not in the original ROM (see
+    /* Sprint, this port's own addition, not in the original ROM (see
      * sprint_speed_multipliers above). Only boosts ordinary on-foot walking
      * (not bicycle/ladder/stairs/etc., which already have their own speeds
      * in the table above, and not water or demo/attract mode). Stacks with
@@ -1065,7 +1065,7 @@ static int32_t adjust_position(int16_t direction, uint16_t surface_flags,
 }
 
 /*
- * mushroomization_movement_swap — confuse d-pad input when mushroomized.
+ * mushroomization_movement_swap, confuse d-pad input when mushroomized.
  *
  * Port of MUSHROOMIZATION_MOVEMENT_SWAP
  * (asm/overworld/mushroomization_movement_swap.asm).
@@ -1099,7 +1099,7 @@ static void mushroomization_movement_swap(void) {
 }
 
 /*
- * update_escalator_movement — per-frame escalator movement handler.
+ * update_escalator_movement, per-frame escalator movement handler.
  *
  * Port of UPDATE_ESCALATOR_MOVEMENT (asm/overworld/door/update_escalator_movement.asm).
  * Called from update_leader_movement() when walking_style == ESCALATOR.
@@ -1145,7 +1145,7 @@ static void update_escalator_movement(void) {
 
     /* Lines 69-107: Apply escalator movement speed.
      * Uses walking_style 12 (ESCALATOR) speed tables.
-     * Movement is always applied — escalator doesn't check wall collision. */
+     * Movement is always applied, escalator doesn't check wall collision. */
     int32_t pos_x = (int32_t)(((uint32_t)game_state.leader_x_coord << 16) |
                                game_state.leader_x_frac);
     int32_t pos_y = (int32_t)(((uint32_t)game_state.leader_y_coord << 16) |
@@ -1165,7 +1165,7 @@ static void update_escalator_movement(void) {
 }
 
 /*
- * update_bicycle_movement — per-frame bicycle movement handler.
+ * update_bicycle_movement, per-frame bicycle movement handler.
  *
  * Port of UPDATE_BICYCLE_MOVEMENT (asm/overworld/update_bicycle_movement.asm).
  * Called from update_leader_movement() when walking_style == BICYCLE.
@@ -1227,17 +1227,17 @@ static void update_bicycle_movement(uint16_t prev_leader_moved) {
      *   - When counter reaches 0: use raw input direction if available,
      *     else keep current facing */
     if (direction & 1) {
-        /* Diagonal direction — reset counter */
+        /* Diagonal direction, reset counter */
         pb.bicycle_diagonal_turn_counter = 4;
     } else {
-        /* Cardinal direction — check delay counter */
+        /* Cardinal direction, check delay counter */
         if (pb.bicycle_diagonal_turn_counter) {
             pb.bicycle_diagonal_turn_counter--;
             if (pb.bicycle_diagonal_turn_counter != 0) {
-                /* Still in delay — keep current facing direction */
+                /* Still in delay, keep current facing direction */
                 direction = game_state.leader_direction;
             } else {
-                /* Counter just expired — if no input, keep facing */
+                /* Counter just expired, if no input, keep facing */
                 if (input_direction == -1) {
                     direction = game_state.leader_direction;
                 }
@@ -1294,7 +1294,7 @@ static void update_bicycle_movement(uint16_t prev_leader_moved) {
 }
 
 /*
- * check_hotspot_exit — check if the leader has left a hotspot boundary.
+ * check_hotspot_exit, check if the leader has left a hotspot boundary.
  *
  * Port of CHECK_HOTSPOT_EXIT (asm/overworld/check_hotspot_exit.asm).
  * Called twice per pair of frames from update_overworld_player_input
@@ -1309,7 +1309,7 @@ static void update_bicycle_movement(uint16_t prev_leader_moved) {
 void check_hotspot_exit(uint16_t hotspot_idx) {
     /* Lines 12-14: Assembly does LDA NEXT_QUEUED_INTERACTION; EOR NEXT_QUEUED_INTERACTION
      * which is value XOR value = always 0, so BNEL never branches.
-     * This is dead code in the original — possibly an intended
+     * This is dead code in the original, possibly an intended
      * "skip if queue non-empty" check that was incorrectly implemented
      * (should have been CURRENT EOR NEXT). Match the assembly: no-op. */
 
@@ -1324,24 +1324,24 @@ void check_hotspot_exit(uint16_t hotspot_idx) {
     uint16_t player_x = game_state.leader_x_coord;
     uint16_t player_y = game_state.leader_y_coord;
 
-    /* Lines 28-42: Mode 1 — inside check.
+    /* Lines 28-42: Mode 1, inside check.
      * Player must be inside bounds to stay; if outside, trigger exit. */
     if (mode == 1) {
         if (player_x < hs->x1 || player_x > hs->x2 ||
             player_y < hs->y1 || player_y > hs->y2) {
-            /* Player has left the hotspot — fall through to deactivate */
+            /* Player has left the hotspot, fall through to deactivate */
         } else {
             return;  /* Still inside, do nothing */
         }
     }
-    /* Lines 43-55: Mode 2 — outside check.
+    /* Lines 43-55: Mode 2, outside check.
      * Player must be outside bounds to stay; if inside (strictly), trigger. */
     else if (mode == 2) {
         if (player_x <= hs->x1 || player_x >= hs->x2 ||
             player_y <= hs->y1 || player_y >= hs->y2) {
             return;  /* Still outside, do nothing */
         }
-        /* Player entered the zone — fall through to deactivate */
+        /* Player entered the zone, fall through to deactivate */
     }
     else {
         /* Mode 0 or other: inactive */
@@ -1359,7 +1359,7 @@ void check_hotspot_exit(uint16_t hotspot_idx) {
 }
 
 /*
- * update_overworld_player_input — handle d-pad movement for normal walking.
+ * update_overworld_player_input, handle d-pad movement for normal walking.
  *
  * Port of UPDATE_OVERWORLD_PLAYER_INPUT (asm/overworld/update_overworld_player_input.asm).
  * Reads d-pad input, converts to direction, applies speed tables,
@@ -1450,11 +1450,11 @@ static void update_overworld_player_input(void) {
     /* Lines 132-172: Collision checking.
      * If movement_locked (bit 1), skip directional collision → use GET_COLLISION_AT_PIXEL.
      * Otherwise, CHECK_DIRECTIONAL_COLLISION samples tile collision at the new position.
-     * Returns surface flags — bits 6-7 (0xC0) = wall blocking.
+     * Returns surface flags, bits 6-7 (0xC0) = wall blocking.
      * Also sets ow.final_movement_direction (may change for wall sliding). */
     uint16_t collision_flags;
     if (ow.player_movement_flags & 0x0002) {
-        /* Lines 160-172: Movement locked — use GET_COLLISION_AT_PIXEL. */
+        /* Lines 160-172: Movement locked, use GET_COLLISION_AT_PIXEL. */
         if (ow.demo_frames_left) {
             collision_flags = 0;
         } else {
@@ -1544,7 +1544,7 @@ static void update_overworld_player_input(void) {
 }
 
 /*
- * update_leader_movement — leader entity tick callback.
+ * update_leader_movement, leader entity tick callback.
  *
  * Port of UPDATE_LEADER_MOVEMENT (C04236, asm/overworld/update_leader_movement.asm).
  * Per-frame: saves/clears leader_moved, syncs position_index, dispatches movement
@@ -1614,7 +1614,7 @@ void update_leader_movement(int16_t entity_offset) {
      * position_buffer_write; tile_flags/walking_style/direction always written. */
     position_buffer_write(0);
 
-    /* 7b. CENTER_SCREEN (assembly line 103) — update BG scroll registers
+    /* 7b. CENTER_SCREEN (assembly line 103), update BG scroll registers
      * AND stream new tilemap rows/columns as camera scrolls.
      * Only called when leader_moved is set (assembly: BEQ @LEADER_NOT_MOVED).
      * CRITICAL: This MUST happen during Phase 1 (tick callback), BEFORE Phase 2
@@ -1644,7 +1644,7 @@ void update_leader_movement(int16_t entity_offset) {
 }
 
 /*
- * update_follower_state — per-frame follower tick callback.
+ * update_follower_state, per-frame follower tick callback.
  *
  * Port of UPDATE_FOLLOWER_STATE (C04D78, asm/overworld/update_follower_state.asm).
  * Reads the follower's historical position from the circular ert.buffer and
@@ -1684,16 +1684,16 @@ void update_follower_state(int16_t entity_offset) {
     entities.abs_x[entity_offset] = entry->x_coord;
     entities.abs_y[entity_offset] = entry->y_coord;
 
-    /* Check if this char_id+1 equals party_order[0] — if so, this is the
+    /* Check if this char_id+1 equals party_order[0], if so, this is the
      * "first" party member and gets simpler handling (assembly @UNKNOWN11/12).
      * Assembly: if (char_id + 1) == party_order[0] (first byte), skip spacing
      * and just increment by 1. */
     int hide_entity = 0;
     uint16_t target = (uint16_t)(char_id + 1);
     if ((game_state.party_order[0] & 0xFF) == target) {
-        /* First follower — just advance by 1 (assembly @SIMPLE_ADVANCE path).
+        /* First follower, just advance by 1 (assembly @SIMPLE_ADVANCE path).
          * NOTE: Assembly stores buffer_walking_style once BEFORE branching (line 139).
-         * We store it in each branch instead — functionally equivalent since the
+         * We store it in each branch instead, functionally equivalent since the
          * value (entry->walking_style) is the same regardless of path taken. */
         party_characters[party_idx].buffer_walking_style = entry->walking_style;
         uint16_t new_idx = (read_idx + 1) & 0xFF;

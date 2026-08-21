@@ -1,5 +1,5 @@
 /*
- * Callroutine movement functions — speed, direction, velocity, movement loops.
+ * Callroutine movement functions, speed, direction, velocity, movement loops.
  * Extracted from callroutine.c.
  */
 #include "entity/callroutine_internal.h"
@@ -31,12 +31,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* FOOTSTEP_SOUND_TABLE — 10 entries x 2 bytes (uint16_t), maps terrain type to SFX ID.
+/* FOOTSTEP_SOUND_TABLE: 10 entries x 2 bytes (uint16_t), maps terrain type to SFX ID.
  * Loaded from data/footstep_sound_table.bin (extracted by ebtools from ROM C40BD4).
  * Indexed by ow.footstep_sound_id/2 (ow.footstep_sound_id is pre-multiplied by 2). */
 static const uint8_t *footstep_sound_table;
 
-/* ---- Movement helpers ---- */
+/* Movement helpers */
 
 /*
  * Set entity velocity from 8-way direction and movement speed.
@@ -118,7 +118,7 @@ int16_t clamp_to_range(int16_t val, int16_t max) {
     return val;
 }
 
-/* update_bubble_monkey_mode — Port of UPDATE_BUBBLE_MONKEY_MODE
+/* update_bubble_monkey_mode, Port of UPDATE_BUBBLE_MONKEY_MODE
  * (asm/misc/update_bubble_monkey_mode.asm).
  * Transitions bubble monkey between behavioral modes:
  *   0 = normal following, 1 = hiding, 2 = returning, 3 = distracted.
@@ -147,7 +147,7 @@ void update_bubble_monkey_mode(int16_t char_id, uint16_t position_index) {
     ow.bubble_monkey_movement_change_timer = (timer_mode & 0x03) * 3 + 4;
 }
 
-/* ---- cr_* callroutine functions ---- */
+/* cr_* callroutine functions */
 
 /*
  * SET_ENTITY_DIRECTION_VELOCITY (C0C83B)
@@ -164,7 +164,7 @@ int16_t cr_set_entity_direction_velocity(int16_t ent, int16_t scr,
     int16_t offset = ENT(ert.current_entity_slot);
 
     /* Store moving direction (ENTITY_MOVING_DIRECTIONS, NOT ENTITY_DIRECTIONS).
-     * Assembly: STA ENTITY_MOVING_DIRECTIONS,X — this is the movement direction
+     * Assembly: STA ENTITY_MOVING_DIRECTIONS,X, this is the movement direction
      * used for velocity computation and battle initiative calculation.
      * ENTITY_DIRECTIONS (visual/sprite direction) is set separately by
      * UPDATE_ENTITY_ANIMATION or callroutines like SET_DIRECTION. */
@@ -317,7 +317,7 @@ int16_t cr_clear_current_entity_collision(int16_t ent, int16_t scr,
     return 0;
 }
 
-/* ---- Inline movement cases extracted from dispatch switch ---- */
+/* Inline movement cases extracted from dispatch switch */
 
 int16_t cr_set_entity_movement_speed(int16_t entity_offset, int16_t script_offset,
                                       uint16_t pc, uint16_t *out_pc) {
@@ -531,7 +531,7 @@ int16_t cr_movement_display_text(int16_t entity_offset, int16_t script_offset,
      * GAME_MODE_ACTIONSCRIPT_FRAME; the interpreter parks this frame and
      * resumes the script after the text. FLG_TEMP_1 (flag 2, the text-done
      * flag that unblocks script spin loops) is set by the mode's
-     * AS_EPI_TEXT_FLAG epilogue at this exact sequence point — after the
+     * AS_EPI_TEXT_FLAG epilogue at this exact sequence point, after the
      * text, before the next opcode. An unresolvable address skips the child
      * and warns there, matching display_text_from_addr(); probe it here so
      * the no-text case doesn't take a frame boundary at all. */
@@ -599,7 +599,7 @@ int16_t cr_movement_store_offset_position(int16_t entity_offset, int16_t script_
 
 int16_t cr_movement_cmd_get_event_flag(int16_t entity_offset, int16_t script_offset,
                                         uint16_t pc, uint16_t *out_pc) {
-    /* 2 extra bytes: flag ID (word) — return flag state */
+    /* 2 extra bytes: flag ID (word), return flag state */
     uint16_t flag_id = sw(pc);
     *out_pc = pc + 2;
     return event_flag_get(flag_id) ? 1 : 0;
@@ -607,7 +607,7 @@ int16_t cr_movement_cmd_get_event_flag(int16_t entity_offset, int16_t script_off
 
 int16_t cr_movement_cmd_set_event_flag(int16_t entity_offset, int16_t script_offset,
                                         uint16_t pc, uint16_t *out_pc) {
-    /* 2 extra bytes: flag ID (word) — set the flag */
+    /* 2 extra bytes: flag ID (word), set the flag */
     uint16_t flag_id = sw(pc);
     *out_pc = pc + 2;
     event_flag_set(flag_id);
@@ -745,13 +745,13 @@ int16_t cr_movement_cmd_animate_pal_fade(int16_t entity_offset, int16_t script_o
     /* Port of C0AAB5 MOVEMENT_CMD_ANIMATE_PALETTE_FADE.
      * Reads 4 bytes: 16-bit palette mask, 8-bit fade_type, 8-bit frames.
      * Calls ANIMATE_PALETTE_FADE_TO_MAP which:
-     *   1. LOAD_PALETTE_TO_FADE_BUFFER — applies brightness transform
+     *   1. LOAD_PALETTE_TO_FADE_BUFFER, applies brightness transform
      *      (fade_type: 0=black, 1-49=dim, 50=normal, 51+=white) to
      *      MAP_PALETTE_BACKUP and stores result in ert.buffer[].
-     *   2. PREPARE_PALETTE_FADE — computes per-color fade slopes from
+     *   2. PREPARE_PALETTE_FADE, computes per-color fade slopes from
      *      current ert.palettes[] to ert.buffer[] target.
      *   3. Loops `frames` times calling UPDATE_MAP_PALETTE_ANIMATION.
-     *   4. FINALIZE_PALETTE_FADE — copies ert.buffer[] to ert.palettes[].
+     *   4. FINALIZE_PALETTE_FADE, copies ert.buffer[] to ert.palettes[].
      *
      * Since this is blocking in assembly (internal WAIT_UNTIL_NEXT_FRAME
      * loop), we fast-forward the entire fade: load target to ert.buffer,
@@ -761,7 +761,7 @@ int16_t cr_movement_cmd_animate_pal_fade(int16_t entity_offset, int16_t script_o
     uint8_t frames = sb(pc + 3);
     *out_pc = pc + 4;
 
-    /* Step 1: LOAD_PALETTE_TO_FADE_BUFFER — transform MAP_PALETTE_BACKUP
+    /* Step 1: LOAD_PALETTE_TO_FADE_BUFFER, transform MAP_PALETTE_BACKUP
      * by fade_type brightness and store into ert.buffer[].
      * Port of FADE_PALETTE_COLOR (C49496):
      *   type < 50: channel_out = min((channel * type * 5) >> 8, 31)
@@ -788,11 +788,11 @@ int16_t cr_movement_cmd_animate_pal_fade(int16_t entity_offset, int16_t script_o
         ert.buffer[i * 2 + 1] = (uint8_t)(out_color >> 8);
     }
 
-    /* Step 2: PREPARE_PALETTE_FADE — compute slopes from ert.palettes[] to
+    /* Step 2: PREPARE_PALETTE_FADE, compute slopes from ert.palettes[] to
      * ert.buffer[] target, then fast-forward by running the animation. */
     prepare_palette_fade_slopes((int16_t)frames, mask);
 
-    /* Step 3: Fast-forward the fade — run update_map_palette_animation
+    /* Step 3: Fast-forward the fade, run update_map_palette_animation
      * `frames` times to reach the target palette state. */
     if (frames > 1) {
         for (int f = 0; f < (int)frames; f++) {
@@ -800,7 +800,7 @@ int16_t cr_movement_cmd_animate_pal_fade(int16_t entity_offset, int16_t script_o
         }
     }
 
-    /* Step 4: FINALIZE_PALETTE_FADE — copy ert.buffer[] (target) to ert.palettes[]. */
+    /* Step 4: FINALIZE_PALETTE_FADE, copy ert.buffer[] (target) to ert.palettes[]. */
     memcpy(ert.palettes, ert.buffer, 512);
     ert.palette_upload_mode = PALETTE_UPLOAD_FULL;
     return 0;
@@ -827,7 +827,7 @@ int16_t cr_movement_cmd_setup_spotlight(int16_t entity_offset, int16_t script_of
     int screen_left  = (int)(int16_t)((uint16_t)left_x - ppu.bg_hofs[0]);
     int screen_right = (int)(int16_t)((uint16_t)right_x - ppu.bg_hofs[0]);
 
-    /* Phase 1: scanlines before cone — full window (dark area) */
+    /* Phase 1: scanlines before cone, full window (dark area) */
     for (int s = 0; s < EB_VIEWPORT_HEIGHT && s < screen_y; s++) {
         ppu.wh0_table[s] = 0;
         ppu.wh1_table[s] = 0xFF;
@@ -842,7 +842,7 @@ int16_t cr_movement_cmd_setup_spotlight(int16_t entity_offset, int16_t script_of
         ppu.wh1_table[s] = (uint8_t)(screen_right - i);
     }
 
-    /* Phase 3: remaining scanlines — empty window (no masking) */
+    /* Phase 3: remaining scanlines, empty window (no masking) */
     for (int s = screen_y + 16; s < EB_VIEWPORT_HEIGHT; s++) {
         if (s < 0) continue;
         ppu.wh0_table[s] = 128;
@@ -928,14 +928,14 @@ int16_t cr_move_toward_no_sprite_cb(int16_t entity_offset, int16_t script_offset
     int dx = abs((int)entities.abs_x[entity_offset] - (int)target_x);
     int dy = abs((int)entities.abs_y[entity_offset] - (int)target_y);
     if (dx < threshold && dy < threshold) {
-        /* Reached target — stop movement */
+        /* Reached target, stop movement */
         entities.delta_x[entity_offset] = 0;
         entities.delta_frac_x[entity_offset] = 0;
         entities.delta_y[entity_offset] = 0;
         entities.delta_frac_y[entity_offset] = 0;
         return 1;  /* TRUE = arrived */
     }
-    /* Still moving — update direction and velocity toward target */
+    /* Still moving, update direction and velocity toward target */
     uint16_t mt_fine = calculate_direction_fine(
         entities.abs_x[entity_offset], entities.abs_y[entity_offset],
         target_x, target_y);
@@ -1044,7 +1044,7 @@ int16_t cr_move_toward_target_cb(int16_t entity_offset, int16_t script_offset,
     int dy = abs((int)entities.abs_y[entity_offset] - (int)ty);
     if (dx < thr && dy < thr) {
         /* Assembly (MOVE_ENTITY_TOWARD_TARGET line 73): LDA #TRUE; BRA @RETURN
-         * — returns TRUE without zeroing deltas. */
+         *, returns TRUE without zeroing deltas. */
         return 1;
     }
     uint16_t met_fine = calculate_direction_fine(

@@ -2,19 +2,19 @@
  * Overworld collision detection functions.
  *
  * Ported from:
- *   CHECK_ENTITY_ENEMY_COLLISION         — asm/overworld/collision/check_entity_enemy_collision.asm
- *   CHECK_CURRENT_ENTITY_OBSTACLES       — asm/overworld/collision/check_current_entity_obstacles.asm
- *   CHECK_ENTITY_COLLISION_AT_POSITION   — asm/overworld/collision/check_entity_collision_at_position.asm
- *   CHECK_PROSPECTIVE_ENTITY_COLLISION   — asm/overworld/collision/check_prospective_entity_collision.asm
- *   CHECK_ENTITY_AND_NPC_COLLISION       — asm/overworld/collision/check_entity_and_npc_collision.asm
- *   CHECK_PROSPECTIVE_NPC_COLLISION      — asm/overworld/collision/check_prospective_npc_collision.asm
- *   CHECK_ENEMY_MOVEMENT_OBSTACLES       — asm/overworld/collision/check_enemy_movement_obstacles.asm
- *   CHECK_NPC_PLAYER_OBSTACLES           — asm/overworld/collision/check_npc_player_obstacles.asm
- *   NPC_COLLISION_CHECK                  — asm/overworld/npc_collision_check.asm
- *   CLEAR_ENTITY_DELTA_MOTION            — C09907
- *   CHECK_COLLISION_IN_DIRECTION         — C042EF
- *   CHECK_DIRECTIONAL_NPC_COLLISION      — C04116
- *   FIND_CLEAR_DIRECTION_FOR_LEADER      — C043BC
+ *   CHECK_ENTITY_ENEMY_COLLISION: asm/overworld/collision/check_entity_enemy_collision.asm
+ *   CHECK_CURRENT_ENTITY_OBSTACLES: asm/overworld/collision/check_current_entity_obstacles.asm
+ *   CHECK_ENTITY_COLLISION_AT_POSITION: asm/overworld/collision/check_entity_collision_at_position.asm
+ *   CHECK_PROSPECTIVE_ENTITY_COLLISION: asm/overworld/collision/check_prospective_entity_collision.asm
+ *   CHECK_ENTITY_AND_NPC_COLLISION: asm/overworld/collision/check_entity_and_npc_collision.asm
+ *   CHECK_PROSPECTIVE_NPC_COLLISION: asm/overworld/collision/check_prospective_npc_collision.asm
+ *   CHECK_ENEMY_MOVEMENT_OBSTACLES: asm/overworld/collision/check_enemy_movement_obstacles.asm
+ *   CHECK_NPC_PLAYER_OBSTACLES: asm/overworld/collision/check_npc_player_obstacles.asm
+ *   NPC_COLLISION_CHECK: asm/overworld/npc_collision_check.asm
+ *   CLEAR_ENTITY_DELTA_MOTION: C09907
+ *   CHECK_COLLISION_IN_DIRECTION: C042EF
+ *   CHECK_DIRECTIONAL_NPC_COLLISION: C04116
+ *   FIND_CLEAR_DIRECTION_FOR_LEADER: C043BC
  */
 
 #include "game/overworld_internal.h"
@@ -73,7 +73,7 @@ int16_t check_entity_enemy_collision(void) {
 
     /* Check if init entity (slot 23) collided with current entity.
      * Slot 23 is the invisible "init entity" that runs the overworld tick and
-     * performs NPC collision detection — NOT the party leader (slot 24). */
+     * performs NPC collision detection, NOT the party leader (slot 24). */
     if (entities.collided_objects[ENT(INIT_ENTITY_SLOT)] == ert.current_entity_slot)
         return -1;
 
@@ -117,7 +117,7 @@ int16_t check_current_entity_obstacles(void) {
 }
 
 /*
- * check_entity_collision_at_position — entity-vs-entity AABB collision.
+ * check_entity_collision_at_position, entity-vs-entity AABB collision.
  *
  * Port of CHECK_ENTITY_COLLISION_AT_POSITION (asm/overworld/collision/check_entity_collision_at_position.asm).
  *
@@ -226,8 +226,8 @@ void check_prospective_entity_collision(void) {
 
 /* CHECK_ENTITY_AND_NPC_COLLISION (asm/overworld/collision/check_entity_and_npc_collision.asm).
  * Like check_entity_collision_at_position but checks two specific entity ranges:
- *   1. Party entities (slots 24-29) — skipped if player_intangibility_frames != 0
- *   2. NPC entities (slots 0-22) — only those with npc_id < 0x1000
+ *   1. Party entities (slots 24-29), skipped if player_intangibility_frames != 0
+ *   2. NPC entities (slots 0-22), only those with npc_id < 0x1000
  * The NPC overlap test is 1 pixel tighter (DEC) than the party test.
  * Stores result in entities.collided_objects[entity_slot]. */
 int16_t check_entity_and_npc_collision(int16_t x, int16_t y,
@@ -254,7 +254,7 @@ int16_t check_entity_and_npc_collision(int16_t x, int16_t y,
     int16_t self_box_width = (int16_t)(self_width * 2);
     int16_t self_top = y - (int16_t)self_height;
 
-    /* Party entity loop (slots 24-29) — skip if player is intangible */
+    /* Party entity loop (slots 24-29), skip if player is intangible */
     if (ow.player_intangibility_frames == 0) {
         for (int16_t i = 24; i < MAX_ENTITIES; i++) {
             int16_t ioff = i;
@@ -295,7 +295,7 @@ int16_t check_entity_and_npc_collision(int16_t x, int16_t y,
         }
     }
 
-    /* NPC entity loop (slots 0-22) — with 1-pixel-tighter overlap tests (DEC) */
+    /* NPC entity loop (slots 0-22), with 1-pixel-tighter overlap tests (DEC) */
     for (int16_t i = 0; i < 23; i++) {
         if (i == entity_slot) continue;
 
@@ -371,7 +371,7 @@ int16_t check_enemy_movement_obstacles(void) {
     if (result != 0)
         return 0;  /* has map obstacle (already stored in obstacle_flags) */
 
-    /* No map obstacle — check enemy-specific run restrictions */
+    /* No map obstacle, check enemy-specific run restrictions */
     int16_t offset = entity_slot;
     int16_t enemy_id = entities.enemy_ids[offset];
     int16_t run_result = can_enemy_run_in_direction(0, enemy_id);
@@ -401,7 +401,7 @@ int16_t check_npc_player_obstacles(void) {
     if (flags != 0)
         return 0;  /* has tile obstacle, already stored */
 
-    /* No tile obstacle — check enemy-specific run restrictions */
+    /* No tile obstacle, check enemy-specific run restrictions */
     int16_t enemy_id = entities.enemy_ids[offset];
     int16_t run_result = can_enemy_run_in_direction(0, enemy_id);
     entities.obstacle_flags[offset] |= run_result;
@@ -409,7 +409,7 @@ int16_t check_npc_player_obstacles(void) {
 }
 
 /*
- * npc_collision_check — check leader hitbox against all NPC entities.
+ * npc_collision_check, check leader hitbox against all NPC entities.
  *
  * Port of NPC_COLLISION_CHECK (asm/overworld/npc_collision_check.asm).
  * Performs AABB overlap test between the leader entity's hitbox at the
@@ -479,7 +479,7 @@ int16_t npc_collision_check(int16_t x, int16_t y, int16_t leader_slot) {
         if (ow.player_intangibility_frames) {
             uint16_t npc_id = entities.npc_ids[offset];
             if ((uint16_t)(npc_id + 1) >= 0x8001) {
-                /* NPC ID >= 0x8000 means enemy — skip during intangibility */
+                /* NPC ID >= 0x8000 means enemy, skip during intangibility */
                 continue;
             }
         }
@@ -576,17 +576,17 @@ int16_t check_collision_in_direction(int16_t direction) {
             break;
         }
 
-        /* No NPC — check entity/terrain collision */
+        /* No NPC, check entity/terrain collision */
         uint16_t surface = check_entity_collision(
             check_x, check_y,
             game_state.current_party_members, direction);
 
         if ((surface & 0x0082) != 0x0082) {
-            /* No wall/entity collision — stop searching */
+            /* No wall/entity collision, stop searching */
             break;
         }
 
-        /* Surface collision 0x82 found — nudge check position by ±8 pixels
+        /* Surface collision 0x82 found, nudge check position by ±8 pixels
          * in the direction's axis and retry NPC check */
         if (dir_x != 0) {
             check_x += (dir_x < 0) ? -8 : 8;
@@ -634,7 +634,7 @@ int16_t check_directional_npc_collision(int16_t direction) {
             break;
         }
 
-        /* No NPC — check entity/terrain collision */
+        /* No NPC, check entity/terrain collision */
         uint16_t surface = check_entity_collision(
             check_x, check_y,
             game_state.current_party_members, direction);
@@ -701,7 +701,7 @@ int16_t find_clear_direction_for_leader(void) {
     if (result != -1 && result != 0)
         return dir;
 
-    /* Nothing found — restore original direction */
+    /* Nothing found, restore original direction */
     game_state.leader_direction = orig_dir;
     return -1;
 }

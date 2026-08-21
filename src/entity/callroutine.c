@@ -1,5 +1,5 @@
 /*
- * CALLROUTINE dispatch — maps ROM addresses to C function implementations.
+ * CALLROUTINE dispatch, maps ROM addresses to C function implementations.
  *
  * In the ROM, opcode 0x42 reads a 24-bit ROM address and calls it via
  * JUMP_TO_LOADED_MOVEMENT_PTR. Since we load raw bytecode from the donor
@@ -130,17 +130,17 @@ static const uint8_t anim_seq_meta[][4] = {
 };
 
 
-/* PHOTOGRAPHER_CFG_TABLE — loaded from ending/photographer_cfg.bin.
+/* PHOTOGRAPHER_CFG_TABLE: loaded from ending/photographer_cfg.bin.
  * Used by SET_PHOTOGRAPHER_POSITION to place the photographer entity. */
 static const uint8_t *photographer_cfg_cr;
 
-/* DELIVERY_SECTOR_PASSABLE_TABLE — from C3DFE8.
+/* DELIVERY_SECTOR_PASSABLE_TABLE: from C3DFE8.
  * Indexed by (sector_attrs & 7); nonzero = delivery path is passable. */
 static const uint8_t delivery_sector_passable_table[8] = {
     1, 1, 1, 0, 1, 1, 0, 0
 };
 
-/* Bank index for read helpers — shared with callroutine sub-files via
+/* Bank index for read helpers, shared with callroutine sub-files via
  * callroutine_internal.h (sb/sw inline helpers). */
 int cr_bank_idx;
 
@@ -157,7 +157,7 @@ void disable_other_entity_callbacks(void) {
     }
 }
 
-/* ---- CALLROUTINE implementations ---- */
+/* CALLROUTINE implementations */
 
 static int16_t cr_update_battle_screen_effects(int16_t ent, int16_t scr,
                                                uint16_t pc, uint16_t *out_pc) {
@@ -172,7 +172,7 @@ static int16_t cr_spawn_entity(int16_t ent, int16_t scr,
     uint16_t script_id = sw(pc);
     *out_pc = pc + 2;
 
-    /* Pass ROM script ID directly — resolve_script_id handles all lookups */
+    /* Pass ROM script ID directly, resolve_script_id handles all lookups */
     entity_init_wipe(script_id);
     return 0;
 }
@@ -192,7 +192,7 @@ static int16_t cr_spawn_entity(int16_t ent, int16_t scr,
  * ========================================================================= */
 
 /*
- * LUMINE_HALL_TEXT — EBTEXT-encoded bytes loaded from donor ROM.
+ * LUMINE_HALL_TEXT: EBTEXT-encoded bytes loaded from donor ROM.
  * Prefix = [0..3], name-suffix = [4..9], body = [10..214].
  * Total 215 bytes, locale-specific (US/JP differ).
  */
@@ -200,7 +200,7 @@ static int16_t cr_spawn_entity(int16_t ent, int16_t scr,
 #define LUMINE_HALL_BODY_LEN  205  /* chars at index 10..214 */
 
 /*
- * rcnd_buf_offset — current byte offset into ert.buffer for VWF tile copy.
+ * rcnd_buf_offset, current byte offset into ert.buffer for VWF tile copy.
  * Advances by 16 per tile, skipping the lower-tile region on block boundaries.
  */
 static void rcnd_advance_offset(uint16_t *buf_offset) {
@@ -211,7 +211,7 @@ static void rcnd_advance_offset(uint16_t *buf_offset) {
 }
 
 /*
- * rcnd_copy_tile — copy one completed VWF tile (32 bytes = 16 upper + 16 lower)
+ * rcnd_copy_tile, copy one completed VWF tile (32 bytes = 16 upper + 16 lower)
  * from vwf_buffer[tile_idx] into ert.buffer at [buf_offset] (upper) and
  * [buf_offset + 256] (lower).
  *
@@ -229,7 +229,7 @@ static void rcnd_copy_tile(uint16_t tile_idx, uint16_t buf_offset) {
 }
 
 /*
- * rcnd_render_glyph — render one NORMAL-font glyph (RENDER_FONT_GLYPH equivalent)
+ * rcnd_render_glyph, render one NORMAL-font glyph (RENDER_FONT_GLYPH equivalent)
  * into vwf_buffer at the current vwf_x position, using blit_vwf_glyph().
  *
  * eb_char: EB character code (0x50+)
@@ -246,7 +246,7 @@ static void rcnd_render_glyph(uint8_t eb_char) {
 }
 
 /*
- * render_character_name_display — port of RENDER_CHARACTER_NAME_DISPLAY
+ * render_character_name_display, port of RENDER_CHARACTER_NAME_DISPLAY
  * (asm/intro/render_character_name_display.asm, US version).
  *
  * Renders "I'm <name>....  <lumine_body>" into ert.buffer in the block tile
@@ -286,13 +286,13 @@ static uint16_t render_character_name_display(void) {
         } \
     } while (0)
 
-    /* --- Phase 1: render prefix "I'm " (4 chars from lumine_hall_text[0..3]) --- */
+    /* Phase 1: render prefix "I'm " (4 chars from lumine_hall_text[0..3]) */
     /* Assembly: LDA #0; JSL RENDER_FONT_GLYPH for chars at LUMINE_HALL_TEXT[0..3] */
     for (int i = 0; i < 4; i++) {
         rcnd_render_glyph(lumine_hall_text[i]);
     }
 
-    /* --- Phase 2: render character name (up to 5 chars, clamped to 5 in US) --- */
+    /* Phase 2: render character name (up to 5 chars, clamped to 5 in US) */
     int name_len = 0;
     while (name_len < 5 && party_characters[0].name[name_len])
         name_len++;
@@ -301,12 +301,12 @@ static uint16_t render_character_name_display(void) {
         rcnd_render_glyph(party_characters[0].name[i]);
     }
 
-    /* --- Phase 3: render 6-char suffix from lumine_hall_text[4..9] --- */
+    /* Phase 3: render 6-char suffix from lumine_hall_text[4..9] */
     for (int i = 4; i < 10; i++) {
         rcnd_render_glyph(lumine_hall_text[i]);
     }
 
-    /* Copy initial tiles (COPY_INITIAL_TILES — no boundary check yet) */
+    /* Copy initial tiles (COPY_INITIAL_TILES, no boundary check yet) */
     {
         uint16_t ntiles = vwf_x >> 3;
         for (uint16_t t = tile_copied; t < ntiles; t++) {
@@ -321,7 +321,7 @@ static uint16_t render_character_name_display(void) {
      * (Assembly copies 32 bytes of VWF_BUFFER[tile_copied] to ert.buffer at buf_offset.)
      * The lumine rendering will overwrite this when the tile completes. */
     rcnd_copy_tile(tile_copied, buf_offset);
-    /* Don't advance buf_offset — we'll overwrite this tile when it completes */
+    /* Don't advance buf_offset, we'll overwrite this tile when it completes */
 
     /* Save sub-pixel state: VWF_X mod 8 (partial pixel offset into current tile).
      * Assembly does: VWF_X = VWF_X % 8; VWF_TILE = 0; MEMSET16 VWF_BUFFER with 0xFF. */
@@ -364,7 +364,7 @@ static uint16_t render_character_name_display(void) {
 }
 
 /*
- * decode_planar_tilemap — port of DECODE_PLANAR_TILEMAP
+ * decode_planar_tilemap, port of DECODE_PLANAR_TILEMAP
  * (asm/system/dma/decode_planar_tilemap.asm).
  *
  * Reads a 16×16 pixel (2bpp) tile from ert.buffer at the offset computed
@@ -398,7 +398,7 @@ static void decode_planar_tilemap(uint8_t char_code, uint16_t **dest_ptr) {
         /* Upper tile: 4 groups of 4 source bytes each */
         uint32_t src = src_off;
         for (int grp = 0; grp < 4; grp++) {
-            /* (b0 XOR b1) AND b0 — extracts plane-0-dominant pixels */
+            /* (b0 XOR b1) AND b0, extracts plane-0-dominant pixels */
             uint8_t b0 = ert.buffer[src + 0];
             uint8_t b1 = ert.buffer[src + 1];
             uint16_t lo_val = (uint16_t)((b0 ^ b1) & b0);
@@ -436,7 +436,7 @@ static void decode_planar_tilemap(uint8_t char_code, uint16_t **dest_ptr) {
 }
 
 /*
- * callroutine_dispatch — called from opcodes.c for CALLROUTINE opcode.
+ * callroutine_dispatch, called from opcodes.c for CALLROUTINE opcode.
  */
 int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
                              int16_t script_offset, uint16_t pc,
@@ -508,7 +508,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
          * Assembly: STZ USE_SECOND_SPRITE_FRAME; JSL IS_ENTITY_ON_SCREEN;
          *           BNE → RENDER_ENTITY_SPRITE_SETUP_AND_RENDER (ENTRY4).
          * Uploads frame-0 tiles to VRAM if the entity is on screen.
-         * IMPORTANT: The assembly does NOT modify ENTITY_ANIMATION_FRAME —
+         * IMPORTANT: The assembly does NOT modify ENTITY_ANIMATION_FRAME, 
          * it only sets the transient USE_SECOND_SPRITE_FRAME global to 0.
          * Entity visibility is controlled separately by SET_ANIMATION (0x3B).
          * The per-frame draw callback handles ongoing tile rendering. */
@@ -524,7 +524,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
     case ROM_ADDR_RESET_ENTITY_ANIMATION:
         return cr_reset_entity_animation(entity_offset, script_offset,
                                           pc, out_pc);
-    /* ---- Overworld movement callroutines ---- */
+    /* Overworld movement callroutines */
     case ROM_ADDR_SET_ENTITY_MOVEMENT_SPEED:
         return cr_set_entity_movement_speed(entity_offset, script_offset,
                                           pc, out_pc);
@@ -842,7 +842,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         return 0;
     }
     case ROM_ADDR_UPDATE_ENTITY_SURFACE_FLAGS: {
-        /* C0C7DB: UPDATE_ENTITY_SURFACE_FLAGS — looks up terrain flags from
+        /* C0C7DB: UPDATE_ENTITY_SURFACE_FLAGS, looks up terrain flags from
          * the collision map at the entity's (X,Y) position and stores them
          * in ENTITY_SURFACE_FLAGS. Calls lookup_surface_flags() which reads
          * the LOADED_COLLISION_TILES grid. */
@@ -855,7 +855,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         return 0;
     }
     case ROM_ADDR_SET_NPC_DIR_FROM_FLAG: {
-        /* C0C353/C0C30C: SET_NPC_DIRECTION_FROM_FLAG — reads the NPC config's
+        /* C0C353/C0C30C: SET_NPC_DIRECTION_FROM_FLAG, reads the NPC config's
          * event_flag field, checks if the flag is set, and sets entity direction
          * to UP (0) if set, DOWN (4) if not. Then re-renders the sprite.
          *
@@ -1186,7 +1186,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
     }
 
     case ROM_ADDR_NULL_CALLROUTINE:
-        /* Port of C4CC2C NULL_CALLROUTINE — pure no-op. */
+        /* Port of C4CC2C NULL_CALLROUTINE, pure no-op. */
         *out_pc = pc;
         return 0;
 
@@ -1389,7 +1389,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         /* Port of C2654C INSTANT_WIN_PP_RECOVERY.
          * Flashes screen purple twice, recovers 20 PP for NESS/PAULA/POO.
          * Runs as a GAME_MODE_PP_RECOVERY_FLASH child pushed by
-         * GAME_MODE_ACTIONSCRIPT_FRAME (the SFX plays on its first step —
+         * GAME_MODE_ACTIONSCRIPT_FRAME (the SFX plays on its first step, 
          * the accepted <=1-frame push boundary). */
         *out_pc = pc;
         actionscript_request_pp_recovery();
@@ -1544,7 +1544,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         int16_t old_q = quantize_entity_direction(entity_offset, cur_dir);
         int16_t new_q = quantize_entity_direction(entity_offset, new_dir);
         if (old_q != new_q) {
-            /* Sprite group changed — re-render sprite.
+            /* Sprite group changed, re-render sprite.
              * RENDER_ENTITY_SPRITE_ENTRY2 takes slot, uses animation_frame. */
             render_entity_sprite(entity_offset);
         }
@@ -1718,7 +1718,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         set_cast_scroll_threshold(scripts.tempvar[script_offset], entity_offset);
         return 0;
 
-    /* ---- Delivery system (EF bank) ---- */
+    /* Delivery system (EF bank) */
 
     case ROM_ADDR_GET_DELIVERY_ATTEMPTS: {
         /* Port of EF0C87 GET_DELIVERY_ATTEMPTS.
@@ -1855,7 +1855,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         *out_pc = pc;
         int16_t slot = ert.current_entity_slot;
 
-        /* --- Early exits --- */
+        /* Early exits */
         if (bt.battle_mode_flag != 0) return 0;
         if (dr.using_door != 0) return 0;
 
@@ -1883,7 +1883,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
                 return 0;
         }
 
-        /* --- Collision detected --- */
+        /* Collision detected */
 
         /* Magic butterfly special case: if no swirl and no prior touch,
          * and this enemy is a magic butterfly, return 1 without starting encounter */
@@ -1892,7 +1892,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
                 return 1;
         }
 
-        /* --- Start encounter or handle active swirl --- */
+        /* Start encounter or handle active swirl */
         if (ow.battle_swirl_countdown == 0 && ow.enemy_has_been_touched == 0) {
             /* First contact: start the encounter sequence */
             ow.enemy_has_been_touched = 1;
@@ -1923,7 +1923,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
 
         if (ow.battle_swirl_countdown != 0) {
             if (slot == bt.touched_enemy) {
-                /* Original touching enemy — just disable it */
+                /* Original touching enemy, just disable it */
                 entities.tick_callback_hi[slot] |= 0xC000;
                 result = 1;
             } else {
@@ -1948,7 +1948,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
                 }
 
                 if (total_count == 0 && !is_battle_swirl_active()) {
-                    /* No more pathfinding enemies and swirl done — disable all entities */
+                    /* No more pathfinding enemies and swirl done, disable all entities */
                     for (int16_t i = 0; i < MAX_ENTITIES; i++) {
                         if (i != 23) {
                             entities.tick_callback_hi[i] |= 0xC000;
@@ -1963,7 +1963,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
 
     case ROM_ADDR_ADVANCE_ENTITY_TOWARD_LEADER: {
         /* Port of C0D0E6 ADVANCE_ENTITY_TOWARD_LEADER.
-         * 1. Classify Manhattan distance to leader — if close (0) AND pathfinding
+         * 1. Classify Manhattan distance to leader, if close (0) AND pathfinding
          *    active → teleport entity to leader position.
          * 2. Otherwise compute prospective position, check collision:
          *    - Collision → reduce movement speed by 0x1000, return 0
@@ -1996,11 +1996,11 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
             ow.entity_movement_prospective_x, ow.entity_movement_prospective_y,
             ert.current_entity_slot, 4);
         if (coll & 0x00C0) {
-            /* Collision — reduce movement speed */
+            /* Collision, reduce movement speed */
             entities.movement_speeds[ent] -= 0x1000;
             return 0;
         }
-        /* No collision — apply new position */
+        /* No collision, apply new position */
         entities.abs_x[ent] = ow.entity_movement_prospective_x;
         entities.abs_y[ent] = ow.entity_movement_prospective_y;
         return -1;
@@ -2061,7 +2061,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         return 0;
 
     case ROM_ADDR_UPLOAD_SPECIAL_CAST_PALETTE:
-        /* C4EC6E: UPLOAD_SPECIAL_CAST_PALETTE — copies palette from
+        /* C4EC6E: UPLOAD_SPECIAL_CAST_PALETTE, copies palette from
          * decompressed data in BUFFER+$7000 to OBJ palette 12.
          * Parameter is tempvar (previous callroutine return value). */
         *out_pc = pc;
@@ -2124,7 +2124,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
     case ROM_ADDR_DISPLAY_ANTI_PIRACY_SCREEN:
         /* Port of DISPLAY_ANTI_PIRACY_SCREEN (asm/system/display_antipiracy_screen.asm).
          * Shows the anti-piracy warning screen (copy protection).
-         * No-op in the C port — this is not gameplay-relevant. */
+         * No-op in the C port, this is not gameplay-relevant. */
         *out_pc = pc;
         return 0;
 
@@ -2280,7 +2280,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         if (!photographer_cfg_cr)
             photographer_cfg_cr = ASSET_DATA(ASSET_ENDING_PHOTOGRAPHER_CFG_BIN);
         if (!photographer_cfg_cr) {
-            LOG_WARN("WARN: SET_PHOTOGRAPHER_POSITION — failed to load photographer_cfg.bin\n");
+            LOG_WARN("WARN: SET_PHOTOGRAPHER_POSITION, failed to load photographer_cfg.bin\n");
             return 0;
         }
 
@@ -2301,7 +2301,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         return 0;
     }
 
-    /* ---- Your Sanctuary display callroutines ---- */
+    /* Your Sanctuary display callroutines */
 
     case ROM_ADDR_INITIALIZE_YOUR_SANCTUARY_DISPLAY:
         /* C4DE98: INITIALIZE_YOUR_SANCTUARY_DISPLAY
@@ -2340,12 +2340,12 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         *out_pc = pc;
         uint16_t sanctuary_idx = scripts.tempvar[script_offset] & 0x0007;
 
-        /* Always reload — single-slot, no caching */
+        /* Always reload, single-slot, no caching */
         load_your_sanctuary_location(sanctuary_idx);
         /* Assembly RENDER_FRAME_TICK: flush a frame before swapping the tilemap
          * into VRAM. This callroutine runs inside run_actionscript_frame() with
          * ert.disable_actionscript set, so the nested actionscript frame is a
-         * guaranteed no-op (run_actionscript_frame_step() returns false) — the
+         * guaranteed no-op (run_actionscript_frame_step() returns false), the
          * render work runs inline with no park and no host yield (the dropped
          * intermediate present is imperceptible; the next root yield shows the
          * final state). Run-to-completion: no blocking render_frame_tick(). */
@@ -2368,7 +2368,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         return 0;
     }
 
-    /* ---- Bubble Monkey callroutine ---- */
+    /* Bubble Monkey callroutine */
 
     case ROM_ADDR_INIT_BUBBLE_MONKEY: {
         /* EF027D: INIT_BUBBLE_MONKEY
@@ -2391,7 +2391,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         return 0;
     }
 
-    /* ---- Butterfly movement callroutines ---- */
+    /* Butterfly movement callroutines */
 
     case ROM_ADDR_INIT_BUTTERFLY_MOVEMENT: {
         /* C0CCCC: INIT_BUTTERFLY_MOVEMENT
@@ -2500,7 +2500,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         return (int16_t)face_angle;
     }
 
-    /* ---- Animation sequence / visual callroutines ---- */
+    /* Animation sequence / visual callroutines */
 
     case ROM_ADDR_MOVEMENT_LOAD_BATTLEBG: {
         /* Port of MOVEMENT_LOAD_BATTLEBG (asm/battle/load_battlebg_movement.asm).
@@ -2630,7 +2630,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         size_t lasf_dec_sz = decomp(lasf_comp, lasf_comp_sz, ert.buffer, BUFFER_SIZE);
         if (lasf_dec_sz == 0) return 0;
 
-        /* Decompressed data layout (no header — tile_size from metadata table):
+        /* Decompressed data layout (no header, tile_size from metadata table):
          * [0 .. tile_size-1]: tile graphics
          * [tile_size .. tile_size+7]: palette (BPP2PALETTE_SIZE = 8 bytes, 4 colors)
          * [tile_size+8 ..]: frame tilemap data (1792 bytes per frame) */

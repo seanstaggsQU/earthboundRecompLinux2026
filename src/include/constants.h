@@ -21,11 +21,11 @@
 
 /* Event flag IDs (1-based, from include/constants/event_flags.asm) */
 #define EVENT_FLAG_NESS_PAJAMA    749  /* FLG_MYHOME_NES_CHANGE */
-#define EVENT_FLAG_BUNBUN         18  /* FLG_BUNBUN — BuzzBuzz in party */
+#define EVENT_FLAG_BUNBUN         18  /* FLG_BUNBUN, BuzzBuzz in party */
 #define EVENT_FLAG_MONSTER_OFF    11  /* FLG_SYS_MONSTER_OFF */
-#define EVENT_FLAG_DIS_2H_PAPA  775  /* FLG_SYS_DIS_2H_PAPA — disables dad phone */
-#define EVENT_FLAG_WIN_GIEGU     73  /* FLG_WIN_GIEGU — defeated Giygas */
-#define EVENT_FLAG_DISABLE_TELEPORT 754 /* FLG_SYS_DISTLPT — disable PSI Teleport */
+#define EVENT_FLAG_DIS_2H_PAPA  775  /* FLG_SYS_DIS_2H_PAPA, disables dad phone */
+#define EVENT_FLAG_WIN_GIEGU     73  /* FLG_WIN_GIEGU, defeated Giygas */
+#define EVENT_FLAG_DISABLE_TELEPORT 754 /* FLG_SYS_DISTLPT, disable PSI Teleport */
 
 /* Party member NPCs (from include/enums.asm PARTY_MEMBER enum) */
 #define PARTY_NPC_DUNGEON_MAN  10
@@ -172,7 +172,7 @@ enum {
     FONT_LARGE,
 };
 
-/* Item IDs — generated from items.json (full 254-entry enum) */
+/* Item IDs, generated from items.json (full 254-entry enum) */
 #include "items_generated.h"
 
 /* Walking styles (from include/enums.asm WALKING_STYLE) */

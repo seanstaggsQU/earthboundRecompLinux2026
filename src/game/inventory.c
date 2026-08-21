@@ -19,7 +19,7 @@
 /* Forward declarations for party management (defined later in this file,
  * exported via inventory.h for CC_1F_11/12 in display_text.c) */
 
-/* --- Item configuration table (loaded from ROM data) --- */
+/* Item configuration table (loaded from ROM data) */
 
 static const uint8_t *item_config_data = NULL;
 static size_t item_config_size = 0;
@@ -43,7 +43,7 @@ const ItemConfig *get_item_entry(uint16_t item_id) {
     return (const ItemConfig *)(item_config_data + offset);
 }
 
-/* --- Internal helpers --- */
+/* Internal helpers */
 
 /* Read a signed parameter byte from item configuration table.
  * Matches assembly pattern: SEC; AND #$00FF; SBC #$0080; EOR #$FF80
@@ -67,7 +67,7 @@ static int16_t get_equipment_strength_modifier(uint16_t char_idx, int equipment_
 }
 
 /* Get a signed ep modifier from an equipment slot (used by speed, guts, luck).
- * No Poo special handling — everyone reads ep the same way. */
+ * No Poo special handling, everyone reads ep the same way. */
 static int16_t get_equipment_ep_modifier(uint16_t char_idx, int equipment_slot) {
     uint8_t equip_val = party_characters[char_idx].equipment[equipment_slot];
     if (equip_val == 0) return 0;
@@ -94,7 +94,7 @@ static uint8_t clamp_stat_lower(int16_t total) {
     return (uint8_t)(total & 0xFF);
 }
 
-/* --- Stat recalculation functions --- */
+/* Stat recalculation functions */
 
 /* RECALC_CHARACTER_POSTMATH_OFFENSE: Port of asm/misc/recalc_character_postmath_offense.asm.
  * Reads base_offense, adds weapon strength modifier (epi for Poo), clamps 0-255.
@@ -306,31 +306,31 @@ void calc_resistances(uint16_t char_id) {
 
     #undef GET_SPECIAL
 
-    /* --- fire_resist: bits 0-1 from BODY + OTHER, clamped 0-3 --- */
+    /* fire_resist: bits 0-1 from BODY + OTHER, clamped 0-3 */
     {
         int16_t total = (body_special & 0x03) + (other_special & 0x03);
         ch->fire_resist = (total > 3) ? 3 : (uint8_t)total;
     }
 
-    /* --- freeze_resist: bits 2-3 from BODY + OTHER, shifted >> 2, clamped 0-3 --- */
+    /* freeze_resist: bits 2-3 from BODY + OTHER, shifted >> 2, clamped 0-3 */
     {
         int16_t total = ((body_special & 0x0C) >> 2) + ((other_special & 0x0C) >> 2);
         ch->freeze_resist = (total > 3) ? 3 : (uint8_t)total;
     }
 
-    /* --- flash_resist: bits 4-5 from BODY + OTHER, shifted >> 4, clamped 0-3 --- */
+    /* flash_resist: bits 4-5 from BODY + OTHER, shifted >> 4, clamped 0-3 */
     {
         int16_t total = ((body_special & 0x30) >> 4) + ((other_special & 0x30) >> 4);
         ch->flash_resist = (total > 3) ? 3 : (uint8_t)total;
     }
 
-    /* --- paralysis_resist: bits 6-7 from BODY + OTHER, shifted >> 6, clamped 0-3 --- */
+    /* paralysis_resist: bits 6-7 from BODY + OTHER, shifted >> 6, clamped 0-3 */
     {
         int16_t total = ((body_special & 0xC0) >> 6) + ((other_special & 0xC0) >> 6);
         ch->paralysis_resist = (total > 3) ? 3 : (uint8_t)total;
     }
 
-    /* --- hypnosis_brainshock_resist: full signed byte from ARMS --- */
+    /* hypnosis_brainshock_resist: full signed byte from ARMS */
     ch->hypnosis_brainshock_resist = (uint8_t)(arms_special & 0xFF);
 }
 
@@ -376,7 +376,7 @@ static uint8_t loaded_transformations[ITEM_TRANSFORM_MAX_ENTRIES * LOADED_TRANSF
 uint16_t item_transformations_loaded = 0;
 static uint8_t time_until_next_item_transformation_check = 0;
 
-/* ---- Savestate snapshot (see ItemTransformSaveState in inventory.h) ---- */
+/* Savestate snapshot (see ItemTransformSaveState in inventory.h) */
 void item_transform_savestate_pack(void *out) {
     ItemTransformSaveState *s = (ItemTransformSaveState *)out;
     memcpy(s->loaded_transformations, loaded_transformations, sizeof(loaded_transformations));
@@ -773,7 +773,7 @@ void remove_char_from_party(uint16_t char_id) {
     }
 }
 
-/* --- Item access functions --- */
+/* Item access functions */
 
 /* Key Items pool feature, not part of the original ROM/assembly. Several
  * item-use event scripts (found live: Key to the Cabin's unlock check,
@@ -781,7 +781,7 @@ void remove_char_from_party(uint16_t char_id) {
  * being used" mid-script via GET_CHARACTER_ITEM(char_id, item_slot),
  * reading the exact (char_id, item_slot) that mode_step_use_item()'s
  * UI_SETUP already wrote to working_memory/argument_memory for ANY item
- * use -- a pattern that only works when item_slot is a real inventory
+ * use, a pattern that only works when item_slot is a real inventory
  * position, which a pool item doesn't have. mode_step_use_item() routes
  * around this by setting item_slot to this sentinel (never a real 1-14
  * slot) and recording the in-progress item_id here; get_character_item()
@@ -800,7 +800,7 @@ void key_items_set_use_in_progress(uint16_t item_id) {
  * Assembly calling convention: A=char_id, X=slot (both 1-indexed).
  * Returns the item ID at items[slot-1] for party_characters[char_id-1].
  *
- * Key Items pool safety: the sentinel read is one-shot -- it consumes
+ * Key Items pool safety: the sentinel read is one-shot, it consumes
  * (clears) key_items_pool_use_item_id as it returns it. The only known
  * consumer reads it exactly once per pool-item use (see the doc comment
  * above key_items_pool_use_item_id), and one-shot consumption is also
@@ -810,7 +810,7 @@ void key_items_set_use_in_progress(uint16_t item_id) {
  * been cleared elsewhere would fall through to slot_idx = 0xFFFE, far
  * outside items[]'s 14 entries. The explicit slot bounds check below is
  * a second, independent guard against that same class of stale/garbage
- * slot value -- belt and suspenders, since this function has no other
+ * slot value, belt and suspenders, since this function has no other
  * caller-side validation to rely on (several callers pass slot values
  * that themselves trace back to script/menu state, not just the
  * sentinel path). */
@@ -848,7 +848,7 @@ uint16_t find_empty_inventory_slot(uint16_t char_id) {
     return slot;
 }
 
-/* --- Item give/remove functions --- */
+/* Item give/remove functions */
 
 /* GIVE_ITEM_TO_SPECIFIC_CHARACTER: Port of asm/misc/give_item_to_specific_character.asm.
  * Finds an empty inventory slot and places the item there.
@@ -865,7 +865,7 @@ uint16_t give_item_to_specific_character(uint16_t char_id, uint16_t item_id) {
         FATAL("give_item_to_specific_character: invalid char_id=%u\n", char_id);
 
     /* Key items route to the global pool instead of this character's
-     * regular inventory -- see the Key Items pool section above. */
+     * regular inventory, see the Key Items pool section above. */
     if (is_key_item_type(item_id)) {
         return key_items_give(item_id) ? char_id : 0;
     }
@@ -875,7 +875,7 @@ uint16_t give_item_to_specific_character(uint16_t char_id, uint16_t item_id) {
         if (party_characters[char_idx].items[slot] != 0)
             continue;
 
-        /* Found empty slot — store item */
+        /* Found empty slot, store item */
         party_characters[char_idx].items[slot] = (uint8_t)item_id;
 
         /* Check if item type is TEDDY_BEAR */
@@ -903,7 +903,7 @@ uint16_t give_item_to_specific_character(uint16_t char_id, uint16_t item_id) {
  * Assembly: FAR function. First param A=char_id, second param X=item_id. */
 uint16_t give_item_to_character(uint16_t char_id, uint16_t item_id) {
     /* Key items route to the global pool regardless of char_id (specific or
-     * CHAR_ID_ANY) -- handled once here, before the CHAR_ID_ANY loop below,
+     * CHAR_ID_ANY), handled once here, before the CHAR_ID_ANY loop below,
      * so that loop can't call key_items_give() once per party member and
      * insert the same item repeatedly. give_item_to_specific_character()
      * has its own equivalent redirect for any caller that reaches it
@@ -935,7 +935,7 @@ uint16_t give_item_to_character(uint16_t char_id, uint16_t item_id) {
  * char_id: 1-indexed. item_slot: 1-indexed position.
  *
  * Steps:
- * 1. Check each equipment slot — if it matches item_slot, unequip it
+ * 1. Check each equipment slot, if it matches item_slot, unequip it
  * 2. For each equipment slot with index > removed position, decrement it
  * 3. Save the item being removed
  * 4. Shift items left to compact the array
@@ -944,7 +944,7 @@ uint16_t give_item_to_character(uint16_t char_id, uint16_t item_id) {
  * 7. Handle transform flag (START_TIMED_ITEM_TRANSFORMATION)
  * Returns char_id.
  *
- * C-port safety guard (no assembly counterpart -- the ROM's script data
+ * C-port safety guard (no assembly counterpart, the ROM's script data
  * always supplied a valid slot): char_id/item_slot are validated before
  * any array access. This is what keeps a stray
  * KEY_ITEMS_POOL_USE_SLOT_SENTINEL (0xFFFF), or any other out-of-range
@@ -955,7 +955,7 @@ uint16_t remove_item_from_inventory(uint16_t char_id, uint16_t item_slot) {
     if (item_slot == 0 || item_slot > ITEM_INVENTORY_SIZE) return char_id;
     uint16_t char_idx = char_id - 1;
 
-    /* --- Step 1: Unequip if the removed item is equipped --- */
+    /* Step 1: Unequip if the removed item is equipped */
     /* Check WEAPON slot */
     uint8_t weapon_equip = party_characters[char_idx].equipment[EQUIP_WEAPON];
     if (weapon_equip == item_slot) {
@@ -997,7 +997,7 @@ uint16_t remove_item_from_inventory(uint16_t char_id, uint16_t item_slot) {
         party_characters[char_idx].equipment[EQUIP_OTHER]--;
     }
 
-    /* --- Step 3: Save the removed item --- */
+    /* Step 3: Save the removed item */
     uint16_t removed_slot_idx = item_slot - 1; /* 0-based */
     uint8_t removed_item = party_characters[char_idx].items[removed_slot_idx];
 
@@ -1031,7 +1031,7 @@ uint16_t remove_item_from_inventory(uint16_t char_id, uint16_t item_slot) {
         update_teddy_bear_party();
     }
 
-    /* --- Step 7: Handle transform flag --- */
+    /* Step 7: Handle transform flag */
     if (entry && (entry->flags & ITEM_FLAG_TRANSFORM)) {
         start_timed_item_transformation(removed_item);
     }
@@ -1161,7 +1161,7 @@ void swap_item_into_equipment(uint16_t source_char_id, uint16_t item_slot,
         /* Different character: item moved to another character.
          * Check if the item was equipped on source; if so, unequip it.
          * Assembly @DIFFERENT_CHARACTER: checks each slot of TARGET char...
-         * wait — actually the assembly checks SOURCE char's equipment to see
+         * wait, actually the assembly checks SOURCE char's equipment to see
          * if the moved item was equipped, then calls CHANGE_EQUIPPED_*(source, 0).
          * Then adjusts remaining indices above removed position. */
         for (int eq = 0; eq < EQUIP_COUNT; eq++) {
@@ -1205,7 +1205,7 @@ uint16_t take_item_from_specific_character(uint16_t char_id, uint16_t item_id) {
 
     for (uint16_t slot = 0; slot < ITEM_INVENTORY_SIZE; slot++) {
         if (party_characters[char_idx].items[slot] == (uint8_t)item_id) {
-            /* Found the item — remove it (slot+1 for 1-based, char_idx+1 for char_id) */
+            /* Found the item, remove it (slot+1 for 1-based, char_idx+1 for char_id) */
             return remove_item_from_inventory(char_idx + 1, slot + 1);
         }
     }
@@ -1291,7 +1291,7 @@ uint16_t find_item_in_inventory(uint16_t char_id, uint16_t item_id) {
  * When specific: calls FIND_ITEM_IN_INVENTORY directly, returns as-is. */
 uint16_t find_item_in_inventory2(uint16_t char_id, uint16_t item_id) {
     /* Key items: check the global pool once, regardless of char_id (specific
-     * or CHAR_ID_ANY) -- this is the actual fix for the ShrineFox-mod-style
+     * or CHAR_ID_ANY), this is the actual fix for the ShrineFox-mod-style
      * bug (lookups there only scan the currently-controlled party via
      * CHAR_ID_ANY, so benching the character "holding" a key item makes it
      * disappear from checks). The pool has no such dependency: a key item
@@ -1325,7 +1325,7 @@ uint16_t find_item_in_inventory2(uint16_t char_id, uint16_t item_id) {
  * Assembly: FAR function. First param A=char_id, second param X=item_id. */
 uint16_t take_item_from_character(uint16_t char_id, uint16_t item_id) {
     /* Key items: remove from the global pool once, regardless of char_id
-     * (specific or CHAR_ID_ANY) -- handled here so the CHAR_ID_ANY loop
+     * (specific or CHAR_ID_ANY), handled here so the CHAR_ID_ANY loop
      * below doesn't call key_items_remove() once per party member (harmless
      * since it's idempotent after the first hit, but wasted work and an
      * ambiguous return value otherwise). */
@@ -1409,7 +1409,7 @@ uint16_t key_items_remove(uint16_t item_id) {
     return item_id;
 }
 
-/* --- Escargo Express functions --- */
+/* Escargo Express functions */
 
 /* ESCARGO_EXPRESS_STORE: Port of asm/misc/escargo_express_store.asm.
  * Finds first empty slot in escargo_express_items[] and stores item.
@@ -1467,7 +1467,7 @@ uint16_t deliver_escargo_express_item(uint16_t char_id, uint16_t escargo_slot) {
     return char_id; /* assembly always returns the original char_id param */
 }
 
-/* --- Experience table --- */
+/* Experience table */
 
 #define MAX_LEVEL 99
 #define EXP_LEVELS_PER_CHAR 100
@@ -1587,7 +1587,7 @@ uint32_t get_required_exp(uint16_t char_id) {
     return next_level_exp - current_exp;
 }
 
-/* --- Stats growth data (loaded from ROM data) --- */
+/* Stats growth data (loaded from ROM data) */
 
 #define STATS_GROWTH_CHARS     4
 #define STATS_GROWTH_STATS     7   /* offense, defense, speed, guts, vitality, IQ, luck */
@@ -1619,7 +1619,7 @@ static bool ensure_stats_growth(void) {
     return true;
 }
 
-/* --- PSI ability table (loaded from ROM data, for PSI learning checks) --- */
+/* PSI ability table (loaded from ROM data, for PSI learning checks) */
 
 static const PsiAbility *psi_table_data_inv = NULL;
 static size_t psi_table_size_inv = 0;
@@ -1680,7 +1680,7 @@ static int16_t calculate_stat_gain_simple(uint8_t growth_var, uint8_t base_stat,
  * Split for the run-to-completion conversion: the per-stage stat math lives
  * in level_up_apply_stage() (shared so both paths run the exact assembly
  * math, including the rand() call order); the silent play_sound == 0 path
- * (no music, no texts, no PSI-learn scan — the assembly gates all of those
+ * (no music, no texts, no PSI-learn scan, the assembly gates all of those
  * on the play-sound flag) is level_up_char_silent(); the text-displaying
  * play_sound != 0 path is mode_step_level_up() (GAME_MODE_LEVEL_UP), defined
  * with gain_exp() below. */
@@ -1731,7 +1731,7 @@ static int16_t level_up_apply_stage(uint16_t char_id, uint16_t old_level, uint8_
         recalc_character_postmath_offense(char_id);
         return gain;
     }
-    /* --- Defense growth (assembly lines 108-155) --- */
+    /* Defense growth (assembly lines 108-155) */
     case LU_STAGE_DEFENSE: {
         uint8_t growth = stats_growth_data[char_index * STATS_GROWTH_STATS + 1];
         int16_t gain = calculate_stat_gain(growth, ch->base_defense, old_level);
@@ -1740,7 +1740,7 @@ static int16_t level_up_apply_stage(uint16_t char_id, uint16_t old_level, uint8_
         recalc_character_postmath_defense(char_id);
         return gain;
     }
-    /* --- Speed growth (assembly lines 156-209) --- */
+    /* Speed growth (assembly lines 156-209) */
     case LU_STAGE_SPEED: {
         uint8_t growth = stats_growth_data[char_index * STATS_GROWTH_STATS + 2];
         int16_t gain = calculate_stat_gain(growth, ch->base_speed, old_level);
@@ -1749,7 +1749,7 @@ static int16_t level_up_apply_stage(uint16_t char_id, uint16_t old_level, uint8_
         recalc_character_postmath_speed(char_id);
         return gain;
     }
-    /* --- Guts growth (assembly lines 210-259) --- */
+    /* Guts growth (assembly lines 210-259) */
     case LU_STAGE_GUTS: {
         uint8_t growth = stats_growth_data[char_index * STATS_GROWTH_STATS + 3];
         int16_t gain = calculate_stat_gain(growth, ch->base_guts, old_level);
@@ -1761,7 +1761,7 @@ static int16_t level_up_apply_stage(uint16_t char_id, uint16_t old_level, uint8_
     /* --- Vitality growth (assembly lines 260-349) ---
      * Simple formula for old_level < 10 (lines 265-294), standard
      * CALCULATE_STAT_GAIN otherwise (lines 296-318).
-     * Assembly: CLC; SBC #0; BRANCHLTEQS — skips gain <= 0. */
+     * Assembly: CLC; SBC #0; BRANCHLTEQS, skips gain <= 0. */
     case LU_STAGE_VITALITY: {
         uint8_t growth = stats_growth_data[char_index * STATS_GROWTH_STATS + 4];
         int16_t gain = (old_level < 10)
@@ -1772,7 +1772,7 @@ static int16_t level_up_apply_stage(uint16_t char_id, uint16_t old_level, uint8_
         recalc_character_postmath_vitality(char_id);
         return gain;
     }
-    /* --- IQ growth (assembly lines 350-435): same level<10 branching --- */
+    /* IQ growth (assembly lines 350-435): same level<10 branching */
     case LU_STAGE_IQ: {
         uint8_t growth = stats_growth_data[char_index * STATS_GROWTH_STATS + 5];
         int16_t gain = (old_level < 10)
@@ -1783,7 +1783,7 @@ static int16_t level_up_apply_stage(uint16_t char_id, uint16_t old_level, uint8_
         recalc_character_postmath_iq(char_id);
         return gain;
     }
-    /* --- Luck growth (assembly lines 436-489) --- */
+    /* Luck growth (assembly lines 436-489) */
     case LU_STAGE_LUCK: {
         uint8_t growth = stats_growth_data[char_index * STATS_GROWTH_STATS + 6];
         int16_t gain = calculate_stat_gain(growth, ch->base_luck, old_level);
@@ -1795,7 +1795,7 @@ static int16_t level_up_apply_stage(uint16_t char_id, uint16_t old_level, uint8_
     /* --- Max HP increase (assembly lines 490-540) ---
      * hp_potential = vitality * 15 - max_hp
      * If hp_potential > 1: hp_increase = hp_potential
-     * Otherwise: hp_increase = rand()%3 + 1 (i.e., 1-3) — always >= 1, so
+     * Otherwise: hp_increase = rand()%3 + 1 (i.e., 1-3), always >= 1, so
      * the HP message always shows. */
     case LU_STAGE_HP: {
         int16_t hp_potential = (int16_t)ch->vitality * 15 - (int16_t)ch->max_hp;
@@ -1839,7 +1839,7 @@ static int16_t level_up_apply_stage(uint16_t char_id, uint16_t old_level, uint8_
     }
 }
 
-/* Silent (play_sound == 0) level-up — reset_char_level_one and silent
+/* Silent (play_sound == 0) level-up, reset_char_level_one and silent
  * gain_exp. Never yields. char_id: 1-indexed. */
 static void level_up_char_silent(uint16_t char_id) {
     if (char_id < 1 || char_id > 4) return;
@@ -1925,7 +1925,7 @@ void reset_char_level_one(uint16_t char_id, uint16_t target_level, uint16_t set_
     }
 }
 
-/* True when char_id's EXP meets the next level's threshold — gain_exp's loop
+/* True when char_id's EXP meets the next level's threshold, gain_exp's loop
  * condition (asm/misc/gain_exp.asm lines 33-66 / 78-118): not at MAX_LEVEL,
  * the EXP_TABLE entry exists, and exp >= threshold. char_id: 1-indexed,
  * validated by the caller. */
@@ -1964,7 +1964,7 @@ void level_up_make_init(ModeState *init, uint16_t char_id) {
 }
 
 /* Push a DISPLAY_TEXT child for `addr`. If the address can't be resolved,
- * warn (like display_text_from_addr) and don't push — the step's for(;;)
+ * warn (like display_text_from_addr) and don't push, the step's for(;;)
  * falls through inline. Same idiom as menu_push_text (text.c). */
 static ModeState lu_child_init;  /* outlives the dispatch (the pump copies it) */
 static StepResult lu_push_text(uint32_t addr, bool *pushed) {
@@ -1977,7 +1977,7 @@ static StepResult lu_push_text(uint32_t addr, bool *pushed) {
     return STEP_RESULT_CONTINUE();
 }
 
-/* GAME_MODE_LEVEL_UP step — run-to-completion port of the gain_exp()
+/* GAME_MODE_LEVEL_UP step, run-to-completion port of the gain_exp()
  * level-up loop (asm/misc/gain_exp.asm lines 68-118) + LEVEL_UP_CHAR
  * (asm/misc/level_up_char.asm) for the text-displaying play_sound != 0 path.
  * Phases chain inside an internal for(;;) so everything between two texts
@@ -2096,7 +2096,7 @@ void gain_exp(uint16_t play_sound, uint16_t char_id, uint32_t exp_amount) {
     } while (level_up_pending(char_id));
 }
 
-/* --- Financial functions --- */
+/* Financial functions */
 
 /* Maximum wallet balance */
 #define WALLET_LIMIT 99999u
@@ -2152,7 +2152,7 @@ void withdraw_from_atm(uint32_t amount) {
     game_state.bank_balance -= amount;
 }
 
-/* --- Item usability query --- */
+/* Item usability query */
 
 /* CHECK_ITEM_USABLE_BY: Port of src/inventory/check_item_usable_by.asm.
  * Checks if char_id (1-indexed) can use item_id by ANDing item.flags
@@ -2167,7 +2167,7 @@ uint16_t check_item_usable_by(uint16_t char_id, uint16_t item_id) {
     return (flags & item_usable_flags[char_id - 1]) ? 1 : 0;
 }
 
-/* --- Item type query --- */
+/* Item type query */
 
 /* GET_ITEM_TYPE: Port of asm/misc/get_item_type.asm (43 lines).
  * Returns item type category:
@@ -2208,7 +2208,7 @@ uint16_t get_item_subtype(uint16_t item_id) {
     }
 }
 
-/* --- Condiment search --- */
+/* Condiment search */
 
 /* FIND_CONDIMENT: Port of asm/misc/find_condiment.asm (66 lines).
  * Takes an item_id. First checks if the item is food-type (type & 0x3C == 0x20).
@@ -2239,7 +2239,7 @@ uint16_t find_condiment(uint16_t item_id) {
     return 0;
 }
 
-/* --- Inventory space query --- */
+/* Inventory space query */
 
 /* FIND_INVENTORY_SPACE2: Port of asm/misc/find_inventory_space2.asm (52 lines).
  * FAR wrapper. If char_id == 0xFF, searches all player-controlled party members
@@ -2269,7 +2269,7 @@ uint16_t count_alive_party_members(void) {
 /* FIND_INVENTORY_SPACE (asm/misc/find_inventory_space.asm): returns char_id if the
  * character has ANY empty item slot, else 0. Checks all SIZEOF(char_struct::items)
  * = 14 slots (the assembly loops slot 0..13 via BRANCHGTS). NOTE: this is distinct
- * from find_empty_inventory_slot(), which only scans slots 0..12 — using that here
+ * from find_empty_inventory_slot(), which only scans slots 0..12, using that here
  * mis-reports a character whose sole free slot is the 14th (index 13, where a freed
  * slot lands after the inventory compacts) as full ("carrying too much stuff"). */
 static uint16_t inventory_find_space(uint16_t char_id) {

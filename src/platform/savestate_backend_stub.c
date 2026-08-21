@@ -8,7 +8,7 @@
  * handler. That firmware backend is target-specific code handled in a later session.
  *
  * Until an embedded target provides a real backend, these stubs satisfy the link and
- * make a savestate capture/restore fail SAFE — _begin/_write/_commit return false and
+ * make a savestate capture/restore fail SAFE, _begin/_write/_commit return false and
  * _read returns 0, so state_dump_save_slots()/_load_slots() report failure (the
  * firmware's rail-hold handshake sees HOST_CAPTURE_FAILED) instead of tearing a write.
  *

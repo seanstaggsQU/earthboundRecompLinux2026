@@ -41,7 +41,7 @@ bool game_is_fast_forward(void);
  * does NOT snapshot immediately: it sets a pending flag, host_process_frame() then
  * free-runs (skips render + vblank pacing but keeps the per-frame logic running) so
  * any finite blocking helper unwinds to the root in CPU time, and host_root_boundary()
- * — called only from the outermost loop — performs the actual capture. An indefinite
+ *, called only from the outermost loop, performs the actual capture. An indefinite
  * input-wait (e.g. display_text at a "▼" prompt) never unwinds; the unwind is capped
  * and a capture failure is logged rather than writing a torn snapshot. This is the
  * `g_shutdown_requested` mechanism the embedded power-off handler will reuse. */
@@ -52,21 +52,21 @@ bool game_is_fast_forward(void);
 void host_request_capture(void);
 
 /* Request a savestate restore at the next root-loop boundary. Like the capture
- * request, this free-runs the C stack back to the root before acting — loading
+ * request, this free-runs the C stack back to the root before acting, loading
  * replaces the mode stack wholesale, which is only coherent with no game logic
  * suspended on the C stack. Idempotent while one is already pending. */
 void host_request_load(void);
 
 /* Perform a pending capture if one was requested, then clear the request. MUST be
- * called ONLY from the outermost host loop (the root boundary) — never while a
+ * called ONLY from the outermost host loop (the root boundary), never while a
  * mode-step or a synchronous blocking helper is mid-execution, or the snapshot
  * would be torn. A no-op when nothing is pending. */
 void host_root_boundary(void);
 
 /* Outcome of the most recent host_request_capture()/host_request_load(), so the
- * embedded firmware power-off handler — which calls host_request_capture() from its
+ * embedded firmware power-off handler, which calls host_request_capture() from its
  * ISR but drives frames through the port main loop (it does NOT call host_root_boundary
- * itself) — can implement the rail-hold handshake by polling:
+ * itself), can implement the rail-hold handshake by polling:
  *
  *     host_request_capture();
  *     do { game_logic_entry(); } while (host_capture_status() == HOST_CAPTURE_PENDING);

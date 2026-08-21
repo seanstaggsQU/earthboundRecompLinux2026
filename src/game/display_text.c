@@ -1,5 +1,5 @@
 /*
- * DISPLAY_TEXT — text bytecode interpreter.
+ * DISPLAY_TEXT, text bytecode interpreter.
  *
  * Port of asm/text/display_text.asm.
  *
@@ -80,7 +80,7 @@ DisplayTextState dt = {
 static const uint8_t *inline_string_table = NULL;
 static size_t inline_string_table_size = 0;
 
-/* Flat dialogue blob — all compiled dialogue concatenated into one blob.
+/* Flat dialogue blob, all compiled dialogue concatenated into one blob.
  * See resolve_text_addr() for the address range layout. */
 #define DIALOGUE_BLOB_BASE 0x100000
 static const uint8_t *dialogue_blob = NULL;
@@ -91,7 +91,7 @@ static size_t dialogue_blob_size = 0;
 static const uint8_t *status_window_text_data;
 static size_t   status_window_text_size;
 
-/* Dormant CC 0x15-0x17 dictionary base — prefix substitution is not yet wired up,
+/* Dormant CC 0x15-0x17 dictionary base, prefix substitution is not yet wired up,
  * so ScriptReader::prefix_off is always -1 and this stays NULL. */
 static const uint8_t *text_prefix_base = NULL;
 
@@ -178,7 +178,7 @@ void restore_window_text_attributes(void) {
  * These helper functions access the focused window's memory.
  *
  * DUMMY_WINDOW: When no window is open, the assembly's GET_ACTIVE_WINDOW_ADDRESS
- * returns a pointer to DUMMY_WINDOW — a full window_stats structure in RAM that
+ * returns a pointer to DUMMY_WINDOW, a full window_stats structure in RAM that
  * always exists. This allows CC codes like CHECK_EVENT_FLAG + JUMP_IF_FALSE to
  * work in windowless text scripts (e.g., TEXT_DOOR_043 which never opens a window).
  * Without this fallback, set_working_memory() silently drops the value and
@@ -235,7 +235,7 @@ void increment_secondary_memory(void) {
     if (w) w->secondary_memory++;
 }
 
-/* --- Text utility functions --- */
+/* Text utility functions */
 
 void set_instant_printing(void) {
     /* Port of SET_INSTANT_PRINTING (asm/text/set_instant_printing.asm). */
@@ -262,7 +262,7 @@ void render_pagination_arrows(void) {
      *
      * Assembly uses PREPARE_VRAM_COPY (line 227) to write directly to VRAM
      * after window_tick has already uploaded bg2_buffer. We match this by
-     * writing to ppu.vram — bg2_buffer would be overwritten by
+     * writing to ppu.vram, bg2_buffer would be overwritten by
      * render_all_windows() before the next upload. */
     if (dt.pagination_window == WINDOW_ID_NONE) return;
 
@@ -318,8 +318,8 @@ static uint16_t check_last_member_status_change(void) {
  *   4. If ow.redraw_all_windows, render all; else if windows open, render tail
  *   5. HP/PP roller + meter tile updates
  *   6. If !ow.disabled_transitions && status changed, reload palette
- *   7. upload_battle_screen_to_vram() — sync win.bg2_buffer to VRAM
- *   8. render_frame_tick() — process one frame
+ *   7. upload_battle_screen_to_vram(), sync win.bg2_buffer to VRAM
+ *   8. render_frame_tick(), process one frame
  */
 /* Window-tick body up to (but not including) the frame render. Returns true if
  * a frame render should follow, false on an early exit (early_tick_exit or
@@ -393,7 +393,7 @@ bool window_tick_work_step(void) {
      * but the mode-step caller still consumes a presented frame via its
      * STEP_CONTINUE (e.g. the BW_* battle waits in mode_step_battle_wait). In
      * battle the animated background must advance on EVERY presented frame or it
-     * visibly freezes for that frame — the same class of bug as the PUSH/POP
+     * visibly freezes for that frame, the same class of bug as the PUSH/POP
      * transition stutter. render_frame_tick_work_step()'s battle branch is just
      * update_battle_screen_effects() and never parks, so match it here. Outside
      * battle there is no per-frame background animation, so the original no-op is
@@ -422,7 +422,7 @@ void window_tick_without_instant_printing(void) {
     /* Port of WINDOW_TICK_WITHOUT_INSTANT_PRINTING
      * (asm/text/window_tick_without_instant_printing.asm).
      * Temporarily disables instant printing, renders one frame to show the
-     * freshly-built window (no actionscript advance — see window_tick_no_
+     * freshly-built window (no actionscript advance, see window_tick_no_
      * actionscript), then re-enables instant printing. */
     dt.instant_printing = 0;
     window_tick_no_actionscript();
@@ -465,7 +465,7 @@ void set_text_pixel_position(uint16_t row, uint16_t pixel_pos) {
     if (w) w->cursor_pixel_x = pixel_pos;
 }
 
-/* --- Battle text accessors --- */
+/* Battle text accessors */
 
 void set_battle_attacker_name(const char *src, uint16_t length) {
     /* Port of SET_BATTLE_ATTACKER_NAME (asm/battle/ui/set_battle_attacker_name.asm).
@@ -501,7 +501,7 @@ uint32_t get_cnum(void) {
     return dt.cnum;
 }
 
-/* TextBlock — lightweight struct used by resolve_text_addr() to return
+/* TextBlock, lightweight struct used by resolve_text_addr() to return
  * a data pointer + size to callers that need to compute remaining bytes. */
 typedef struct {
     const uint8_t *data;
@@ -512,8 +512,8 @@ typedef struct {
 /* Resolve a text address to a byte pointer.
  *
  * Address ranges:
- *   0x000000 .. 0x0FFFFF  — inline string table (item/enemy descriptions)
- *   0x100000 .. 0xBFFFFF  — dialogue blob (compiled from YAML)
+ *   0x000000 .. 0x0FFFFF: inline string table (item/enemy descriptions)
+ *   0x100000 .. 0xBFFFFF: dialogue blob (compiled from YAML)
  *
  * *out_block receives the data source for size-remaining calculation.
  * Returns NULL if the address cannot be resolved. */
@@ -550,7 +550,7 @@ static const uint8_t *resolve_text_addr(uint32_t addr, TextBlock **out_block) {
 void print_psi_name(uint16_t psi_name_id) {
 
     if (psi_name_id == 1) {
-        /* PSI Rockin — print favourite_thing (EB-encoded in game_state, null-terminated) */
+        /* PSI Rockin, print favourite_thing (EB-encoded in game_state, null-terminated) */
         int len = 0;
         while (len < (int)sizeof(game_state.favourite_thing) && game_state.favourite_thing[len] != 0x00) len++;
         print_eb_string(game_state.favourite_thing, len);
@@ -640,7 +640,7 @@ bool display_text_init(void) {
     return ok;
 }
 
-/* Battle text is part of the dialogue blob — no separate loading needed. */
+/* Battle text is part of the dialogue blob, no separate loading needed. */
 bool display_text_load_battle_text(void) { return true; }
 
 /* No-ops: dialogue blob is always loaded, nothing to free. */
@@ -692,7 +692,7 @@ void resolve_text_jump(ScriptReader *r, uint32_t addr) {
     const uint8_t *ptr = resolve_text_addr(addr, &blk);
     if (ptr && blk) {
         /* resolve_text_addr only resolves dialogue-blob / inline-string addresses,
-         * split on DIALOGUE_BLOB_BASE — matching its own range check. */
+         * split on DIALOGUE_BLOB_BASE, matching its own range check. */
         r->source  = (addr >= DIALOGUE_BLOB_BASE) ? TEXT_SRC_DIALOGUE : TEXT_SRC_INLINE_STRINGS;
         r->ptr_off = (uint32_t)(ptr - blk->data);
         r->end_off = (uint32_t)blk->size;
@@ -701,7 +701,7 @@ void resolve_text_jump(ScriptReader *r, uint32_t addr) {
     }
 }
 
-/* --- Teleport destination loading --- */
+/* Teleport destination loading */
 
 #define teleport_table_data  ASSET_DATA(ASSET_DATA_TELEPORT_DESTINATION_TABLE_BIN)
 #define teleport_table_size  ASSET_SIZE(ASSET_DATA_TELEPORT_DESTINATION_TABLE_BIN)
@@ -718,7 +718,7 @@ const TeleportDestination *get_teleport_dest(uint16_t index) {
 
 /* GET_ITEM_TYPE: now in inventory.c, declared in inventory.h */
 
-/* CHECK_ITEM_USABLE_BY: now shared via inventory.h — see inventory.c. */
+/* CHECK_ITEM_USABLE_BY: now shared via inventory.h, see inventory.c. */
 
 /* IS_ESCARGO_EXPRESS_FULL: Port of asm/text/is_escargo_express_full.asm.
  * Returns 0 if there is at least one empty slot, 1 if full.
@@ -756,7 +756,7 @@ uint16_t get_item_subtype_2(uint16_t item_id) {
 }
 
 /*
- * HP/PP flipout mode — backup arrays from ram.asm:1141-1144.
+ * HP/PP flipout mode, backup arrays from ram.asm:1141-1144.
  *
  * When enabled (e.g., during Giygas battle), sets all PCs' HP to 999 and PP to 0,
  * backing up the originals. When disabled, restores the backups.
@@ -765,10 +765,10 @@ uint16_t get_item_subtype_2(uint16_t item_id) {
 #define PLAYER_CHAR_COUNT 4
 /* hppp_meter_flipout_mode backups now in DisplayTextState dt. */
 
-/* HP/PP meter speed flags — now in BattleState (bt.half_hppp_meter_speed, bt.disable_hppp_rolling). */
+/* HP/PP meter speed flags, now in BattleState (bt.half_hppp_meter_speed, bt.disable_hppp_rolling). */
 
 /*
- * toggle_hppp_flipout_mode — Port of TOGGLE_HPPP_FLIPOUT_MODE (C12D17).
+ * toggle_hppp_flipout_mode, Port of TOGGLE_HPPP_FLIPOUT_MODE (C12D17).
  *
  * When enabling (param != 0, currently off):
  *   Back up each PC's hp_target/pp_target, then set hp = hp_target = 999, pp = pp_target = 0.
@@ -1002,7 +1002,7 @@ int eb_to_ascii_buf(const uint8_t *src, int max_len, char *dst) {
 }
 
 /*
- * Overworld party-member selection — the former party_character_selector mode==1
+ * Overworld party-member selection, the former party_character_selector mode==1
  * branch (asm/text/party_character_selector.asm lines 34-111). Builds the selection
  * window + one menu item per party member and fills the GAME_MODE_SELECTION_MENU
  * child init for a STEP_PUSH by the caller (cc_1a_dispatch). The selection_menu()
@@ -1057,15 +1057,15 @@ uint32_t party_selector_overworld_prepare(uint16_t allow_cancel, ModeState *out_
 }
 
 /*
- * PARTY_CHARACTER_SELECTOR — Port of asm/text/party_character_selector.asm.
+ * PARTY_CHARACTER_SELECTOR, Port of asm/text/party_character_selector.asm.
  *
  * Displays a party member selection menu and returns the selected character ID
  * (PARTY_MEMBER enum: 1=Ness, 2=Paula, 3=Jeff, 4=Poo), or 0 if cancelled.
  *
  * Two modes controlled by the mode parameter:
- *   mode == 0: Overworld mode — creates a text window with party member names,
+ *   mode == 0: Overworld mode, creates a text window with party member names,
  *              runs selection_menu, returns selected character's party_members[] ID.
- *   mode == 1: Battle mode — uses HPPP window column selection with LEFT/RIGHT
+ *   mode == 1: Battle mode, uses HPPP window column selection with LEFT/RIGHT
  *              navigation, A/L=select, B=cancel.
  *
  * script_ptrs: array of 4 x uint32_t text script pointers (one per possible party
@@ -1087,7 +1087,7 @@ void party_selector_battle_prepare(uint32_t *script_ptrs, uint16_t mode,
      * for a STEP_PUSH by cc_1a_dispatch; the input loop runs in mode_step_char_select
      * (battle.c). The per-character on_change displays the member's text script via
      * CS_ONCHANGE_PARTY_SELECT_SCRIPT (cs_invoke_on_change, text.c), which itself
-     * STEP_PUSHes a nested DISPLAY_TEXT child — no C-stack pump remains.
+     * STEP_PUSHes a nested DISPLAY_TEXT child, no C-stack pump remains.
      *
      * Save the calling window's argument_memory (assembly lines 24-30); the step
      * restores it before it pops (@CLEANUP_AND_RETURN, lines 370-378). */
@@ -1316,7 +1316,7 @@ void print_cc_table_value(uint16_t index) {
             print_eb_string(data, len);
         }
     } else {
-        /* Print integer — delegate to print_number() like the assembly does
+        /* Print integer, delegate to print_number() like the assembly does
          * (JSR PRINT_NUMBER in print_cc_table_value.asm lines 43/56/68). */
         print_number((int)value, 0);
     }
@@ -1325,16 +1325,16 @@ void print_cc_table_value(uint16_t index) {
 /* --- CC 0x1C tree: text printing/display ---
  * Byte counts from include/textmacros.asm.
  *
- *   0x00: TEXT_COLOUR_EFFECTS(flag) — toggle text color/style
+ *   0x00: TEXT_COLOUR_EFFECTS(flag), toggle text color/style
  *   0x01-0x03: Print character stat/name/character by ID
- *   0x04: OPEN_HP_PP_WINDOWS — show HP/PP status windows
+ *   0x04: OPEN_HP_PP_WINDOWS, show HP/PP status windows
  *   0x05-0x08: Print item/teleport/text string/special GFX by ID
  *   0x0A-0x0B: Print number/money from working memory
- *   0x0C: PRINT_VERTICAL_TEXT_STRING — vertical text layout
+ *   0x0C: PRINT_VERTICAL_TEXT_STRING, vertical text layout
  *   0x0D-0x0F: Print battle action names/amounts (user, target, damage)
- *   0x12: PRINT_PSI_NAME(id) — render PSI ability name
- *   0x13: DISPLAY_PSI_ANIMATION(id, target) — play PSI visual effect
- *   0x14-0x15: LOAD_SPECIAL — query special values for branching */
+ *   0x12: PRINT_PSI_NAME(id), render PSI ability name
+ *   0x13: DISPLAY_PSI_ANIMATION(id, target), play PSI visual effect
+ *   0x14-0x15: LOAD_SPECIAL, query special values for branching */
 
 /* PRINT_ENEMY_ARTICLE: Port of asm/battle/print_enemy_article.asm (USA only).
  * Conditionally prints "The " or "the " before an enemy name.
@@ -1564,7 +1564,7 @@ StepResult mode_step_display_text(ModeState *ms) {
     }
 
     /* DT_ENTER: per-call prologue (save the parent's g_cc18_attrs_saved, zero the
-     * global, reset the word counter), then fall through to DT_RUN with no yield —
+     * global, reset the word counter), then fall through to DT_RUN with no yield , 
      * mirroring PUSH_TEXT_STACK_FRAME / the blocking display_text() entry. Each
      * call level (including a nested CC_08 child) gets a clean flag; the parent's
      * value is restored before this level pops. */
@@ -1580,13 +1580,13 @@ StepResult mode_step_display_text(ModeState *ms) {
      * next byte is read. */
     if (st->resume == DT_RESUME_CC11) {
         /* CC_11 (selection_menu): store the chosen userdata (0 on cancel) to
-         * working memory, then clear the menu — the tail of the former CC_11. */
+         * working memory, then clear the menu, the tail of the former CC_11. */
         st->resume = DT_RESUME_NONE;
         set_working_memory((uint32_t)(uint16_t)mode_child_result());
         clear_focus_window_menu_options();
     } else if (st->resume == DT_RESUME_CC1F_NUMSEL) {
         /* CC_1F_52 (number-select): store the entered value, or zero both working
-         * and argument memory on cancel (-1) — the tail of the former CC_1F_52. */
+         * and argument memory on cancel (-1), the tail of the former CC_1F_52. */
         st->resume = DT_RESUME_NONE;
         int32_t value = mode_child_result();
         if (value == -1) {
@@ -1598,7 +1598,7 @@ StepResult mode_step_display_text(ModeState *ms) {
     } else if (st->resume == DT_RESUME_CC1A_PARTY_SEL) {
         /* CC_1A_00/01 overworld party select: the former
          * party_character_selector mode==1 tail (assembly @CHAR_LOOP_CHECK2 /
-         * lines 370-378) — close the selection window, restore text attributes,
+         * lines 370-378), close the selection window, restore text attributes,
          * reset pagination, restore argument_memory, and store the chosen
          * member id (0 on cancel) to working memory. */
         st->resume = DT_RESUME_NONE;
@@ -1611,48 +1611,48 @@ StepResult mode_step_display_text(ModeState *ms) {
         /* CC_1A_00/01 battle party select: GAME_MODE_CHAR_SELECT did its own
          * @CLEANUP_AND_RETURN (argument_memory restore + pagination reset) before
          * popping; the only tail left is storing the chosen member id (0 on cancel)
-         * to working memory — the former party_character_selector return value. */
+         * to working memory, the former party_character_selector return value. */
         st->resume = DT_RESUME_NONE;
         set_working_memory((uint32_t)(uint16_t)mode_child_result());
     } else if (st->resume == DT_RESUME_CC1A_TELEPORT) {
         /* CC_1A_0B teleport menu: GAME_MODE_TELEPORT_MENU did its own window
          * cleanup before popping; store the chosen destination (0 on cancel)
-         * to working memory — the former open_teleport_destination_menu()
+         * to working memory, the former open_teleport_destination_menu()
          * return value. */
         st->resume = DT_RESUME_NONE;
         set_working_memory((uint32_t)(uint16_t)mode_child_result());
     } else if (st->resume == DT_RESUME_CC1F_BATTLE) {
         /* CC_1F_23 trigger battle: store the battle result (0 = victory,
-         * 1 = party defeated) to working memory — the former
+         * 1 = party defeated) to working memory, the former
          * init_battle_scripted() return value (sign-extended, as before). */
         st->resume = DT_RESUME_NONE;
         set_working_memory((uint32_t)(int32_t)(int16_t)mode_child_result());
     } else if (st->resume == DT_RESUME_CC1F_PHOTO) {
         /* CC_1F_D2 photographer: save the photo state after the camera-guy
-         * text — the tail of the former encounter_travelling_photographer(). */
+         * text, the tail of the former encounter_travelling_photographer(). */
         st->resume = DT_RESUME_NONE;
         save_photo_state(st->cc1f_aux);
     } else if (st->resume == DT_RESUME_CC1F_SPECIAL_EVENT) {
         /* CC_1F_41 special event: store the GAME_MODE_SPECIAL_EVENT result to
-         * working memory — the former set_working_memory(dispatch_special_event(...)).
+         * working memory, the former set_working_memory(dispatch_special_event(...)).
          * The original cast a uint16_t result, i.e. zero-extended. */
         st->resume = DT_RESUME_NONE;
         set_working_memory((uint32_t)(uint16_t)mode_child_result());
     } else if (st->resume == DT_RESUME_CC1A_SEL) {
         /* CC_1A_08/09 selection menu: store the chosen userdata (0 on cancel)
-         * to working memory — the former selection_menu() return value. */
+         * to working memory, the former selection_menu() return value. */
         st->resume = DT_RESUME_NONE;
         set_working_memory((uint32_t)(uint16_t)mode_child_result());
     } else if (st->resume == DT_RESUME_CC1A_SEL_CLEAR) {
         /* CC_1A_04 selection menu: store the result, then clear the focus
-         * window's menu options — the tail of the former CC_1A_04. */
+         * window's menu options, the tail of the former CC_1A_04. */
         st->resume = DT_RESUME_NONE;
         set_working_memory((uint32_t)(uint16_t)mode_child_result());
         WindowInfo *w = get_focus_window_info();
         if (w) w->menu_count = 0;
     } else if (st->resume == DT_RESUME_CC18_SEL) {
         /* CC_18_08 selection menu: store the result; if it was cancelled (0)
-         * and a cancel target was supplied, jump there — the tail of the former
+         * and a cancel target was supplied, jump there, the tail of the former
          * CC_18_08. resolve_text_jump acts on st->reader (r is set up below). */
         st->resume = DT_RESUME_NONE;
         uint16_t result = (uint16_t)mode_child_result();
@@ -1662,13 +1662,13 @@ StepResult mode_step_display_text(ModeState *ms) {
         }
     } else if (st->resume == DT_RESUME_CC18_SEL_RESTORE) {
         /* CC_18_09 selection menu: restore the saved text attributes, then store
-         * the result — the tail of the former CC_18_09. */
+         * the result, the tail of the former CC_18_09. */
         st->resume = DT_RESUME_NONE;
         restore_window_text_attributes();
         set_working_memory((uint32_t)(uint16_t)mode_child_result());
     } else if (st->resume == DT_RESUME_MENU_RESULT) {
         /* STORE / ESCARGO / TELEPHONE menu: store the popped result to working
-         * memory — the former open_store_menu / select_escargo_express_item /
+         * memory, the former open_store_menu / select_escargo_express_item /
          * open_telephone_menu / display_telephone_contact_text return value. */
         st->resume = DT_RESUME_NONE;
         set_working_memory((uint32_t)(uint16_t)mode_child_result());
@@ -1682,7 +1682,7 @@ StepResult mode_step_display_text(ModeState *ms) {
             dt.g_cc18_attrs_saved = st->saved_cc18_attrs;
             return STEP_RESULT_POP(0);
         }
-        /* Word-wrap lookahead — port of display_text.asm @MAIN_LOOP lines 49-61.
+        /* Word-wrap lookahead, port of display_text.asm @MAIN_LOOP lines 49-61.
          * When ENABLE_WORD_WRAP is active, before each character we check if
          * we're at a word boundary (dt.upcoming_word_length == 0).  If so, peek
          * ahead to measure the next word and insert a newline if it won't fit.
@@ -1701,7 +1701,7 @@ StepResult mode_step_display_text(ModeState *ms) {
 
         uint8_t byte = script_read_byte(r);
 
-        /* Printable character (>= 0x20) — port of PRINT_LETTER
+        /* Printable character (>= 0x20), port of PRINT_LETTER
          * (asm/text/print_letter.asm).
          *
          * Assembly processes one character at a time:
@@ -1712,7 +1712,7 @@ StepResult mode_step_display_text(ModeState *ms) {
          * The per-character delay creates the typewriter effect. */
         if (byte >= 0x20) {
             /* PRINT_LETTER (print_letter.asm) early-out: if no window is open
-             * (CURRENT_FOCUS_WINDOW == -1), the routine RETURNs immediately —
+             * (CURRENT_FOCUS_WINDOW == -1), the routine RETURNs immediately , 
              * no VWF render and, crucially, no per-character WINDOW_TICK
              * typewriter delay. Cutscene scripts use runs of space characters
              * with no window open purely as control-stream padding; rendering
@@ -1752,7 +1752,7 @@ StepResult mode_step_display_text(ModeState *ms) {
                 /* Typewriter delay (assembly lines 71-81): SELECTED_TEXT_SPEED+1
                  * WINDOW_TICK frames. The first frame's work runs now; any
                  * remaining frames run in DT_DELAY. Each returns CONTINUE so the
-                 * pump yields once per frame — matching the blocking for-loop's
+                 * pump yields once per frame, matching the blocking for-loop's
                  * window_tick() (work-then-yield) repeated `delay` times. */
                 int delay = (game_state.text_speed & 0xFF) + 1;
                 if (window_tick_work_step()) {
@@ -1866,7 +1866,7 @@ StepResult mode_step_display_text(ModeState *ms) {
             break;
         case 0x10: {
             /* PAUSE (CC_10): read the frame count, clear instant printing, then
-             * STEP_PUSH GAME_MODE_TEXT_DELAY (lead_window=1, non-cancelable) — the
+             * STEP_PUSH GAME_MODE_TEXT_DELAY (lead_window=1, non-cancelable), the
              * former cc_pause() -> pump_mode(GAME_MODE_TEXT_DELAY). No post-work;
              * the parent resumes DT_RUN on POP. */
             uint8_t frames = script_read_byte(r);
@@ -1896,7 +1896,7 @@ StepResult mode_step_display_text(ModeState *ms) {
              * recursed via display_text_from_addr(); now it STEP_PUSHes a nested
              * GAME_MODE_DISPLAY_TEXT child so the recursion lives on the mode stack
              * (serializable), not the C stack. The parent resumes DT_RUN on POP.
-             * One yield is inserted at the push (and one at the child's pop) — an
+             * One yield is inserted at the push (and one at the child's pop), an
              * accepted imperceptible shift on text that already yields per char. */
             uint32_t target = script_read_dword(r);
             static ModeState dt_call_init;  /* outlives this dispatch (pump copies it) */
@@ -1916,7 +1916,7 @@ StepResult mode_step_display_text(ModeState *ms) {
                 uint32_t target = script_read_dword(r);
                 resolve_text_jump(r, target);
             } else {
-                /* Out of range or 0 — skip all destinations */
+                /* Out of range or 0, skip all destinations */
                 script_skip(r, count * 4);
             }
             break;
@@ -1947,7 +1947,7 @@ StepResult mode_step_display_text(ModeState *ms) {
              * selection_menu() -> pump_mode; the result is stored to working memory
              * in the DT_RESUME_CC11 handler when the menu pops. Assembly:
              * JSR SELECTION_MENU; SET_WORKING_MEMORY; JSR CLEAR_FOCUS_WINDOW_MENU_OPTIONS.
-             * selection_menu() returns 0 without pumping for a null/empty menu —
+             * selection_menu() returns 0 without pumping for a null/empty menu , 
              * replicate that early-out here (no push, no resume). */
             WindowInfo *w = get_window(win.current_focus_window);
             if (!w || w->menu_count == 0) {
@@ -2052,7 +2052,7 @@ StepResult mode_step_display_text(ModeState *ms) {
             break;
         }
 
-        /* All other simple CCs — skip arguments */
+        /* All other simple CCs, skip arguments */
         default:
             cc_skip_args(r, byte);
             break;
@@ -2066,7 +2066,7 @@ StepResult mode_step_display_text(ModeState *ms) {
 }
 
 /* No-yield runner for instant-print text. Drives GAME_MODE_DISPLAY_TEXT to
- * completion with NO host_process_frame() yield — the keystone that lets
+ * completion with NO host_process_frame() yield, the keystone that lets
  * instant-print callers (menu hover text, the status window) print without a yield
  * (and without the extra frame a STEP_PUSH would add).
  *
@@ -2099,7 +2099,7 @@ void display_text_inline(const uint8_t *script, size_t script_size) {
             if (g_mode_stack.depth < floor)
                 return;   /* completed without consuming a host yield */
         }
-        /* STEP_CONTINUE: loop again — never host_process_frame() here. */
+        /* STEP_CONTINUE: loop again, never host_process_frame() here. */
     }
     /* Guard hit or quit requested: unwind whatever is left of our sub-stack. */
     while (g_mode_stack.depth >= floor)

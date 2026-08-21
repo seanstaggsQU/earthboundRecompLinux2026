@@ -31,29 +31,29 @@ static uint8_t save_files_present[SAVE_COUNT];
 
 /* current_save_slot is now a global in game_state.c (port of CURRENT_SAVE_SLOT BSS) */
 
-/* Don't Care names — loaded from ROM via asset pipeline.
+/* Don't Care names, loaded from ROM via asset pipeline.
  * 49 entries (7 categories × 7 names), 6 bytes each, EB-encoded and null-padded. */
 #define DONT_CARE_COUNT 7
 #define DONT_CARE_NAME_SIZE 6
 static const uint8_t *dont_care_names_data;
 
-/* HP_METER_SPEEDS — loaded from ROM via asset pipeline.
+/* HP_METER_SPEEDS: loaded from ROM via asset pipeline.
  * 3 entries × 4 bytes (32-bit LE fixed-point rolling speeds). */
 static const uint8_t *hp_meter_speeds_data;
 
-/* FILE_SELECT_TEXT_PLEASE_NAME_THEM_STRINGS — loaded from ROM via asset pipeline.
+/* FILE_SELECT_TEXT_PLEASE_NAME_THEM_STRINGS: loaded from ROM via asset pipeline.
  * 7 prompts × NAME_THEM_STRING_LENGTH bytes, EB-encoded and null-padded. */
 #define NAMING_PROMPT_ENTRY_SIZE 40  /* NAME_THEM_STRING_LENGTH (US) */
 static const uint8_t *naming_prompts_data;
 
-/* INITIAL_STATS — loaded from ROM via asset pipeline.
+/* INITIAL_STATS: loaded from ROM via asset pipeline.
  * 4 characters × 20 bytes (coords, money, level, EXP, items). */
 #define INITIAL_STATS_ENTRY_SIZE 20
 static const uint8_t *initial_stats_data;
 
 /* Resolve the file-select asset pointers (don't-care names, HP-meter speeds,
  * naming prompts, initial stats). These are link-time-constant ASSET_DATA bases,
- * not runtime loads — but they must be resolved before any consumer reads them.
+ * not runtime loads, but they must be resolved before any consumer reads them.
  *
  * file_menu_setup() resolves them on the normal path, but a savestate taken on
  * the file-select/naming flow can be restored into a process where that setup
@@ -230,10 +230,10 @@ static int fm_file_select_build(void) {
     }
 
     /* This port's own addition, not in WINDOW_CONFIGURATION_TABLE or the
-     * original assembly -- a 4th row below the 3 save slots, unconditional
+     * original assembly, a 4th row below the 3 save slots, unconditional
      * (unlike Check for Updates below), opening the same
      * GAME_MODE_SETTINGS_MENU the in-game pause menu's Config item does
-     * (mode_step_settings_menu(), text.c -- generic global-state UI, no
+     * (mode_step_settings_menu(), text.c, generic global-state UI, no
      * new implementation needed). userdata 4 is handled as a special case
      * in FM_SELECT_RESULT, before the save-slot math below, same pattern
      * as Check for Updates' userdata 5. */
@@ -279,7 +279,7 @@ static int fm_file_select_build(void) {
         print_string(speed_buf);
     }
 
-    /* Assembly (file_select_menu.asm:271): SELECTION_MENU directly —
+    /* Assembly (file_select_menu.asm:271): SELECTION_MENU directly, 
      * no RENDER_ALL_WINDOWS in between. The caller pushes GAME_MODE_SELECTION_
      * MENU(allow_cancel=0); current_save_slot is set from the result in the
      * FM_SELECT_RESULT phase. */
@@ -312,14 +312,14 @@ static int fm_submenu_build(void) {
     add_menu_item("Set Up", 4, 15, 0);
 
     /* Assembly (show_file_select_menu.asm:58-62): PRINT_MENU_ITEMS then
-     * SELECTION_MENU directly — no RENDER_ALL_WINDOWS in between. The caller
+     * SELECTION_MENU directly, no RENDER_ALL_WINDOWS in between. The caller
      * pushes GAME_MODE_SELECTION_MENU(allow_cancel=1). */
     print_menu_items();
     return -1;
 }
 
 /*
- * Display-only version of FILE_SELECT_MENU — recreate the file select
+ * Display-only version of FILE_SELECT_MENU, recreate the file select
  * window with slot labels and details, but no selection_menu() call.
  * Matches assembly's FILE_SELECT_MENU(1) path (file_select_menu.asm:
  * @VIRTUAL02 != 0 → skip SELECTION_MENU, just highlight selected slot).
@@ -377,7 +377,7 @@ static void file_select_menu_display_only(void) {
 }
 
 /*
- * Display-only versions of setup menus — recreate the window with items
+ * Display-only versions of setup menus, recreate the window with items
  * printed but no selection_menu() call.  Matches assembly's arg=1 path
  * (FILE_SELECT_TEXT_SPEED_MENU(1), FILE_SELECT_SOUND_MODE_MENU(1))
  * which highlights the previously selected option and returns immediately.
@@ -480,7 +480,7 @@ static void fm_sound_apply(uint16_t result) {
 }
 
 /*
- * Cursor move callback for flavour menu — previews window appearance as user
+ * Cursor move callback for flavour menu, previews window appearance as user
  * navigates.  Matches PREVIEW_WINDOW_FLAVOUR (C1EC8F.asm):
  *   1. Save original text_flavour
  *   2. Set text_flavour = new value
@@ -539,7 +539,7 @@ static void fm_flavour_apply(uint16_t result) {
 }
 
 /*
- * Naming screen — faithful port of text_input_dialog.asm + name_a_character.asm.
+ * Naming screen, faithful port of text_input_dialog.asm + name_a_character.asm.
  *
  * The keyboard window (0x1C: x=1, y=9, w=30, h=16) renders EB char tiles.
  * Each selectable position has a $2F marker tile at an even text_x, with the
@@ -737,7 +737,7 @@ static void kb_build_name_display(uint8_t *display, const uint8_t *eb_name,
         if (i < name_pos && eb_name[i] != 0)
             display[i] = eb_name[i];   /* entered character */
         else if (i == name_pos)
-            display[i] = 0x70;         /* CHAR::BULLET — centered dot at insertion point */
+            display[i] = 0x70;         /* CHAR::BULLET, centered dot at insertion point */
         else
             display[i] = 0x53;         /* placeholder dash (EB 0x53) */
     }
@@ -775,7 +775,7 @@ static void kb_write_name_tilemap(WindowInfo *nw, int num_cols) {
 }
 
 /*
- * text_input_dialog — shared keyboard input loop for naming screens.
+ * text_input_dialog, shared keyboard input loop for naming screens.
  * Port of TEXT_INPUT_DIALOG (asm/text/text_input_dialog.asm). Run to completion
  * as GAME_MODE_TEXT_INPUT; the wrapper at the bottom seeds the state and pumps.
  * Creates the keyboard window (0x1C), runs the input loop, closes on done. Name
@@ -800,7 +800,7 @@ static uint8_t *name_target_buffer(int id) {
     }
 }
 
-/* GAME_MODE_TEXT_INPUT step — run-to-completion port of the text_input_dialog()
+/* GAME_MODE_TEXT_INPUT step, run-to-completion port of the text_input_dialog()
  * keyboard loop. Each step reads the input the pump's prior yield latched (when
  * `primed`), acts on it, then renders one frame; the pump owns the single yield.
  * See the mode header in mode_stack.h. */
@@ -830,7 +830,7 @@ StepResult mode_step_text_input(ModeState *st) {
     if (s->primed) {
         uint16_t pressed = platform_input_get_pad_new();
 
-        /* Directional input — assembly: MOVE_CURSOR plays SFX only on
+        /* Directional input, assembly: MOVE_CURSOR plays SFX only on
            successful cursor movement (SFX 124 for UP/DOWN, 123 for LEFT/RIGHT) */
         if (pressed & PAD_UP) {
             int found = kb_find_next(kw, s->cur_x, s->cur_y, 0, -1);
@@ -873,7 +873,7 @@ StepResult mode_step_text_input(ModeState *st) {
             if (s->cur_y == 6) {
                 /* Row 6: buttons */
                 if (s->cur_x == 0 && s->has_dont_care) {
-                    /* Don't Care — cycle through preset names (assembly: @DONTCARE_SELECTED).
+                    /* Don't Care, cycle through preset names (assembly: @DONTCARE_SELECTED).
                        Counter starts at -1; on each press: if >= 6 reset to 0, else increment.
                        Then load dont_care_names[naming_index][row] into eb_name. */
                     play_sfx(122); /* SFX::TEXT_INPUT */
@@ -888,7 +888,7 @@ StepResult mode_step_text_input(ModeState *st) {
                         s->eb_name[i] = eb_src[i];
                         s->name_pos++;
                     }
-                    /* Continue loop — assembly jumps back to @RENDER_CURSOR */
+                    /* Continue loop, assembly jumps back to @RENDER_CURSOR */
                 } else if (s->cur_x == 17) {
                     /* Backspace */
                     play_sfx(122); /* SFX::TEXT_INPUT */
@@ -936,7 +936,7 @@ StepResult mode_step_text_input(ModeState *st) {
                 s->name_pos--;
                 s->eb_name[s->name_pos] = 0;
             } else if (s->naming_index != -1) {
-                /* No characters and not standalone — go back to previous screen.
+                /* No characters and not standalone, go back to previous screen.
                    Assembly only closes the keyboard window; name box and message
                    are left for the caller. */
                 close_window(WINDOW_FILE_SELECT_NAMING_KB);
@@ -964,9 +964,9 @@ StepResult mode_step_text_input(ModeState *st) {
         }
     }
 
-    /* --- Render one frame (no yield; owned by the pump) --- */
+    /* Render one frame (no yield; owned by the pump) */
 
-    /* Reset VWF VRAM tile allocation pointer each frame — without this,
+    /* Reset VWF VRAM tile allocation pointer each frame, without this,
        kb_render_grid() and kb_render_labels() advance vwf_vram_next every
        frame, eventually overwriting sprite tile data in VRAM. */
     vwf_frame_reset();
@@ -997,8 +997,8 @@ StepResult mode_step_text_input(ModeState *st) {
     }
 
     /* Draw blinking cursor matching selection_menu() two-frame animation:
-       Frame 0 (big):  tiles 0x41/0x51  — CURSOR_FRAME0 from TEXT_WINDOW_GFX
-       Frame 1 (small): tiles 0x28D/0x29D — CURSOR_FRAME1 from TEXT_WINDOW_GFX
+       Frame 0 (big):  tiles 0x41/0x51, CURSOR_FRAME0 from TEXT_WINDOW_GFX
+       Frame 1 (small): tiles 0x28D/0x29D, CURSOR_FRAME1 from TEXT_WINDOW_GFX
        Toggle every 10 frames; always draw one frame (never skip). */
     {
         bool cursor_frame = ((s->frame_counter / 10) % 2 != 0);
@@ -1060,7 +1060,7 @@ void text_input_prepare(ModeState *init, int name_target, int max_len,
     s->naming_index = (int16_t)naming_index;
     s->has_dont_care = (naming_index >= 0);
     s->is_lowercase = false;
-    /* Don't Care row counter — starts at -1, incremented to 0 on first press,
+    /* Don't Care row counter, starts at -1, incremented to 0 on first press,
        then cycles 0→1→2→3→4→5→6→0→... (assembly: @LOCAL0A) */
     s->dont_care_row = -1;
     s->name_pos = 0;
@@ -1080,7 +1080,7 @@ void text_input_prepare(ModeState *init, int name_target, int max_len,
     }
 }
 
-/* GAME_MODE_NAMING_PROMPT step — run-to-completion port of the name_a_character()
+/* GAME_MODE_NAMING_PROMPT step, run-to-completion port of the name_a_character()
  * prompt-wait loop. Renders the name box + prompt each frame; the pump owns the
  * yield. `primed` reproduces the blocking loop's render-before-first-read. */
 StepResult mode_step_naming_prompt(ModeState *st) {
@@ -1123,9 +1123,9 @@ StepResult mode_step_naming_prompt(ModeState *st) {
 }
 
 /*
- * RENDER_FRAME_TICK (C1004E.asm) — overworld path, naming-screen variant.
+ * RENDER_FRAME_TICK (C1004E.asm), overworld path, naming-screen variant.
  * Executes one frame's WORK (OAM clear, run scripts, draw, sync) WITHOUT the
- * trailing wait_for_vblank() — the yield belongs to the mode pump (the single
+ * trailing wait_for_vblank(), the yield belongs to the mode pump (the single
  * host_process_frame() yield), per the savestate run-to-completion model.
  * Used by GAME_MODE_NAMING_EVENTS (init_naming_screen_events).
  */
@@ -1146,7 +1146,7 @@ static void render_frame_tick_naming_work_flush(void) {
  * GAME_MODE_ACTIONSCRIPT_FRAME (actionscript_frame_take_push) and runs the tail at
  * its flush resume. On no park it completes the frame inline and returns false. */
 static bool render_frame_tick_naming_work_step(void) {
-    /* OAM_CLEAR — hide all sprites and reset priority queues */
+    /* OAM_CLEAR: hide all sprites and reset priority queues */
     oam_clear();
 
     /* RUN_ACTIONSCRIPT_FRAME (entity script execution + draw list) */
@@ -1205,7 +1205,7 @@ static bool naming_events_reassign_scripts(uint16_t naming_index) {
     return true;
 }
 
-/* GAME_MODE_NAMING_EVENTS step — run-to-completion port of the two
+/* GAME_MODE_NAMING_EVENTS step, run-to-completion port of the two
  * render_frame_tick_naming() wait loops in init_naming_screen_events(). See the
  * mode header comment in mode_stack.h for the phase/timing rationale. */
 StepResult mode_step_naming_events(ModeState *st) {
@@ -1248,7 +1248,7 @@ StepResult mode_step_naming_events(ModeState *st) {
     /* NE_WAIT_SCRIPTS: wait for all entity scripts (slots 0 ..
      * PARTY_LEADER_ENTITY_INDEX-2) to finish (script_table == -1 for all).
      * The blocking loop renders once more than strictly needed (it computes the
-     * AND before the render and breaks after); `done` reproduces that — the
+     * AND before the render and breaks after); `done` reproduces that, the
      * final render's yield happens, then the next step cleans up and pops. */
     if (s->done) {
         /* All entities are now deactivated.  The assembly achieves a clean VRAM
@@ -1373,7 +1373,7 @@ static const struct {
 static ModeState ngn_child_init;
 
 /*
- * GAME_MODE_NEW_GAME_NAMING step — run-to-completion port of new_game_naming().
+ * GAME_MODE_NEW_GAME_NAMING step, run-to-completion port of new_game_naming().
  * See NewGameNamingState in mode_stack.h for the phase machine. Folds in the
  * former blocking helpers name_a_character() and init_naming_screen_events().
  */
@@ -1454,7 +1454,7 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
         case NGN_INPUT_DONE: {
             st->char_result = (int16_t)mode_child_result();
             /* Assembly (@NAMING_ADVANCE): ALWAYS run INIT_NAMING_SCREEN_EVENTS
-               for the current index BEFORE advancing — the return animation
+               for the current index BEFORE advancing, the return animation
                (entities walk off) + wait for all entity scripts to finish. */
             ngn_child_init = (ModeState){0};
             ngn_child_init.naming_events.phase = NE_WAIT_PENDING;
@@ -1465,8 +1465,8 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
 
         case NGN_EVENTS_DONE:
             if (st->char_result == 0) {
-                st->char_i++;             /* confirmed — advance */
-            } else {                      /* cancelled (-1) — go back */
+                st->char_i++;             /* confirmed, advance */
+            } else {                      /* cancelled (-1), go back */
                 if (st->char_i > 0) {
                     st->char_i--;
                 } else {
@@ -1481,7 +1481,7 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
 
         case NGN_CONFIRM_BUILD: {
             /* Set default names for any empty slots (first name in each group).
-             * Names are already EB-encoded in the ROM data — copy directly. */
+             * Names are already EB-encoded in the ROM data, copy directly. */
             for (int c = 0; c < 4; c++) {
                 if (party_characters[c].name[0] == 0) {
                     const uint8_t *eb_src = get_dont_care_name(c, 0);
@@ -1537,13 +1537,13 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
                 print_eb_string(game_state.pet_name, len);
             }
 
-            /* Favorite food — label on row 0, right-justified value on row 1 */
+            /* Favorite food, label on row 0, right-justified value on row 1 */
             create_window(WINDOW_FILE_SELECT_CONFIRM_FOOD);
             set_focus_text_cursor(0, 0);
             print_string("Favorite food:");
             print_right_justified_name(game_state.favourite_food, 6, WINDOW_FILE_SELECT_CONFIRM_FOOD);
 
-            /* Favorite thing — same layout as food */
+            /* Favorite thing, same layout as food */
             create_window(WINDOW_FILE_SELECT_CONFIRM_THING);
             set_focus_text_cursor(0, 0);
             print_string("Coolest thing:");
@@ -1559,7 +1559,7 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
                 add_menu_item("Nope", 0, 18, 0);
             }
 
-            /* PRINT_MENU_ITEMS then CREATE_FILE_SELECT_PARTY_SPRITES — no
+            /* PRINT_MENU_ITEMS then CREATE_FILE_SELECT_PARTY_SPRITES, no
              * RENDER_ALL_WINDOWS in between (file_select_menu_loop.asm:470-471). */
             print_menu_items();
             create_file_select_party_sprites();
@@ -1575,7 +1575,7 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
         case NGN_CONFIRM_DONE: {
             uint16_t confirm = (uint16_t)mode_child_result();
             if (confirm == 0) {
-                /* Nope — clear entities and redo naming from the top (the
+                /* Nope, clear entities and redo naming from the top (the
                    original tail-recursion `return new_game_naming()`). */
                 entity_system_init();
                 close_all_windows();
@@ -1591,7 +1591,7 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
 
         case NGN_CONFIRM_WAIT:
             /* Wait for the confirmation animation (assembly 487-497: 180-frame
-               loop; the C original was wait_frames_or_button(180, 0) — no game
+               loop; the C original was wait_frames_or_button(180, 0), no game
                work, just yields). */
             if (st->wait_frames > 0) {
                 st->wait_frames--;
@@ -1607,7 +1607,7 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
         break; /* NGN_FINALIZE reached: run the synchronous finalize, then POP */
     }
 
-    /* ---- NGN_FINALIZE: initialise the new game (synchronous) ---------------- */
+    /* NGN_FINALIZE: initialise the new game (synchronous) */
 
     /* Clear map entities after animation (assembly line 498) */
     entity_system_init();
@@ -1615,7 +1615,7 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
     /* Initialize character stats from INITIAL_STATS (asm/data/initial_stats.asm).
      * Assembly: file_select_menu_loop.asm lines 501-576.
      * For each character:
-     *   1. RESET_CHAR_LEVEL_ONE(char_id, level, 0) — sets base stats and levels up
+     *   1. RESET_CHAR_LEVEL_ONE(char_id, level, 0), sets base stats and levels up
      *   2. GAIN_EXP if initial EXP > 0
      *   3. Copy max HP/PP → current (sync after level-ups)
      *   4. Clear items and set from INITIAL_STATS */
@@ -1758,7 +1758,7 @@ static uint16_t fm_take_result(FileMenuState *st) {
 }
 
 /*
- * GAME_MODE_FILE_MENU step — run-to-completion port of the file-menu cascade
+ * GAME_MODE_FILE_MENU step, run-to-completion port of the file-menu cascade
  * (the loop half of the former file_menu_loop(); its one-shot setup is now
  * file_menu_setup()).
  * See FileMenuState in mode_stack.h for the phase machine and what stays blocking.
@@ -1828,7 +1828,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
 
         case FM_CONFIG: {
             /* Pushes the exact same GAME_MODE_SETTINGS_MENU the pause
-             * menu's Config item pushes (text.c) -- generic global engine
+             * menu's Config item pushes (text.c), generic global engine
              * state, nothing party/save-slot specific, so it's directly
              * reusable here with no new settings-menu implementation. */
             fm_child_init = (ModeState){0};
@@ -1838,7 +1838,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
         }
 
         case FM_CONFIG_RESULT:
-            /* Same shape as FM_UPDATE_CHECK_RESULT below -- rebuild the
+            /* Same shape as FM_UPDATE_CHECK_RESULT below, rebuild the
              * slot list, exactly like FM_SUBMENU_RESULT's B-pressed path. */
             close_focus_window();
             st->phase = FM_SELECT;
@@ -1852,7 +1852,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
         }
 
         case FM_UPDATE_CHECK_RESULT: {
-            /* Nothing to branch on -- a successful update relaunches the
+            /* Nothing to branch on, a successful update relaunches the
              * whole process, so this phase only ever runs for the
              * no-update/cancelled/error outcomes. Just rebuild the slot
              * list, exactly like FM_SUBMENU_RESULT's B-pressed path does. */
@@ -1876,12 +1876,12 @@ StepResult mode_step_file_menu(ModeState *ms) {
             uint16_t action = fm_take_result(st);
             int slot = st->selected - 1;
             switch (action) {
-            case 0: /* B pressed — @MENU_B_PRESSED */
+            case 0: /* B pressed, @MENU_B_PRESSED */
                 close_focus_window();
                 st->phase = FM_SELECT;
                 continue;
 
-            case 1: /* Continue — @MENU_STARTGAME_SELECTED */
+            case 1: /* Continue, @MENU_STARTGAME_SELECTED */
                 load_game(slot);
                 reset_queued_interactions();
                 reload_hotspots();
@@ -1895,12 +1895,12 @@ StepResult mode_step_file_menu(ModeState *ms) {
                 close_all_windows();
                 return STEP_RESULT_POP(1);
 
-            case 2: /* Copy — @MENU_COPY_SELECTED */
+            case 2: /* Copy, @MENU_COPY_SELECTED */
                 close_all_windows();
                 st->phase = FM_SELECT;
                 continue;
 
-            case 3: /* Delete — CONFIRM_FILE_DELETE (C1F2A8) */
+            case 3: /* Delete, CONFIRM_FILE_DELETE (C1F2A8) */
             {
                 close_focus_window();
                 WindowInfo *dw = create_window(WINDOW_FILE_SELECT_DELETE);
@@ -1954,7 +1954,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
             continue;
         }
 
-        /* ---- existing-save Set Up cascade ------------------------------- */
+        /* existing-save Set Up cascade */
         case FM_SETUP_TS: {
             int e = fm_textspeed_build();
             if (e >= 0) { st->result_ready = 1; st->result = (uint16_t)e;
@@ -1963,7 +1963,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
         }
         case FM_SETUP_TS_RESULT: {
             uint16_t ts = fm_take_result(st);
-            if (ts == 0) {  /* @VALID_FILE_SELECTED — back to submenu */
+            if (ts == 0) {  /* @VALID_FILE_SELECTED, back to submenu */
                 close_window(WINDOW_FILE_SELECT_TEXT_SPEED);
                 st->phase = FM_SUBMENU;
                 continue;
@@ -2009,7 +2009,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
             continue;
         }
 
-        /* ---- new-game cascade ------------------------------------------- */
+        /* new-game cascade */
         case FM_NG_TS: {
             int e = fm_textspeed_build();
             if (e >= 0) { st->result_ready = 1; st->result = (uint16_t)e;
@@ -2063,7 +2063,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
         }
 
         case FM_NG_NAMING:
-            /* Naming screen — GAME_MODE_NEW_GAME_NAMING (pops 1 = started, 0 =
+            /* Naming screen, GAME_MODE_NEW_GAME_NAMING (pops 1 = started, 0 =
              * backed out past the first name). */
             current_save_slot = (uint8_t)st->selected;
             fm_child_init = (ModeState){0};
@@ -2097,7 +2097,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
 }
 
 /*
- * Main file select loop — thin blocking wrapper.
+ * Main file select loop, thin blocking wrapper.
  * One-shot setup (asset loads + FILE_SELECT_INIT + fade_in) stays here; the
  * fade-in wait and the menu cascade run as GAME_MODE_FILE_MENU.
  * Ported from FILE_SELECT_INIT + RUN_FILE_MENU in assembly.

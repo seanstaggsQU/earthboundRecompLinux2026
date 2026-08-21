@@ -45,7 +45,7 @@
  * Port of LOAD_TITLE_SCREEN_GRAPHICS (asm/intro/load_title_screen_graphics.asm).
  *
  * Decompresses and DMA-transfers tile/tilemap/OBJ data to VRAM.
- * Does NOT load ert.palettes — the entity system handles those.
+ * Does NOT load ert.palettes, the entity system handles those.
  *
  * VRAM layout (word addresses, from include/enums.asm):
  *   VRAM::LOGO_TILES              = $0000  ($B000 bytes, BG1 8bpp tile data)
@@ -58,7 +58,7 @@ void load_title_screen_graphics(void) {
 
     /* ROM: DECOMP TITLE_SCREEN_GRAPHICS → BUFFER
      *      COPY_TO_VRAM1P BUFFER, VRAM::LOGO_TILES, $B000, 0
-     * Decompress directly to VRAM — no intermediate buffer needed. */
+     * Decompress directly to VRAM, no intermediate buffer needed. */
     comp_size = ASSET_SIZE(ASSET_INTRO_TITLE_SCREEN_GFX_LZHAL);
     comp_data = ASSET_DATA(ASSET_INTRO_TITLE_SCREEN_GFX_LZHAL);
     if (comp_data) {
@@ -97,7 +97,7 @@ void load_title_screen_graphics(void) {
 /* The manual fade-out + exit cleanup, run as its own phase and also called
  * inline when TS_INPUT decides to exit (so there is no extra yield between the
  * decision and the first fade frame). Displays brightness 0x0F..1 for four
- * frames each, then force-blanks — matching the existing manual loop exactly. */
+ * frames each, then force-blanks, matching the existing manual loop exactly. */
 static StepResult title_fadeout_step(TitleScreenState *s) {
     if (s->fade_delay_left > 0) {
         s->fade_delay_left--;
@@ -144,7 +144,7 @@ StepResult mode_step_title_screen(ModeState *st) {
          * force-blanked so the BG palette loader's brief full-brightness write
          * isn't shown. By the third warm-up frame UPDATE_MAP_PALETTE_ANIMATION's
          * fade has pulled the logo down to black and is ramping it up, so turn the
-         * screen on now — no full-brightness "EARTHBOUND" flash. (Quick mode uses
+         * screen on now, no full-brightness "EARTHBOUND" flash. (Quick mode uses
          * the NMI brightness fade and never force-blanks here.) */
         if (!s->quick_mode && s->frame >= 2)
             ppu.inidisp = 0x0F;
@@ -222,13 +222,13 @@ void title_screen_setup(uint16_t quick_mode) {
     /* ROM: JSL FORCE_BLANK_AND_WAIT_VBLANK */
     ppu.inidisp = 0x80;
 
-    /* Script data is loaded in init_intro() — available for both
+    /* Script data is loaded in init_intro(), available for both
      * gas station (EVENT_860) and title screen (EVENT_BATTLE_FX through TITLE_SCREEN_11, 787-798). */
 
     /* ROM: JSL INIT_ENTITY_SYSTEM */
     entity_system_init();
 
-    /* Clear color math registers — may have residual values from
+    /* Clear color math registers, may have residual values from
      * setup_entity_color_math() at previous title screen exit or
      * from attract mode entity scripts. The assembly relies on
      * SNES hardware prevent_mode handling; the C port must clear. */
@@ -259,7 +259,7 @@ void title_screen_setup(uint16_t quick_mode) {
     /* ROM: JSL LOAD_TITLE_SCREEN_GRAPHICS */
     load_title_screen_graphics();
 
-    /* ROM: LDA #$11 / STA TM_MIRROR — enable BG1 + OBJ on main screen */
+    /* ROM: LDA #$11 / STA TM_MIRROR, enable BG1 + OBJ on main screen */
     ppu.tm = 0x11;
     ppu.ts = 0x00;
 
@@ -299,7 +299,7 @@ void title_screen_setup(uint16_t quick_mode) {
      * NOTE: EVENT_BATTLE_FX (787) is spawned by FILE_SELECT_INIT, NOT here. */
     entity_init_wipe(EVENT_SCRIPT_TITLE_SCREEN_1);
 
-    /* ROM line 65: STZ ACTIONSCRIPT_STATE — clear after entity wipe.
+    /* ROM line 65: STZ ACTIONSCRIPT_STATE, clear after entity wipe.
      * entity_system_init already set it to 0, but the assembly explicitly
      * clears it again here as a safety measure. */
     ert.actionscript_state = 0;
@@ -312,7 +312,7 @@ void title_screen_setup(uint16_t quick_mode) {
          *   3. Decompress sprite palette (E1AE7C) → PALETTES+256
          *   4. COPY_FADE_BUFFER_TO_PALETTES (save to BUFFER)
          *   5. Zero PALETTES again
-         *   6. PREPARE_PALETTE_FADE(60, $0100) — 60-frame sprite palette fade
+         *   6. PREPARE_PALETTE_FADE(60, $0100), 60-frame sprite palette fade
          *   7. 60-frame loop: UPDATE_MAP_PALETTE_ANIMATION + RUN_ACTIONSCRIPT_FRAME */
 
         /* Zero all ert.palettes */
@@ -321,7 +321,7 @@ void title_screen_setup(uint16_t quick_mode) {
         /* ROM sets INIDISP=$0F here, but the title entity palette loader
          * (TITLE_SCREEN_2) writes the BG palette at FULL brightness for a frame
          * or two before UPDATE_MAP_PALETTE_ANIMATION's fade pulls it down to
-         * black — on the SNES the NMI fade masks that, but the C port's mode
+         * black, on the SNES the NMI fade masks that, but the C port's mode
          * pump renders those warm-up frames, flashing the EARTHBOUND logo at
          * full brightness when returning from attract mode. Keep the screen
          * force-blanked (0x80, set above) and turn it on in TS_WARMUP once the
@@ -343,7 +343,7 @@ void title_screen_setup(uint16_t quick_mode) {
         /* Zero ert.palettes again for fade-from-black */
         memset(ert.palettes, 0, sizeof(ert.palettes));
 
-        /* PREPARE_PALETTE_FADE(60, $0100) — fade sprite palette group 8 */
+        /* PREPARE_PALETTE_FADE(60, $0100): fade sprite palette group 8 */
         /* $0100 = bit 8 set = palette group 8 (colors 128-143) */
         /* Actually, let's just fade all sprite palette entries for correctness */
         /* In the ROM: mask=$0100 means only palette group 8.
@@ -377,15 +377,15 @@ void title_screen_setup(uint16_t quick_mode) {
             }
         }
 
-        /* The 60-frame sprite-palette warm-up — and the @INPUT_LOOP /
-         * @CHECK_ACTIONSCRIPT wait and the closing fade-out — now run as
+        /* The 60-frame sprite-palette warm-up, and the @INPUT_LOOP /
+         * @CHECK_ACTIONSCRIPT wait and the closing fade-out, now run as
          * GAME_MODE_TITLE_SCREEN (TS_WARMUP body re-derives `fade` from
          * ert.buffer each frame; slopes/target were set up above). */
 
         /* Push the just-zeroed palette to CGRAM now (the SNES NMI uploads the
          * PALETTES mirror every vblank). Without this, the single host frame that
          * renders between this setup and TS_WARMUP's first render (the push-yield)
-         * shows the title BG tiles under the PREVIOUS scene's stale CGRAM — e.g.
+         * shows the title BG tiles under the PREVIOUS scene's stale CGRAM, e.g.
          * the bright "EARTHBOUND" glow flashes for a frame when returning from
          * attract mode. inidisp is already $0F (screen on), so the palette must be
          * black here for the transition frame to stay dark. */
@@ -397,7 +397,7 @@ void title_screen_setup(uint16_t quick_mode) {
          * during this warm-up.  The brightness fade (starting from force blank)
          * keeps the screen dark until entity scripts have loaded the palette. */
 
-        /* ROM: LDX #1 / LDA #4 / JSL FADE_IN — non-blocking (NMI-driven on the
+        /* ROM: LDX #1 / LDA #4 / JSL FADE_IN, non-blocking (NMI-driven on the
          * SNES); the warm-up mode advances it each frame via fade_update(). */
         fade_in(4, 1);
     }

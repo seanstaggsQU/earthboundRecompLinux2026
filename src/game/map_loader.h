@@ -2,8 +2,8 @@
  * Map sector loading system.
  *
  * Port of:
- *   LOAD_MAP_AT_POSITION — asm/overworld/load_map_at_position.asm
- *   LOAD_MAP_AT_SECTOR   — asm/overworld/load_map_at_sector.asm
+ *   LOAD_MAP_AT_POSITION: asm/overworld/load_map_at_position.asm
+ *   LOAD_MAP_AT_SECTOR: asm/overworld/load_map_at_sector.asm
  *
  * Loads overworld map tile graphics, arrangements, and palettes
  * based on world coordinates or sector indices.
@@ -83,7 +83,7 @@ uint16_t lookup_surface_flags(int16_t x, int16_t y, uint16_t size_code);
  * Port of CHECK_DIRECTIONAL_COLLISION (asm/overworld/collision/check_directional_collision.asm).
  * Sets final_movement_direction (may differ from input direction for wall slides).
  * Sets not_moving_in_same_direction_faced, ladder_stairs_tile_x/y.
- * Returns surface flags — bits 6-7 (0xC0) indicate wall blocking. */
+ * Returns surface flags, bits 6-7 (0xC0) indicate wall blocking. */
 uint16_t check_directional_collision(int16_t x, int16_t y, int16_t direction);
 
 /* Simple single-point collision lookup at a world position.
@@ -151,14 +151,14 @@ uint32_t get_npc_config_text_pointer2(uint16_t npc_id);
  * high byte = rideable item.  Also sets current_sector_attributes. */
 uint16_t load_sector_attrs(uint16_t x_pixels, uint16_t y_pixels);
 
-/* --- Palette animation state (port of OVERWORLD_PALETTE_ANIM) --- */
+/* Palette animation state (port of OVERWORLD_PALETTE_ANIM) */
 typedef struct {
     uint16_t timer;
     uint16_t index;
     uint16_t delays[9];
 } OverworldPaletteAnim;
 
-/* --- Tileset animation state (port of OVERWORLD_TILESET_ANIM) --- */
+/* Tileset animation state (port of OVERWORLD_TILESET_ANIM) */
 typedef struct {
     uint16_t animation_limit;
     uint16_t frame_delay;
@@ -172,7 +172,7 @@ typedef struct {
 
 /* Consolidated map loader runtime state. */
 typedef struct {
-    /* CURRENT_SECTOR_ATTRIBUTES — last value written by load_sector_attrs(). */
+    /* CURRENT_SECTOR_ATTRIBUTES: last value written by load_sector_attrs(). */
     uint16_t current_sector_attributes;
 
     /* Map music state (from bankconfig/common/ram.asm:955-961) */
@@ -186,13 +186,13 @@ typedef struct {
     /* Whether palette animation is active for the current map sector. */
     uint16_t map_palette_animation_loaded;
 
-    /* LOADED_COLLISION_TILES — 64×64 collision grid. */
+    /* LOADED_COLLISION_TILES: 64×64 collision grid. */
     uint8_t loaded_collision_tiles[64 * 64];
 
     /* Number of active tileset animations for the current sector. */
     uint16_t loaded_animated_tile_count;
 
-    /* --- Promoted statics (saveable runtime state) --- */
+    /* Promoted statics (saveable runtime state) */
     int16_t loaded_tileset_combo;
     int16_t loaded_palette_index;
     OverworldPaletteAnim overworld_palette_anim;
@@ -263,7 +263,7 @@ void load_your_sanctuary_location(uint16_t sanctuary_idx);
 
 /* Load a map palette by tileset combo and palette index.
  * fade_frames == 0: copies 192 bytes (6 sub-palettes) to PALETTES sub-palettes 2-7
- *   (instant, synchronous) — returns false (nothing to push).
+ *   (instant, synchronous), returns false (nothing to push).
  * fade_frames > 0: lays out the per-channel fade in *init and returns true; the
  *   caller STEP_PUSHes GAME_MODE_MAP_PALETTE_FADE to run the fade to completion.
  * Returns false on a bad/too-small palette asset (instant no-op).
@@ -285,13 +285,13 @@ void animate_palette(void);
 void load_bg_palette(uint16_t index);
 
 
-/* ENTITY_COLLISION_X_OFFSET — center-to-left-edge offset per size code (17 entries) */
+/* ENTITY_COLLISION_X_OFFSET: center-to-left-edge offset per size code (17 entries) */
 extern const int16_t entity_collision_x_offset[17];
 
-/* ENTITY_COLLISION_Y_OFFSET — center-to-top offset per size code (17 entries) */
+/* ENTITY_COLLISION_Y_OFFSET: center-to-top offset per size code (17 entries) */
 extern const int16_t entity_collision_y_offset[17];
 
-/* SPRITE_HITBOX_ENABLE_TABLE — Y hitbox adjustment per size code (17 entries) */
+/* SPRITE_HITBOX_ENABLE_TABLE: Y hitbox adjustment per size code (17 entries) */
 extern const int16_t sprite_hitbox_enable[17];
 
 /* Advance tileset animation by one frame. Decrements per-entry timers,
@@ -302,7 +302,7 @@ void animate_tileset(void);
 /* Shared 32 KB scratch buffer, time-shared across exclusive game phases.
  * Access via the appropriate union member to document which phase is active.
  *
- * Never concurrent — map arrangement is only live during overworld rendering,
+ * Never concurrent, map arrangement is only live during overworld rendering,
  * sanctuary decomp only during the sanctuary screen, and battle sprite decomp
  * only during battle init. */
 #define SHARED_SCRATCH_SIZE 0x8000

@@ -11,19 +11,19 @@
  * etc. in pad.h). Ports with fewer buttons should prioritize mapping:
  *
  * REQUIRED (minimum playable):
- *   D-pad       — Movement and menu navigation
- *   PAD_A       — Confirm selection, open command window, interact
- *   PAD_B       — Cancel, back, show HP/PP window on overworld
+ *   D-pad, Movement and menu navigation
+ *   PAD_A: Confirm selection, open command window, interact
+ *   PAD_B: Cancel, back, show HP/PP window on overworld
  *
  * RECOMMENDED:
- *   PAD_X       — Toggle town map (unique function, no equivalent)
- *   PAD_START   — Start game from title screen (only use; could be combined)
- *   PAD_L       — "Check/talk to" shortcut on overworld (like A but tries talk first)
+ *   PAD_X: Toggle town map (unique function, no equivalent)
+ *   PAD_START: Start game from title screen (only use; could be combined)
+ *   PAD_L: "Check/talk to" shortcut on overworld (like A but tries talk first)
  *
  * OPTIONAL (cosmetic or redundant):
- *   PAD_SELECT  — Duplicate of B (for one-handed play)
- *   PAD_R       — Rings bicycle bell (cosmetic sound effect only)
- *   PAD_Y       — No function in normal gameplay
+ *   PAD_SELECT: Duplicate of B (for one-handed play)
+ *   PAD_R: Rings bicycle bell (cosmetic sound effect only)
+ *   PAD_Y: No function in normal gameplay
  *
  * For platforms with limited buttons, consider mapping unused physical buttons
  * to PAD_L (for check/talk) rather than PAD_Y or PAD_R.
@@ -39,12 +39,12 @@ extern int platform_max_frames;   /* --frames N: quit after N frames (0=unlimite
 extern bool platform_force_windowed;
 
 /*
- * Video — scanline-based rendering
+ * Video, scanline-based rendering
  *
  * The PPU renders one scanline at a time. Each frame follows this sequence:
- *   1. platform_video_begin_frame()       — prepare for a new frame
- *   2. platform_video_send_scanline(y, p) — called for y=0..height-1 with RGBA pixels
- *   3. platform_video_end_frame()         — present the completed frame
+ *   1. platform_video_begin_frame(), prepare for a new frame
+ *   2. platform_video_send_scanline(y, p), called for y=0..height-1 with RGBA pixels
+ *   3. platform_video_end_frame(), present the completed frame
  *
  * platform_video_get_framebuffer() returns a pointer to the full frame pixel
  * buffer (for desktop backends that texture-upload), or NULL on embedded
@@ -68,12 +68,12 @@ void platform_video_set_vsync(bool enabled);
 /* Overworld FOV/zoom cycle (R3, see game_main.c's host_process_frame()).
  * The desktop build always renders the full EB_VIEWPORT_WIDTH x HEIGHT
  * canvas internally (see port/unix/CMakeLists.txt); this only changes how
- * much of it gets presented -- it's purely a presentation-layer crop, never
+ * much of it gets presented, it's purely a presentation-layer crop, never
  * a change to game/camera/entity logic, which always runs as if the full
  * canvas were showing regardless of mode. EB_ZOOM_OFF (default) shows the
  * same EB_DEFAULT_WIDTH x SNES_HEIGHT footprint every scene already used
  * before this toggle existed; EB_ZOOM_OUT reveals more of the canvas
- * (adapting to the display's aspect ratio -- see sdl2_video.c); EB_ZOOM_IN
+ * (adapting to the display's aspect ratio, see sdl2_video.c); EB_ZOOM_IN
  * crops tighter than the default footprint instead, magnifying the view. */
 typedef enum {
     EB_ZOOM_OFF = 0,
@@ -81,22 +81,22 @@ typedef enum {
     EB_ZOOM_IN  = 2,
 } EbZoomMode;
 void platform_video_set_zoom(EbZoomMode mode);
-/* Atmosphere-FX suppression override (Color Grading -- see
+/* Atmosphere-FX suppression override (Color Grading, see
  * game_main.c's host_process_frame(), which scans the mode stack for
  * GAME_MODE_TITLE_SCREEN/GAME_MODE_FILE_MENU the same way it already scans
  * for GAME_MODE_BATTLE/GAME_MODE_TOWN_MAP above). A per-frame *override* of
- * the player's Config setting, not a change to it -- engine_experimental_
+ * the player's Config setting, not a change to it, engine_experimental_
  * visuals (settings.h) stays whatever the player chose; this just forces
  * it off on screens it shouldn't touch (the title screen's logo/flash
  * art and the file-select slots were never art-directed with it in
- * mind, and a wrong-looking permanent effect there -- unlike a battle/PSI
- * flash the player leaves in a few seconds -- would be the first and last
- * thing every session shows). Desktop-only, like the setting itself -- see
+ * mind, and a wrong-looking permanent effect there, unlike a battle/PSI
+ * flash the player leaves in a few seconds, would be the first and last
+ * thing every session shows). Desktop-only, like the setting itself, see
  * apply_color_grade() in sdl2_video.c, the only
  * implementation, mirroring platform_video_set_zoom() just above (also
  * unix-only, no embedded stub). */
 void platform_video_set_fx_suppressed(bool suppressed);
-/* Depth of Field suppression override -- a superset of the above: DoF is
+/* Depth of Field suppression override, a superset of the above: DoF is
  * ALSO suppressed during battle/Town Map (their own separate full-screen
  * layouts, same reasoning as the zoom-reset case above) and any time a
  * text/menu window is open, since even DoF's small blur radius can soften
@@ -111,10 +111,10 @@ void platform_render_frame(scanline_stamp_cb_t fps_overlay_cb);
  * title screen / file-select (see version_overlay_stamp_scanline(),
  * game_main.c) -- never NULL, but may be "" if none is available.
  * Desktop (port/unix): the same git-describe string the self-updater
- * compares releases against (main.c, generated/version.h) -- available
+ * compares releases against (main.c, generated/version.h), available
  * unconditionally, independent of whether the updater itself is
  * configured (EB_UPDATER_ENABLED). Embedded: always "" (no build-time
- * git-describe step exists there yet) -- see updater_backend_stub.c. */
+ * git-describe step exists there yet), see updater_backend_stub.c. */
 const char *platform_get_version_string(void);
 
 /* Redirect stdout/stderr to a fixed log file (desktop: "eb_debug.log" next
@@ -125,7 +125,7 @@ const char *platform_get_version_string(void);
  * pre-existing "--log-file" command-line flag at all. One-way: turning
  * logging back off does not restore console output mid-session (matches
  * "--log-file"'s own behavior, and avoids needing a working dup/dup2
- * restore path on every target) -- the file just stops being written to
+ * restore path on every target), the file just stops being written to
  * further. Safe to call every frame the setting reads as on; only the
  * first call in a run actually redirects. Desktop only; embedded targets
  * no-op (no filesystem path meant for player-visible text output). */
@@ -135,7 +135,7 @@ void platform_log_set_enabled(bool enabled);
  * Input
  *
  * Pad state is a uint16_t bitmask of SNES joypad buttons (see pad.h).
- * Each bit corresponds to one button — e.g. PAD_A (0x0080), PAD_B (0x8000).
+ * Each bit corresponds to one button, e.g. PAD_A (0x0080), PAD_B (0x8000).
  * Game logic tests buttons via groups like PAD_CONFIRM (A|L) and PAD_CANCEL
  * (B|SELECT), so ports can map physical buttons to whichever SNES buttons
  * make sense for the hardware.
@@ -150,7 +150,7 @@ void platform_log_set_enabled(bool enabled);
  * get_pad_new(), and get_aux() return consistent values for the frame.
  */
 
-/* Aux button bitmask — non-game actions (debug, turbo, etc.) */
+/* Aux button bitmask, non-game actions (debug, turbo, etc.) */
 #define AUX_DEBUG_DUMP   (1 << 0)   /* F1: dump PPU state */
 #define AUX_VRAM_DUMP    (1 << 1)   /* F2: dump VRAM as image */
 #define AUX_FPS_TOGGLE   (1 << 2)   /* F3: toggle FPS overlay */
@@ -159,11 +159,11 @@ void platform_log_set_enabled(bool enabled);
 #define AUX_DEBUG_TOGGLE (1 << 5)   /* `: toggle debug mode */
 #define AUX_SAVESTATE    (1 << 6)   /* F6: request a torn-safe savestate capture */
 #define AUX_LOAD_STATE   (1 << 7)   /* F7: restore the last savestate */
-#define AUX_LOG_MARK     (1 << 8)   /* F4: bug-report marker — timestamped log line + screenshot */
+#define AUX_LOG_MARK     (1 << 8)   /* F4: bug-report marker, timestamped log line + screenshot */
 
 bool platform_input_init(void);
 void platform_input_shutdown(void);
-void platform_input_poll(void);                       /* sample hardware — call once per frame */
+void platform_input_poll(void);                       /* sample hardware, call once per frame */
 uint16_t platform_input_get_pad(void);                /* bitmask of currently held buttons (pad.h PAD_* flags) */
 uint16_t platform_input_get_pad_new(void);            /* bitmask of buttons pressed this frame (not held last frame) */
 uint16_t platform_input_get_aux(void);                /* bitmask of currently held aux buttons (AUX_* flags) */
@@ -184,7 +184,7 @@ void platform_audio_lock(void);                       /* acquire audio mutex (pa
 void platform_audio_unlock(void);
 
 /*
- * MSU1 audio — optional, off unless a pack is loaded
+ * MSU1 audio, optional, off unless a pack is loaded
  *
  * MSU1 is a hardware trick real SNES romhacks use to stream CD-quality PCM
  * music from an SD card/flash cart, replacing the SPC700's chiptune output
@@ -195,7 +195,7 @@ void platform_audio_unlock(void);
  * SPC700 the play-track command; if a pack is loaded and covers this
  * track, the platform streams that PCM instead and the caller skips the
  * SPC700 command (sound effects still go through the SPC700/DSP
- * emulation as normal -- only the music sequence trigger is skipped, so
+ * emulation as normal, only the music sequence trigger is skipped, so
  * this doesn't need any per-channel muting inside the emulated APU).
  * No-op (always returns false) when no pack is loaded, e.g. on ports that
  * never call platform_audio_msu_load(). */
@@ -203,7 +203,7 @@ bool platform_audio_msu_play(uint16_t track_id);  /* true if this track is cover
 void platform_audio_msu_stop(void);               /* stop any currently-streaming MSU track */
 
 /*
- * Save data — persistent storage
+ * Save data, persistent storage
  *
  * The game calls platform_save_read/write with byte offsets and sizes
  * into a flat SAVE_FILE_SIZE byte buffer (7680 bytes = 3 slots × 2 copies
@@ -221,7 +221,7 @@ size_t platform_save_read(void *dst, size_t offset, size_t size);
 bool platform_save_write(const void *src, size_t offset, size_t size);
 
 /*
- * Engine settings — small persistent C-port preferences (this port's own
+ * Engine settings, small persistent C-port preferences (this port's own
  * addition; NOT part of the original ROM's SRAM save format, and
  * deliberately kept separate from platform_save_* above, which mirrors the
  * real cartridge's 7680-byte battery SRAM byte-for-byte). Things like the
@@ -240,7 +240,7 @@ size_t platform_settings_read(void *dst, size_t size);
 bool platform_settings_write(const void *src, size_t size);
 
 /*
- * Savestate storage — large suspend/resume snapshots (build-order item #5).
+ * Savestate storage, large suspend/resume snapshots (build-order item #5).
  *
  * Distinct from platform_save_* (the 7680-byte battery SRAM). A savestate is the
  * full run-to-completion snapshot (~139 KiB) used for power-off suspend/resume.
@@ -248,7 +248,7 @@ bool platform_settings_write(const void *src, size_t size);
  * is durable only after _commit(), so a power loss mid-write leaves the prior slot
  * intact. The embedded firmware power-off handler requests a capture
  * (host_request_capture) and holds the power rail until the root boundary's
- * state_dump_save_slots() — which calls _begin/_write/_commit — returns. On desktop
+ * state_dump_save_slots(), which calls _begin/_write/_commit, returns. On desktop
  * the slots are two files; on embedded they are two flash regions.
  *
  * Offset/slot-addressed, caller-owned buffers, no malloc (same contract as
@@ -280,7 +280,7 @@ size_t platform_savestate_read(int slot, size_t offset, void *dst, size_t size);
 void platform_savestate_freeze_audio(bool freeze);
 
 /*
- * Transient scratch RAM for the savestate (de)compressor — the LZ window, the
+ * Transient scratch RAM for the savestate (de)compressor, the LZ window, the
  * tamp working struct, and the compressed-byte I/O staging buffer. The payload
  * is stored as a tamp stream (see state_dump.c); compress (save) and decompress
  * (load) both run only at the root boundary, where the port can lend a large
@@ -306,22 +306,22 @@ void platform_debug_dump_vram_image(void);
 void platform_debug_mark_screenshot(const pixel_t *framebuffer);
 
 /*
- * Self-update — desktop (port/unix) builds only, and only when built with a
+ * Self-update, desktop (port/unix) builds only, and only when built with a
  * private release feed configured (EB_UPDATER_REPO/EB_UPDATER_TOKEN CMake
  * cache vars; both empty = feature entirely absent from the binary). NOT
  * part of the universal cross-port contract the way video/input/audio are
- * — see docs/porting-guide.md's "No File I/O" precedent, which treats
+ *, see docs/porting-guide.md's "No File I/O" precedent, which treats
  * persistent-storage backends the same way (real on desktop, safe no-op
  * stub elsewhere: src/platform/updater_backend_stub.c mirrors
  * src/platform/settings_backend_stub.c's pattern exactly). Callers never
- * need '#ifdef EB_EMBEDDED' at the call site — platform_update_supported()
+ * need '#ifdef EB_EMBEDDED' at the call site, platform_update_supported()
  * just reports false and every other call becomes a no-op.
  *
  * Fully non-blocking, by design: the mode-stack game loop steps one frame
  * at a time with no blocking calls anywhere, so a synchronous HTTP request
  * here would freeze rendering. _check_start() and _download_start() spawn a
  * background thread and return immediately; the caller (src/intro/
- * update_screen.c) calls _poll() once per frame to read current status —
+ * update_screen.c) calls _poll() once per frame to read current status, 
  * it never blocks, even mid-download.
  */
 typedef enum {
@@ -341,7 +341,7 @@ typedef struct {
     int  progress_percent;     /* valid during EB_UPDATE_DOWNLOADING, 0-100 */
     /* Deliberately short: this struct is embedded by value in ModeState
      * (mode_stack.h's UpdateCheckState), a union shared by every mode-stack
-     * level (MODE_STACK_MAX=24) -- no other member there comes close to a
+     * level (MODE_STACK_MAX=24), no other member there comes close to a
      * 256-byte string, and a generously-sized error buffer here would bloat
      * every single level's storage (and the savestate ABI) just to cover a
      * message this port's own small WINDOW_UPDATE_CHECK (24 tiles wide)
@@ -356,7 +356,7 @@ void platform_update_download_start(void);   /* non-blocking; only valid once po
 void platform_update_poll(EbUpdateProgress *out); /* call once per frame; never blocks */
 
 /*
- * Timer — frame pacing
+ * Timer, frame pacing
  *
  * Call platform_timer_frame_start() at the top of the game loop and
  * platform_timer_frame_end() at the bottom. frame_end() sleeps or
@@ -382,7 +382,7 @@ uint32_t platform_timer_get_fps_tenths(void);
  * When EB_HOST_PACED_FRAMESKIP is defined, host_process_frame() delegates
  * the per-frame render/skip decision to the platform instead of using its own
  * deadline-based dynamic frame-skip. Platforms that pace the game loop against
- * an external clock implement this — e.g. the Game & Watch port locks the loop
+ * an external clock implement this, e.g. the Game & Watch port locks the loop
  * to its audio DMA: platform_timer_should_render() runs the shared retro-go
  * frame-loop controller (which records this frame's skip state so the matching
  * platform_timer_sleep_until() can rate-match and phase-lock audio), and

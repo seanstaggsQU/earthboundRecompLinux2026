@@ -40,11 +40,11 @@
 #include "tamp/compressor.h"
 #include "tamp/decompressor.h"
 
-/* Container format (20-byte header, all fields little-endian — asserted below):
+/* Container format (20-byte header, all fields little-endian, asserted below):
  *   magic       u32  "EBSD"
  *   version     u16
  *   frame       u16  informational (the authoritative value rides in SECTION_CORE)
- *   seq         u32  monotonic sequence — the ping-pong layer picks the highest valid
+ *   seq         u32  monotonic sequence, the ping-pong layer picks the highest valid
  *   crc32       u32  CRC-32 of the COMPRESSED payload that follows the header
  *   payload_len u32  byte length of the COMPRESSED payload (so the offset-addressed
  *                    slot backend knows how much to read without an EOF signal)
@@ -57,21 +57,21 @@
 #define STATE_DUMP_HEADER_SIZE 20           /* magic+version+frame+seq+crc32+payload_len */
 #define STATE_DUMP_VERSION 12 /* v6: raw-pointer purge (item #3A) changed PSI/oval/
                                * overworld-deferred layouts. v7: ABI hardening (item
-                               * #3B) — PPUState.bg_viewport_fill enum→uint8_t shrank
+                               * #3B), PPUState.bg_viewport_fill enum→uint8_t shrank
                                * the PPU section; the format is now 32/64-bit identical.
-                               * v8: crash-safe persistence (item #4) — added seq +
+                               * v8: crash-safe persistence (item #4), added seq +
                                * payload CRC-32 to the header (validate-on-load).
                                * v9: storage moved onto the platform_savestate_* slot
-                               * backend (item #5) — added payload_len to the header.
+                               * backend (item #5), added payload_len to the header.
                                * v10: SECTION_PPU now serializes only the fixed PPUState
-                               * prefix — the EB_VIEWPORT_HEIGHT-sized per-scanline HDMA
+                               * prefix, the EB_VIEWPORT_HEIGHT-sized per-scanline HDMA
                                * tables are excluded (derived render scratch), making the
                                * format portable across viewport dimensions.
                                * v11: the payload (sections + terminator) is now a single
                                * tamp-compressed stream; the header's crc32/payload_len
                                * describe the COMPRESSED bytes. Header stays uncompressed.
                                * v12: added SECTION_KEY_ITEMS_POOL (Key Items pool feature,
-                               * not part of the original ROM/assembly) — a new top-level
+                               * not part of the original ROM/assembly), a new top-level
                                * global, key_items_pool[KEY_ITEMS_POOL_SIZE]. */
 
 /* Section IDs */
@@ -103,7 +103,7 @@ enum {
     SECTION_LOADED_BG_DATA_1     = 0x0018,
     SECTION_LOADED_BG_DATA_2     = 0x0019,
     SECTION_CURRENT_SAVE_SLOT    = 0x001A,
-    /* VWF text-render engine cursor — the in-progress (typewriter) glyph state
+    /* VWF text-render engine cursor, the in-progress (typewriter) glyph state
      * that lives in text.c module globals, not in any captured struct. */
     SECTION_VWF_BUFFER           = 0x001B,
     SECTION_VWF_X                = 0x001C,
@@ -123,7 +123,7 @@ enum {
     SECTION_ITEM_TRANSFORM       = 0x0028,
     SECTION_BATTLE_BG            = 0x0029,
     SECTION_FRAME_CALLBACK       = 0x002A,
-    /* Key Items pool feature (not part of the original ROM/assembly) — a
+    /* Key Items pool feature (not part of the original ROM/assembly), a
      * new top-level global, see game_state.h's key_items_pool doc comment. */
     SECTION_KEY_ITEMS_POOL       = 0x002B,
     SECTION_TERMINATOR       = 0xFFFF,
@@ -134,7 +134,7 @@ enum {
  * and the 64-bit desktop (LP64). That requires (a) a fixed byte order and (b) every
  * directly-serialized struct having the SAME size + field offsets on both ABIs.
  *
- * (a) Endianness — all targets are little-endian; reject anything else at compile time. */
+ * (a) Endianness, all targets are little-endian; reject anything else at compile time. */
 #if defined(__BYTE_ORDER__) && (__BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__)
 #  error "savestate format assumes a little-endian target"
 #endif
@@ -147,7 +147,7 @@ enum {
  * under arm-none-eabi's default -fshort-enums. The numbers are the
  * canonical (identical) sizes; the SAME _Static_asserts compile in the embedded ARM
  * build and FAIL there if any struct's layout diverges (a stray raw pointer, a
- * size_t/long field, or an enum field under -fshort-enums) — i.e. they ARE the
+ * size_t/long field, or an enum field under -fshort-enums), i.e. they ARE the
  * permanent cross-ABI test. To verify out-of-tree: compile this set with
  * `arm-none-eabi-gcc -mthumb -ffreestanding -c` and confirm it builds. */
 _Static_assert(sizeof(core)                 == 32,    "ABI: core");
@@ -160,14 +160,14 @@ _Static_assert(sizeof(bt)                   == 3780,  "ABI: bt");
 _Static_assert(sizeof(dt)                   == 152,   "ABI: dt");
 _Static_assert(sizeof(win)                  == 12952, "ABI: win");
 _Static_assert(sizeof(ml)                   == 16970, "ABI: ml");
-/* SECTION_PPU serializes only the fixed PREFIX of PPUState — everything before the
+/* SECTION_PPU serializes only the fixed PREFIX of PPUState, everything before the
  * per-scanline HDMA tables (wh0/wh1/wh2/wh3_table, tm/ts_per_scanline), which are
  * EB_VIEWPORT_HEIGHT-sized derived render scratch deliberately excluded so the format
  * stays fixed-size and portable across viewport dimensions (see the savestate boundary
  * comment in snes/ppu.h). The prefix is viewport-independent, so its size is a plain
  * constant again; a stray pointer/size_t/short-enum in the prefix still trips this. */
 _Static_assert(offsetof(PPUState, wh0_table) == 67168, "ABI: ppu");
-/* The six per-scanline tables must be EXACTLY the tail of PPUState — nothing serialized
+/* The six per-scanline tables must be EXACTLY the tail of PPUState, nothing serialized
  * may follow them, or it would be silently dropped from the save. This pins that: prefix
  * + the six EB_VIEWPORT_HEIGHT-sized uint8_t tables == the whole struct. Any field added
  * after the tables (or a table inserted/removed) trips this right here, next to the
@@ -294,7 +294,7 @@ static int build_section_table(StateSection *t) {
      * flyover scrolls, escalator/stairs forced-walk, item-ripen timers, equip/PSI
      * menu previews); a savestate taken mid-operation must round-trip them or the
      * resumed operation corrupts. Each is gathered/scattered via a pack/unpack pair
-     * owned by the file that holds the statics. (Some still embed raw pointers —
+     * owned by the file that holds the statics. (Some still embed raw pointers, 
      * fine in-process; the cross-platform pointer purge is build-order item #3.) */
     ADDFN(SECTION_OVAL_WINDOW,        &s_oval_ss,        sizeof(s_oval_ss),
           oval_window_savestate_pack,   oval_window_savestate_unpack);
@@ -321,8 +321,8 @@ static int build_section_table(StateSection *t) {
 }
 
 /* Standard CRC-32 (reflected, polynomial 0xEDB88420). This step function neither
- * seeds nor finalizes — the caller seeds with 0xFFFFFFFF and XORs the result with
- * 0xFFFFFFFF — so the SAME routine serves both the streaming validate pass (raw slot
+ * seeds nor finalizes, the caller seeds with 0xFFFFFFFF and XORs the result with
+ * 0xFFFFFFFF, so the SAME routine serves both the streaming validate pass (raw slot
  * bytes) and the section-walk compute (in-memory bytes). No static table: a couple of
  * passes over ~139 KiB at save/load time is not perf-critical, and avoiding a 1 KiB
  * table keeps the embedded port allocation-free. */
@@ -422,7 +422,7 @@ static bool comp_init(CompCtx *x, int slot) {
 }
 
 /* Compress one token out of the input buffer into staging (flushing staging to SD
- * first if it's nearly full — a poll emits at most (16+WINDOW_BITS)/8 = 3 bytes). */
+ * first if it's nearly full, a poll emits at most (16+WINDOW_BITS)/8 = 3 bytes). */
 static void comp_poll(CompCtx *x) {
     if (!x->ok)
         return;
@@ -641,7 +641,7 @@ static bool decomp_read(DecompCtx *x, void *dst, size_t n) {
     unsigned char *out = (unsigned char *)dst;
     size_t done = 0;
     while (done < n) {
-        if (x->in_pos >= x->in_fill && x->src_left > 0) {   /* drained — refill from slot */
+        if (x->in_pos >= x->in_fill && x->src_left > 0) {   /* drained, refill from slot */
             size_t chunk = x->src_left < x->in_cap ? x->src_left : x->in_cap;
             size_t got = platform_savestate_read(x->slot, x->src_off, x->in, chunk);
             if (got == 0) { x->ok = false; return false; }
@@ -678,7 +678,7 @@ static bool decomp_read(DecompCtx *x, void *dst, size_t n) {
     return true;
 }
 
-/* Decompress-and-discard `n` bytes — the rare unknown/mismatched-section skip path
+/* Decompress-and-discard `n` bytes, the rare unknown/mismatched-section skip path
  * (can't seek a compressed stream). */
 static bool decomp_skip(DecompCtx *x, uint32_t n) {
     unsigned char tmp[256];
@@ -705,7 +705,7 @@ static bool read_slot(int slot) {
     int n = build_section_table(table);
 
     /* Decompress each tagged section straight into its live global. Unknown ids (or a
-     * known id whose size doesn't match this build) are skipped — forward-compatibility,
+     * known id whose size doesn't match this build) are skipped, forward-compatibility,
      * and a guard against a layout mismatch smashing a struct. Same-binary loads never
      * hit the skip; the CRC pass already proved the structure is intact. */
     DecompCtx r;
@@ -738,7 +738,7 @@ static bool read_slot(int slot) {
     }
 
     /* Rebuild the raw pointers in the directly-serialized sections from their
-     * serializable companions (offsets / ids) — savestate pointer purge, build
+     * serializable companions (offsets / ids), savestate pointer purge, build
      * item #3. The pack/unpack sections rebuild their own pointers inside unpack(). */
     window_savestate_rebind();
     overworld_savestate_rebind();
@@ -750,11 +750,11 @@ static bool read_slot(int slot) {
     return true;
 }
 
-/* ---- Crash-safe ping-pong slots (build-order item #4 + #5) ---- */
+/* Crash-safe ping-pong slots (build-order item #4 + #5) */
 
 bool state_dump_save_slots(void) {
     /* Cheap header-only peek of both slots (20 bytes each), then a SINGLE full CRC
-     * verify of the newest-by-header slot — not both. A torn write leaves a valid
+     * verify of the newest-by-header slot, not both. A torn write leaves a valid
      * header carrying the NEW (highest) seq but a failing payload CRC, so the
      * freshly-torn slot, if any, is always the newest-by-header one. Verifying just
      * it tells us whether the newest slot committed (preserve it, write the other)
@@ -773,7 +773,7 @@ bool state_dump_save_slots(void) {
     int target;
     uint32_t next;
     if (newest < 0) {
-        target = 0;                 /* no valid header anywhere — start a fresh chain */
+        target = 0;                 /* no valid header anywhere, start a fresh chain */
         next = 1;
     } else {
         uint32_t nseq  = newest ? s1 : s0;
@@ -785,7 +785,7 @@ bool state_dump_save_slots(void) {
             target = newest ? 0 : 1;            /* preserve the committed newest slot */
             next = nseq + 1;
         } else {
-            target = newest;                    /* newest-by-header is torn — overwrite it */
+            target = newest;                    /* newest-by-header is torn, overwrite it */
             next = (other_hdr ? oseq : 0) + 1;  /* preserving the older valid slot */
         }
     }
@@ -798,7 +798,7 @@ bool state_dump_load_slots(void) {
      * verify+apply, so we no longer CRC both slots up front. Newest-by-header is
      * tried first; a torn newest fails read_slot()'s CRC pass and we fall back to
      * the older slot. The old code CRC-verified BOTH slots here AND again inside
-     * read_slot — the ~140 KiB snapshot was read ~4x; now it is read at most twice
+     * read_slot, the ~140 KiB snapshot was read ~4x; now it is read at most twice
      * (the chosen slot's verify pass + its apply pass). */
     uint32_t s0 = 0, s1 = 0;
     bool h0 = read_slot_header(0, &s0, NULL, NULL);
@@ -820,7 +820,7 @@ bool state_dump_load_slots(void) {
     return ok;
 }
 
-/* ---- Desktop diagnostics (the `--selftest-savestate` flag) ---- */
+/* Desktop diagnostics (the `--selftest-savestate` flag) */
 
 /* Byte-compare two slots in full (header + payload), in chunks (no heap). */
 static bool slots_byte_equal(int a, int b) {
@@ -844,7 +844,7 @@ static bool slots_byte_equal(int a, int b) {
 /* save -> load -> save idempotency check on the CURRENT live state: writes the same
  * state to both slots with a FIXED sequence (the ping-pong layer would bump seq and
  * break the byte-compare), loads one back (idempotent), and confirms the two slot
- * images are byte-identical — proving the loader reads back exactly what the writer
+ * images are byte-identical, proving the loader reads back exactly what the writer
  * wrote. Leaves the slot files populated (a diagnostic run exits afterward). */
 bool state_dump_roundtrip_test(void) {
     const uint32_t fixed_seq = 1;
@@ -858,7 +858,7 @@ bool state_dump_roundtrip_test(void) {
  * sentinel between the reference save and the load, so the load must reconstruct that
  * state purely from the file. If it does, the re-save byte-matches the reference; a
  * section that is written but never restored on load instead retains the sentinel and
- * the comparison fails. (The plain round-trip can't see that hole — there the
+ * the comparison fails. (The plain round-trip can't see that hole, there the
  * untouched globals reproduce the reference regardless.) Only the direct sections are
  * perturbed; the pack/unpack sections gather from file-private statics this test can't
  * reach, but read_slot() still scatters them back via unpack(). No game code runs
@@ -922,7 +922,7 @@ bool state_dump_crashsafe_test(void) {
 }
 
 /* See state_dump.h. Each module owns the list of its own un-sectioned asset
- * caches (the perturb test can't reach them — they're in no section); add a
+ * caches (the perturb test can't reach them, they're in no section); add a
  * sibling check here when a new module joins the ensure_* pattern. */
 bool state_dump_asset_pointer_test(void) {
     return file_select_asset_selfheal_test()

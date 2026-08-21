@@ -1,5 +1,5 @@
 /*
- * Attract mode — demo scenes shown when the player idles on the title screen.
+ * Attract mode, demo scenes shown when the player idles on the title screen.
  *
  * Port of RUN_ATTRACT_MODE (asm/misc/run_attract_mode.asm).
  *
@@ -37,7 +37,7 @@ static uint16_t current_scene_index;
 
 #define ATTRACT_MODE_SCENE_COUNT 10
 
-/* Attract mode pointer table — loaded from ROM asset.
+/* Attract mode pointer table, loaded from ROM asset.
  * Assembly (C4D989.asm lines 64-73) uses ATTRACT_MODE_TXT, a table of
  * 10 × 4-byte far pointers to MSG_MD_* scripts within EEVENT0.
  * We load the table at runtime and derive offsets by subtracting the
@@ -57,7 +57,7 @@ static bool load_attract_mode_text_offsets(void) {
   }
 
   /* Each entry is a 32-bit little-endian SNES far address.
-   * Store as-is — resolve_text_addr() handles SNES→blob remapping. */
+   * Store as-is, resolve_text_addr() handles SNES→blob remapping. */
   for (int i = 0; i < ATTRACT_MODE_SCENE_COUNT; i++) {
     attract_mode_text_addrs[i] = read_u32_le(&data[i * 4]);
   }
@@ -80,7 +80,7 @@ StepResult mode_step_attract_mode(ModeState *st) {
    * ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP for every overworld-context
    * scene, attract mode included, so ppu_render.c's non-filling-layer
    * scanline selection already accounts for it. Re-adding a bg_vofs[2] shift
-   * here would double-count that offset -- bg_vofs[2] is a genuine scroll
+   * here would double-count that offset, bg_vofs[2] is a genuine scroll
    * register also driven by flyover text (flyover.c) and the ending credits
    * (ending.c), so it must stay untouched by this unrelated concern. */
 
@@ -209,7 +209,7 @@ void run_attract_mode_prepare(uint16_t scene_index) {
   clear_overworld_spritemaps();
   ow.camera_focus_entity = -1;
 
-  /* Step 2: ALLOC_SPRITE_MEM(X=0, A=$8000) — clear sprite VRAM table */
+  /* Step 2: ALLOC_SPRITE_MEM(X=0, A=$8000), clear sprite VRAM table */
   alloc_sprite_mem(0x8000, 0);
 
   /* Step 3: Initialize entity data */
@@ -251,7 +251,7 @@ void run_attract_mode_prepare(uint16_t scene_index) {
    * to BG2, causing horizontal stripe artifacts in the overworld. */
   bg2_distortion_active = false;
 
-  /* Clear color math registers — may have residual values from title screen
+  /* Clear color math registers, may have residual values from title screen
    * or gas station intro that would tint the backdrop (e.g. purple). */
   ppu.cgwsel = 0;
   ppu.cgadsub = 0;
@@ -281,7 +281,7 @@ void run_attract_mode_prepare(uint16_t scene_index) {
    * event flags, adds party members, teleports to the scene location (loading map
    * data), spawns entities with movement scripts, and pauses for the duration.
    *
-   * The assembly does NOT clear ow.camera_focus_entity here — the camera
+   * The assembly does NOT clear ow.camera_focus_entity here, the camera
    * naturally follows the focus entity (sprite 106, invisible pathfinder)
    * during the entire scene via render_frame_tick_work_step()'s scroll update.
    * This is what makes the view pan across the map through the oval window.
@@ -300,7 +300,7 @@ void run_attract_mode_prepare(uint16_t scene_index) {
    * fixed at the teleport destination while the camera follows the pathfinder.
    * The bicycle sprite starts centered but drifts off-screen as the
    * pathfinder moves (~2px/frame). No per-frame position sync mechanism
-   * was found in the assembly for the bicycle case — the drift appears to
+   * was found in the assembly for the bicycle case, the drift appears to
    * be the original ROM behavior. Opcode 0x08 (SET_TICK_CALLBACK in
    * EVENT_002 / party follower) uses an 8-bit STA that preserves the
    * OBJECT_TICK_DISABLED flag in the high byte. */

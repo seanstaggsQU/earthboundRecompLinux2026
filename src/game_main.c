@@ -40,10 +40,9 @@
 #include "game/display_text_internal.h"
 #include "data/text_refs.h"
 
-/* Verbosity level (0=errors, 1=warnings, 2=trace).
- * Defaults to 1 so warnings (asset-load failures, etc.) print without -v;
- * matches the pre-existing behavior of the raw fprintf(stderr, ...) calls
- * that were folded into LOG_WARN. */
+/* Verbosity level (0=errors, 1=warnings, 2=trace). Defaults to 1 so warnings
+ * (asset-load failures etc.) print without -v, matching the old raw
+ * fprintf(stderr, ...) calls that got folded into LOG_WARN. */
 int verbose_level = 1;
 
 /* Auto-dump flag: set to non-zero to trigger a screenshot + VRAM dump */
@@ -54,7 +53,7 @@ static bool fast_forward_active = false;
 static bool debug_menu_requested = false;
 static uint16_t aux_prev = 0;
 
-/* Capture-safety gate — see host_request_capture()/host_request_load()/
+/* Capture-safety gate, see host_request_capture()/host_request_load()/
  * host_root_boundary() in game_main.h. g_pending_root_action is non-NONE while a
  * savestate save OR load is pending; while set, host_process_frame() free-runs and
  * counts unwind frames so the C stack returns to the root boundary (both saving and
@@ -283,7 +282,7 @@ static void fps_overlay_stamp_scanline(int y, pixel_t *pixels) {
     }
 }
 
-/* Mirrors port/unix/platform/sdl2_video.c's EB_DEFAULT_WIDTH -- the
+/* Mirrors port/unix/platform/sdl2_video.c's EB_DEFAULT_WIDTH, the
  * default (zoom-off) on-screen crop width, 400 not the full
  * EB_VIEWPORT_WIDTH (512) compiled canvas. Duplicated here rather than
  * shared via a header since it's a port/unix-only rendering concept this
@@ -294,16 +293,16 @@ static void fps_overlay_stamp_scanline(int y, pixel_t *pixels) {
  * horizontal position was computed against the full 512px canvas while
  * only the centered 400px-wide crop is ever actually displayed, so the
  * text landed in the permanently-letterboxed-off right margin and never
- * rendered at all -- caught by live testing (screenshotting the title
+ * rendered at all, caught by live testing (screenshotting the title
  * screen showed nothing at the expected position) and independently by
  * a code-review pass reasoning about the same crop math. The Y axis
  * below got this right from the start (SNES_HEIGHT vs.
- * EB_VIEWPORT_HEIGHT) -- this is the same reasoning applied to X. */
+ * EB_VIEWPORT_HEIGHT), this is the same reasoning applied to X. */
 #define VERSION_OVERLAY_CONTENT_WIDTH 400
 
 /* ---- Version string overlay (title screen / file-select only) ----
  * This port's own addition: stamps the build version ("v1.2.1", "dev",
- * ...) as small dim text near the bottom of the screen -- same scanline-
+ * ...) as small dim text near the bottom of the screen, same scanline-
  * stamp technique as the FPS overlay above, so it bypasses BG/tilemap
  * state entirely and works identically over the title screen's raw
  * sprite-driven logo animation and file-select's windowed UI.
@@ -365,7 +364,7 @@ static void version_overlay_stamp_scanline(int y, pixel_t *pixels) {
 static bool version_overlay_show = false;
 
 /* Dispatches to whichever of the FPS/version overlays are active this
- * frame -- platform_render_frame() takes only one scanline_stamp_cb_t,
+ * frame, platform_render_frame() takes only one scanline_stamp_cb_t,
  * so when both can be on simultaneously (F3 toggled while looking at the
  * title screen), this is the single callback passed for both. They don't
  * collide on screen: FPS sits in the top-right corner, version overlay in
@@ -379,7 +378,7 @@ static void combined_overlay_stamp_scanline(int y, pixel_t *pixels) {
 
 /* Shared by the several "is a full-screen-layout / title-file-select mode
  * anywhere on the stack" checks below (zoom reset, version overlay, Fx/DoF
- * suppression) -- scans the whole stack, not just the top, since any of
+ * suppression), scans the whole stack, not just the top, since any of
  * them can be pushed while a text box is still an ancestor frame (see the
  * individual call sites' comments for why each one cares). */
 static bool mode_stack_has_any(GameMode a, GameMode b) {
@@ -400,7 +399,7 @@ void host_process_frame(void) {
 
     /* Computed once per frame and reused by every "is a full-screen-layout
      * / title-file-select mode anywhere on the stack" check below (zoom
-     * reset, version overlay, Fx/DoF suppression) -- the mode stack can't
+     * reset, version overlay, Fx/DoF suppression), the mode stack can't
      * change mid-frame (mode transitions only happen via the dispatch loop
      * that calls host_process_frame(), never from inside it), so scanning
      * it once here and reusing the result is equivalent to each site
@@ -410,14 +409,14 @@ void host_process_frame(void) {
     bool in_title_or_file_select = mode_stack_has_any(GAME_MODE_TITLE_SCREEN, GAME_MODE_FILE_MENU);
 
     /* Capture-safety free-run: while a snapshot is pending, this frame is a pure
-     * unwind step — keep the per-frame logic (fade/timers/RNG/tasks) so blocking
+     * unwind step, keep the per-frame logic (fade/timers/RNG/tasks) so blocking
      * helpers progress, but skip render + vblank pacing (set below) so they unwind
      * at CPU speed back to the root boundary, where host_root_boundary() captures.
-     * Bail (abandon the request) past the unwind budget — an indefinite input-wait
+     * Bail (abandon the request) past the unwind budget, an indefinite input-wait
      * that will never reach the boundary; abandoning beats writing a torn snapshot. */
     bool capture_unwinding = (g_pending_root_action != ROOT_ACTION_NONE);
     if (capture_unwinding && ++g_capture_unwind_frames > CAPTURE_UNWIND_FRAME_CAP) {
-        LOG_WARN("savestate: %s abandoned — game did not reach a root boundary "
+        LOG_WARN("savestate: %s abandoned, game did not reach a root boundary "
                  "within %d unwind frames (stuck in an indefinite input-wait?)\n",
                  g_pending_root_action == ROOT_ACTION_LOAD ? "load" : "capture",
                  CAPTURE_UNWIND_FRAME_CAP);
@@ -463,7 +462,7 @@ void host_process_frame(void) {
          * skip decision (e.g. G&W locks to its audio DMA). should_render()
          * records this frame's skip state for the matching sleep_until() and
          * returns whether to render. The deadline-based logic below is bypassed
-         * — the deadline computed in the timing block is then ignored by the
+         *, the deadline computed in the timing block is then ignored by the
          * platform's sleep_until(). */
         do_render = platform_timer_should_render();
         frame_skip_counter = 0;
@@ -514,14 +513,14 @@ void host_process_frame(void) {
                 fps_overlay_prepare();
 
             /* Version overlay: title screen / file-select only, AND only
-             * while zoom is off -- see version_overlay_stamp_scanline()'s
+             * while zoom is off, see version_overlay_stamp_scanline()'s
              * doc comment. The overlay's position math assumes the
              * default (zoom-off) crop; title/file-select never let the
              * player change zoom themselves, but ow.zoom_mode is a
              * persistent setting that in principle could still be
              * non-default if something else (a debug path, an event
              * script) reached one of these modes without resetting it
-             * first -- rather than have the overlay itself try to track
+             * first, rather than have the overlay itself try to track
              * every possible crop size, just don't show it that frame.
              * Reuses the whole-stack scan cached at the top of this
              * function (same pair the fx-suppression check below tests). */
@@ -536,7 +535,7 @@ void host_process_frame(void) {
 
         pixel_t *fb = platform_video_get_framebuffer();
 
-        /* Debug dump — must happen while texture is locked */
+        /* Debug dump, must happen while texture is locked */
         if (fb && debug_dump) {
             platform_debug_dump_ppu(fb);
             platform_debug_dump_vram_image();
@@ -565,7 +564,7 @@ void host_process_frame(void) {
     uint16_t current_pad = platform_input_get_pad();
 
     /* Demo playback: override pad input when playing back auto-movement.
-     * Port of READ_JOYPAD demo section — demo_playback_tick() may
+     * Port of READ_JOYPAD demo section, demo_playback_tick() may
      * overwrite core.pad1_raw, so we call memory_update_joypad with the
      * demo-overridden value when in playback mode. */
     demo_playback_tick();
@@ -585,36 +584,36 @@ void host_process_frame(void) {
      * nearly every ordinary interaction (talking to an NPC, checking a
      * sign, opening the pause menu) pushes a *child* mode on top of the
      * overworld for the duration of a text box/menu, which isn't the
-     * overworld's own screen replacing itself -- it's an overlay drawn on
+     * overworld's own screen replacing itself, it's an overlay drawn on
      * top of the still-correctly-zoomed map underneath. Gating that
      * strictly meant the zoom silently reset on almost every action,
      * which is exactly the annoyance reported after shipping it that way.
      *
-     * The screens that actually need protecting (persistently -- the
+     * The screens that actually need protecting (persistently, the
      * player has to press R3 again after leaving) are the ones with their
      * own separate, unconditionally-wide (not zoom-aware) rendering setup:
      * GAME_MODE_BATTLE (battle_ui.c always sets sprite_y_offset/
      * bg_win_y_offset = EB_VIEWPORT_PAD_TOP regardless of the zoom flag,
      * same footprint whether the player was zoomed or not) and
      * GAME_MODE_TOWN_MAP (its own full-screen map graphic, not an overlay
-     * on the walking-around scene -- untested against any zoom crop, and
+     * on the walking-around scene, untested against any zoom crop, and
      * visually wrong to show zoomed regardless). Also GAME_MODE_TITLE_SCREEN/
-     * GAME_MODE_FILE_MENU -- title/file-select never let the player change
+     * GAME_MODE_FILE_MENU, title/file-select never let the player change
      * zoom themselves (see version_overlay_show's doc comment below, which
      * assumes zoom is off there), but ow.zoom_mode can still be non-OFF by
      * the time either is reached (e.g. Modern Alternative Visuals defaulting
      * gameplay to EB_ZOOM_OUT the moment the player leaves these screens,
-     * below -- reported live: this left the title screen zoomed on the very
+     * below, reported live: this left the title screen zoomed on the very
      * next boot, which quietly broke the version overlay). Scans the whole
      * stack, not just the top, since any of these can be pushed while a
      * text box is still an ancestor frame. Everywhere else (dialogue,
-     * menus, ...) leaves the player's persistent zoom *choice* alone -- see
+     * menus, ...) leaves the player's persistent zoom *choice* alone, see
      * the separate any_window_open() check below for the one case that
      * still needs a temporary (not persistent) override. Reuses the
      * whole-stack scan cached at the top of this function. */
     bool needs_zoom_reset = in_battle_or_town_map || in_title_or_file_select;
     if (!needs_zoom_reset) {
-        /* Classic Alternative Visuals is always true 4:3 -- zoom and
+        /* Classic Alternative Visuals is always true 4:3, zoom and
          * "original aspect ratio" are contradictory asks, so the R3 toggle
          * is a no-op while Classic is active (see settings.h's doc
          * comment). Left as a no-op rather than resetting ow.zoom_mode to
@@ -630,12 +629,12 @@ void host_process_frame(void) {
 
     /* Modern Alternative Visuals defaults gameplay to the zoomed-out FOV
      * (settings.h) the moment the player actually leaves title/file-select
-     * -- not at raw process boot (tried that first; it left ow.zoom_mode
+     *, not at raw process boot (tried that first; it left ow.zoom_mode
      * non-OFF by the time the title screen itself rendered, which broke
      * the version overlay above via the persistent reset's own doc
      * comment). Detected as a title/file-select -> anything-else edge on
      * in_title_or_file_select, which the persistent reset just above
-     * guarantees was OFF up through this exact frame -- so this always
+     * guarantees was OFF up through this exact frame, so this always
      * fires from a known-OFF baseline, whether that's the very first
      * frame of gameplay after boot, after a New Game/Continue, or after
      * this session's own "Return to Title" reboot and a subsequent
@@ -653,14 +652,14 @@ void host_process_frame(void) {
      * open: EarthBound positions windows (e.g. the standard dialogue box,
      * WINDOW::TEXT_STANDARD at y=1, near the very top of the screen --
      * window.c) freely across the full native height, but a ~1.5x zoom-in
-     * crop only shows the center ~2/3 of that height -- a window that close
+     * crop only shows the center ~2/3 of that height, a window that close
      * to an edge gets its border clipped clean off (confirmed live: the
      * dialogue box's whole top edge was missing). Zoom Out has no such
      * problem (it only ever reveals more area, never less, so nothing that
      * was visible before can become clipped) and doesn't need this.
      *
      * This is a per-frame *effective* override, not a change to the
-     * player's persisted ow.zoom_mode choice -- unlike the battle/town-map
+     * player's persisted ow.zoom_mode choice, unlike the battle/town-map
      * case above, zoom-in resumes on its own the instant the window closes,
      * no extra R3 press needed, since suspending it here is purely a
      * rendering safety concern, not a "the player probably wants a
@@ -669,7 +668,7 @@ void host_process_frame(void) {
      * an R3 press. */
     EbZoomMode effective_zoom = (EbZoomMode)ow.zoom_mode;
     if (engine_alternative_visuals == ALT_VISUALS_CLASSIC) {
-        /* Defense in depth alongside the R3-toggle gate above -- forces
+        /* Defense in depth alongside the R3-toggle gate above, forces
          * the *effective* (this-frame) zoom off even if ow.zoom_mode
          * somehow still holds a stale non-OFF value (e.g. the player was
          * zoomed in Modern, then switched to Classic mid-session). The
@@ -687,12 +686,12 @@ void host_process_frame(void) {
      * effects in mind (the title logo/flash art and the file-select slot
      * list), and unlike a battle/PSI flash the player only sees for a few
      * seconds, these are the very first and last things every session
-     * shows -- a wrong-looking permanent effect there would be much more
+     * shows, a wrong-looking permanent effect there would be much more
      * noticeable than anywhere else these apply. Same whole-stack scan as
      * the zoom check above, so a child pushed over file-select (e.g. the
      * self-update screen) stays suppressed too. This is a per-frame
      * override of platform_video_end_frame()'s render step, not a change
-     * to the player's setting -- it resumes exactly where the player left
+     * to the player's setting, it resumes exactly where the player left
      * it the instant either screen is left. Reuses the whole-stack scan
      * cached at the top of this function. */
     bool suppress_fx = in_title_or_file_select;
@@ -702,7 +701,7 @@ void host_process_frame(void) {
      * own separate full-screen layouts, same reasoning as needs_zoom_reset
      * above) and any time a text/menu window is open (even DoF's small
      * blur radius can soften dialogue text right at the screen edges,
-     * where windows are usually positioned) -- on top of, not instead of,
+     * where windows are usually positioned), on top of, not instead of,
      * the title/file-select suppression above. */
     bool suppress_dof = suppress_fx || any_window_open() || in_battle_or_town_map;
     platform_video_set_dof_suppressed(suppress_dof);
@@ -710,7 +709,7 @@ void host_process_frame(void) {
         fast_forward_active = !fast_forward_active;
         platform_video_set_vsync(!fast_forward_active);
     }
-    /* F6 (save) / F7 (load): request the action rather than performing it here —
+    /* F6 (save) / F7 (load): request the action rather than performing it here, 
      * this host_process_frame() may be reached while a mode-step or a synchronous
      * blocking helper is mid-execution, where a save would be torn and a load
      * (replacing the mode stack) would
@@ -769,7 +768,7 @@ void host_process_frame(void) {
             if (!platform_headless && !capture_unwinding)
                 platform_timer_sleep_until(frame_deadline);
 
-            /* Update FPS IIR filter — only on rendered frames so the
+            /* Update FPS IIR filter, only on rendered frames so the
              * counter shows actual display refresh rate, not game logic rate. */
             if (do_render)
                 platform_timer_update_fps();
@@ -784,7 +783,7 @@ void host_process_frame(void) {
 /* Request a torn-safe capture at the next root-loop boundary. See game_main.h. */
 void host_request_capture(void) {
     if (g_pending_root_action != ROOT_ACTION_NONE)
-        return; /* already pending — keep the original action + unwind budget */
+        return; /* already pending, keep the original action + unwind budget */
     g_pending_root_action = ROOT_ACTION_SAVE;
     g_capture_unwind_frames = 0;
     g_capture_status = HOST_CAPTURE_PENDING;
@@ -793,7 +792,7 @@ void host_request_capture(void) {
 /* Request a savestate restore at the next root-loop boundary. See game_main.h. */
 void host_request_load(void) {
     if (g_pending_root_action != ROOT_ACTION_NONE)
-        return; /* already pending — keep the original action + unwind budget */
+        return; /* already pending, keep the original action + unwind budget */
     g_pending_root_action = ROOT_ACTION_LOAD;
     g_capture_unwind_frames = 0;
     g_capture_status = HOST_CAPTURE_PENDING;
@@ -813,7 +812,7 @@ __attribute__((weak)) void platform_savestate_freeze_audio(bool freeze) {
 }
 
 /* Perform a pending save/load, if any. MUST be called only from the outermost host
- * loop (the root boundary) — never from a nested host_process_frame(). See game_main.h. */
+ * loop (the root boundary), never from a nested host_process_frame(). See game_main.h. */
 void host_root_boundary(void) {
     RootAction action = g_pending_root_action;
     if (action == ROOT_ACTION_NONE)
@@ -841,13 +840,13 @@ void host_root_boundary(void) {
     } else { /* ROOT_ACTION_LOAD */
         if (state_dump_load_slots()) {
             /* The snapshot doesn't include the live SPC700/DSP, so restart the music
-             * named by the restored audio_state — otherwise the pre-load track keeps
+             * named by the restored audio_state, otherwise the pre-load track keeps
              * playing over the loaded game. */
             audio_resync_after_load();
             /* ow.zoom_mode is part of the wholesale ow blob (see
              * state_dump.c's SECTION_OVERWORLD), so a load could restore a
              * stale zoom mode with no matching platform_video_set_zoom()
-             * call -- the mode and sdl2_video.c's actual presented crop
+             * call, the mode and sdl2_video.c's actual presented crop
              * would disagree until the next R3 press. Force it off here,
              * same as a fresh launch, rather than trying to resync the
              * display to whatever the snapshot says. */
@@ -869,7 +868,7 @@ void host_root_boundary(void) {
  * (rendering, input, audio, timing) before resuming game logic. */
 void wait_for_vblank(void) {
     host_process_frame();
-    /* Check quit after resuming — game logic may be deep in nested calls
+    /* Check quit after resuming, game logic may be deep in nested calls
      * (battle, text, menu) where the top-level loop check never runs. */
     if (platform_input_quit_requested())
         exit(0);
@@ -888,7 +887,7 @@ bool wait_frames_or_button(uint16_t count, uint16_t button_mask) {
 }
 
 /*
- * mode_step_debug_ymenu — run-to-completion driver for the clean-leaf debug
+ * mode_step_debug_ymenu, run-to-completion driver for the clean-leaf debug
  * Y-button menus (flag editor, guide counter). See DebugYMenuState in
  * mode_stack.h. The single yield is owned by the pump; this body never calls
  * wait_for_vblank(). Input is read post-yield (the established pattern): DY_DRAW
@@ -979,13 +978,13 @@ StepResult mode_step_debug_ymenu(ModeState *st) {
 }
 
 /*
- * mode_step_debug_goods — run-to-completion port of DEBUG_Y_BUTTON_GOODS
+ * mode_step_debug_goods, run-to-completion port of DEBUG_Y_BUTTON_GOODS
  * (asm/overworld/debug/y_button_goods.asm). See DebugGoodsState in mode_stack.h.
  *
  * Interactive item browser/giver. Shows item ID and name. D-pad navigates
  * (up/down by 1, left/right by 10), A gives item to a selected character
  * (auto-equips weapons), B exits. The blocking form was a raw for(;;){ ...
- * wait_for_vblank(); ... } loop with an inline char_select_prompt(mode 1) — the
+ * wait_for_vblank(); ... } loop with an inline char_select_prompt(mode 1), the
  * last non-mode debug driver. The A path now runs char_select_prompt's mode-1
  * (overworld) flow as a STEP_PUSH of SELECTION_MENU, bracketed by
  * char_select_overworld_prepare/finish (the determine-targetting ally pattern).
@@ -1078,7 +1077,7 @@ StepResult mode_step_debug_goods(ModeState *mst) {
          * form's `break` out of the inner loop, which redrew the same item).
          * Key items (Key Items pool feature, not part of the original ROM)
          * don't consume a character's regular inventory slots at all, so
-         * the slot-space check doesn't apply to them -- skip it or a
+         * the slot-space check doesn't apply to them, skip it or a
          * character with a full 14-slot inventory would wrongly be denied
          * a key item that has nowhere to conflict with. */
         if (char_id == 0 ||
@@ -1102,7 +1101,7 @@ StepResult mode_step_debug_goods(ModeState *mst) {
 
 
 /*
- * mode_step_debug_menu — run-to-completion port of DEBUG_Y_BUTTON_MENU
+ * mode_step_debug_menu, run-to-completion port of DEBUG_Y_BUTTON_MENU
  * (asm/system/debug/y_button_menu.asm), the debug Y-button parent menu. See
  * DebugMenuState in mode_stack.h. Triggered by holding B/SELECT + R in the
  * overworld with ow.debug_flag set. The blocking form was a `display_menu:`-goto
@@ -1111,7 +1110,7 @@ StepResult mode_step_debug_goods(ModeState *mst) {
  *
  * Commands that block only via wait_for_vblank/host_process_frame but never
  * pump_mode (Warp, and the cutscenes of CAST/STAFF), and the synchronous ones
- * (Save/learn_special_psi/Meter), run inline within DM_DISPATCH — host_process_frame
+ * (Save/learn_special_psi/Meter), run inline within DM_DISPATCH, host_process_frame
  * does not re-enter the mode stack, so this is safe (and matches the blocking form's
  * behaviour). CAST/STAFF's teleport-back is GAME_MODE_TELEPORT_TO (STEP_PUSHed, D4b).
  * Player 0/1 naming is GAME_MODE_ENTER_NAME (STEP_PUSHed, D4b).
@@ -1179,7 +1178,7 @@ StepResult mode_step_debug_menu(ModeState *mst) {
         s->message_addr = 0;
         switch (result) {
         case 1:
-            /* FLAGS — assembly @CMD_FLAGS: JSL DEBUG_Y_BUTTON_FLAG. */
+            /* FLAGS: assembly @CMD_FLAGS: JSL DEBUG_Y_BUTTON_FLAG. */
             child = (ModeState){0};
             child.debug_ymenu.phase = DY_DRAW;
             child.debug_ymenu.kind  = DBG_YMENU_FLAG;
@@ -1187,44 +1186,44 @@ StepResult mode_step_debug_menu(ModeState *mst) {
             s->phase = DM_AFTER;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_DEBUG_YMENU, &child);
         case 2:
-            /* GOODS — assembly @CMD_GOODS: JSL DEBUG_Y_BUTTON_GOODS. */
+            /* GOODS: assembly @CMD_GOODS: JSL DEBUG_Y_BUTTON_GOODS. */
             child = (ModeState){0};
             child.debug_goods.phase   = DG_DRAW;
             child.debug_goods.item_id = 0;
             s->phase = DM_AFTER;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_DEBUG_GOODS, &child);
         case 3:
-            /* SAVE — assembly @CMD_SAVE: save + update respawn coordinates. */
+            /* SAVE: assembly @CMD_SAVE: save + update respawn coordinates. */
             save_game(current_save_slot - 1);
             ow.respawn_x = game_state.leader_x_coord;
             ow.respawn_y = game_state.leader_y_coord;
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 4:
-            /* Apple (MSG_DEBUG_00) — assembly @CMD_MSG_00. */
+            /* Apple (MSG_DEBUG_00), assembly @CMD_MSG_00. */
             s->message_addr = MSG_DBG_MAIN_MENU;
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 5:
-            /* Banana (MSG_DEBUG_01) — assembly @CMD_MSG_01. */
+            /* Banana (MSG_DEBUG_01), assembly @CMD_MSG_01. */
             s->message_addr = MSG_DBG_EVENT_SCENE_SELECT;
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 6:
-            /* TV (MSG_DEBUG_02) — assembly @CMD_MSG_02. */
+            /* TV (MSG_DEBUG_02), assembly @CMD_MSG_02. */
             s->message_addr = MSG_DBG_MONSTER_TOGGLE;
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 7:
-            /* Event — assembly @CMD_MSG_UNKNOWN. */
+            /* Event, assembly @CMD_MSG_UNKNOWN. */
             s->message_addr = MSG_DBGTXT_DEBUG_MENU_CAMERA_MOVE;
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 8: {
-            /* WARP — assembly @CMD_WARP. Flash HP/PP windows 30 times, then
+            /* WARP: assembly @CMD_WARP. Flash HP/PP windows 30 times, then
              * teleport to Onett center (7696, 2280). Inline-blocking but pump-free
              * (update_hppp_meter_and_render/fade_* block via host_process_frame,
-             * not the mode stack) — a savestate cannot land mid-warp, accepted. */
+             * not the mode stack), a savestate cannot land mid-warp, accepted. */
             for (int i = 0; i < 30; i++) {
                 undraw_hp_pp_window(0);
                 update_hppp_meter_and_render();
@@ -1241,7 +1240,7 @@ StepResult mode_step_debug_menu(ModeState *mst) {
             return STEP_RESULT_CONTINUE();
         }
         case 9: {
-            /* Tea (COFFEE/TEA) — assembly @CMD_COFFEE_TEA: random coffee/tea scene.
+            /* Tea (COFFEE/TEA), assembly @CMD_COFFEE_TEA: random coffee/tea scene.
              * Push GAME_MODE_FLYOVER (FO_COFFEETEA), the coffeetea_scene() init. */
             uint16_t type = rng_next_byte() & 1;
             child = (ModeState){0};
@@ -1255,23 +1254,23 @@ StepResult mode_step_debug_menu(ModeState *mst) {
             return STEP_RESULT_PUSH_INIT(GAME_MODE_FLYOVER, &child);
         }
         case 10:
-            /* Teleport (PSI_1) — assembly @CMD_PSI_1: learn special PSI type 1. */
+            /* Teleport (PSI_1), assembly @CMD_PSI_1: learn special PSI type 1. */
             learn_special_psi(1);
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 11:
-            /* Star ~ (PSI_2) — assembly @CMD_PSI_2: learn special PSI type 2. */
+            /* Star ~ (PSI_2), assembly @CMD_PSI_2: learn special PSI type 2. */
             learn_special_psi(2);
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 12:
-            /* Star ^ (PSI_3_4) — assembly @CMD_PSI_3_4: learn PSI types 3 and 4. */
+            /* Star ^ (PSI_3_4), assembly @CMD_PSI_3_4: learn PSI types 3 and 4. */
             learn_special_psi(3);
             learn_special_psi(4);
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 13:
-            /* Player 0 (NAME_0) — assembly @CMD_NAME_0: name character 0 (Ness).
+            /* Player 0 (NAME_0), assembly @CMD_NAME_0: name character 0 (Ness).
              * The M2/EB name prompt is GAME_MODE_ENTER_NAME (param 0). */
             child = (ModeState){0};
             child.enter_name.phase = EN_ENTER;
@@ -1279,27 +1278,27 @@ StepResult mode_step_debug_menu(ModeState *mst) {
             s->phase = DM_AFTER;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_ENTER_NAME, &child);
         case 14:
-            /* Player 1 (NAME_1) — assembly @CMD_NAME_1: name character 1 (Paula). */
+            /* Player 1 (NAME_1), assembly @CMD_NAME_1: name character 1 (Paula). */
             child = (ModeState){0};
             child.enter_name.phase = EN_ENTER;
             child.enter_name.param = 1;
             s->phase = DM_AFTER;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_ENTER_NAME, &child);
         case 15:
-            /* GUIDE — assembly @CMD_TOWN_MAP: JSL RUN_TOWN_MAP_MENU. (The label
+            /* GUIDE: assembly @CMD_TOWN_MAP: JSL RUN_TOWN_MAP_MENU. (The label
              * says "GUIDE" but the assembly dispatches to the town map.) */
             run_town_map_menu_prepare(&child);
             s->phase = DM_AFTER;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_TOWN_MAP, &child);
         case 16:
-            /* TRACK — assembly @CMD_GUIDE: JSL DEBUG_Y_BUTTON_GUIDE (script counter). */
+            /* TRACK: assembly @CMD_GUIDE: JSL DEBUG_Y_BUTTON_GUIDE (script counter). */
             child = (ModeState){0};
             child.debug_ymenu.phase = DY_DRAW;
             child.debug_ymenu.kind  = DBG_YMENU_GUIDE;
             s->phase = DM_AFTER;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_DEBUG_YMENU, &child);
         case 17:
-            /* CAST — assembly @CMD_CAST: play cast scene, then teleport to dest 1.
+            /* CAST: assembly @CMD_CAST: play cast scene, then teleport to dest 1.
              * The cast scene is GAME_MODE_ENDING (run-to-completion); on its pop,
              * DM_ENDING_TELEPORT STEP_PUSHes the GAME_MODE_TELEPORT_TO teleport-back
              * (resume DM_AFTER). */
@@ -1308,14 +1307,14 @@ StepResult mode_step_debug_menu(ModeState *mst) {
             s->phase = DM_ENDING_TELEPORT;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_ENDING, &child);
         case 18:
-            /* STONE — assembly @CMD_SOUND_STONE: sound stone melody (cancellable). */
+            /* STONE: assembly @CMD_SOUND_STONE: sound stone melody (cancellable). */
             child = (ModeState){0};
             child.sound_stone.phase       = SS_SETUP1;
             child.sound_stone.cancellable = 1;
             s->phase = DM_AFTER;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_SOUND_STONE, &child);
         case 19:
-            /* STAFF (CREDITS) — assembly @CMD_CREDITS: play credits, then dest 1.
+            /* STAFF (CREDITS), assembly @CMD_CREDITS: play credits, then dest 1.
              * Credits are GAME_MODE_ENDING (run-to-completion); on its pop,
              * DM_ENDING_TELEPORT STEP_PUSHes the GAME_MODE_TELEPORT_TO teleport-back
              * (resume DM_AFTER). */
@@ -1324,18 +1323,18 @@ StepResult mode_step_debug_menu(ModeState *mst) {
             s->phase = DM_ENDING_TELEPORT;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_ENDING, &child);
         case 20:
-            /* Meter (FLIPOUT) — assembly @CMD_FLIPOUT: toggle HP/PP flipout mode. */
+            /* Meter (FLIPOUT), assembly @CMD_FLIPOUT: toggle HP/PP flipout mode. */
             toggle_hppp_flipout_mode(bt.hppp_meter_flipout_mode ? 0 : 1);
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 22:
-            /* TEST1 (MSG_BTL) — assembly @CMD_MSG_BTL: show
+            /* TEST1 (MSG_BTL), assembly @CMD_MSG_BTL: show
              * MSG_BTL7_PRAY_RESPONSE_STRANGER (0xC9F70C). */
             s->message_addr = 0xC9F70C;
             s->phase = DM_AFTER;
             return STEP_RESULT_CONTINUE();
         case 23:
-            /* TEST2 (TO_BE_CONTINUED) — assembly @CMD_TO_BE_CONTINUED: close
+            /* TEST2 (TO_BE_CONTINUED), assembly @CMD_TO_BE_CONTINUED: close
              * windows, display the "To Be Continued" text, then cleanup. */
             close_all_windows();
             hide_hppp_windows();
@@ -1346,7 +1345,7 @@ StepResult mode_step_debug_menu(ModeState *mst) {
                      (unsigned)MSG_EVT5_NESS_WAKES_KIDNAP_AFTERMATH);
             return STEP_RESULT_CONTINUE();
         case 21:
-            /* REPLAY — assembly @CMD_REPLAY: START_REPLAY_MODE. Replay recording is
+            /* REPLAY: assembly @CMD_REPLAY: START_REPLAY_MODE. Replay recording is
              * not applicable to the C port (SNES SRAM); go straight to cleanup. */
         default:
             /* Cancelled or item 24+ → DISABLE_REPLAY_MODE (also N/A); cleanup. */
@@ -1356,7 +1355,7 @@ StepResult mode_step_debug_menu(ModeState *mst) {
     }
 
     case DM_ENDING_TELEPORT:
-        /* CAST/STAFF ending finished — teleport back to dest 1 (resume DM_AFTER). */
+        /* CAST/STAFF ending finished, teleport back to dest 1 (resume DM_AFTER). */
         child = (ModeState){0};
         child.teleport_to.phase   = TT_BEGIN;
         child.teleport_to.dest_id = 1;
@@ -1396,7 +1395,7 @@ StepResult mode_step_debug_menu(ModeState *mst) {
     }
 }
 
-/* boot_begin — boot stage 1: one-shot setup, run once from OWP_BOOT_SETUP.
+/* boot_begin, boot stage 1: one-shot setup, run once from OWP_BOOT_SETUP.
  *
  * Normal path: init_intro() does its one-shot init and PUSHes GAME_MODE_INIT_INTRO
  * as a child of the overworld root; the generic pump then drives that intro state
@@ -1432,11 +1431,11 @@ static void boot_begin(void) {
     }
 }
 
-/* overworld_boot — stage 3 of boot: overworld initialization, run once the intro
+/* overworld_boot, stage 3 of boot: overworld initialization, run once the intro
  * has finished (or was skipped). In the assembly, MAIN_LOOP calls INIT_INTRO →
  * FILE_SELECT_INIT → INITIALIZE_OVERWORLD_STATE; this is the work after the intro.
  *
- * IMPORTANT: this must NOT yield before the first overworld render — the assembly
+ * IMPORTANT: this must NOT yield before the first overworld render, the assembly
  * has no WAIT between init and @LOOP_BEGIN (see the fade_in note below). The caller
  * (OWP_BOOT_AWAIT) runs this and the first OWP_RENDER in the same step (its
  * `continue` into OWP_RENDER does not yield). */
@@ -1465,7 +1464,7 @@ static void overworld_boot_flush(void) {
 
 /* Run-to-completion form of overworld_boot (savestate D4b): the boot actionscript
  * frame becomes a STEP_PUSH on the (rare) park instead of a nested pump_mode.
- * Returns true iff the boot frame parked — the caller STEP_PUSHes
+ * Returns true iff the boot frame parked, the caller STEP_PUSHes
  * GAME_MODE_ACTIONSCRIPT_FRAME and runs overworld_boot_flush() at OWP_BOOT_FLUSH.
  * On no park (the normal case) it completes the frame + tail inline and returns
  * false, so OWP_BOOT_AWAIT flows into OWP_RENDER with no yield (no Ness-flash). */
@@ -1503,22 +1502,22 @@ static bool overworld_boot_step(void) {
  * The host's single top-level loop calls game_loop_step() once per frame, then
  * performs the one and only host_process_frame() yield. game_loop_step() advances
  * whatever context the game is in by one frame's worth of pre-yield work and
- * returns — it never blocks on vblank itself.
+ * returns, it never blocks on vblank itself.
  *
  * After D3 there is ONE generic pump: game_loop_step() dispatches the mode-stack
  * top one step and applies its PUSH/POP. g_mode_stack[0] is the permanent
  * GAME_MODE_OVERWORLD root, which folds in boot (OWP_BOOT_* phases run the intro as
- * a child, then overworld_boot()) and never pops — a "Continue" game-over resets
+ * a child, then overworld_boot()) and never pops, a "Continue" game-over resets
  * the root to its boot phase instead of unwinding. Every modal context reached from
  * the overworld (battle, menus, dialogue, fades, teleport, intro, game-over) is a
- * mode pushed onto the stack — including the debug Y-button menu
+ * mode pushed onto the stack, including the debug Y-button menu
  * (GAME_MODE_DEBUG_MENU) and the script/debug teleport (GAME_MODE_TELEPORT_TO). The
  * only blocking holdouts are the pump-bridge wrappers that still drive
  * already-converted modes for remaining inline callers (deleted as their callers
  * convert at the Phase D cutover, D4b). See docs/plans/savestate-unified-loop.md.
  * ------------------------------------------------------------------------- */
 
-/* GAME_MODE_OVERWORLD step — the permanent root (g_mode_stack[0]). Boot stages
+/* GAME_MODE_OVERWORLD step, the permanent root (g_mode_stack[0]). Boot stages
  * (OWP_BOOT_SETUP/AWAIT) fold in the former LOOP_BOOT machine, then it is the
  * run-to-completion port of overworld_post() + overworld_step() (port of main.asm
  * lines 25-161). See OverworldPhase in core/mode_stack.h for the phase map. Each
@@ -1547,7 +1546,7 @@ StepResult mode_step_overworld(ModeState *mst) {
         case OWP_BOOT_AWAIT:
             /* Boot stage 3: the intro has finished (or was skipped). overworld_boot
              * and the first render run in THIS step (the `continue` into OWP_RENDER
-             * does not yield) — the assembly has no WAIT between init and the first
+             * does not yield), the assembly has no WAIT between init and the first
              * loop iteration, and a yield here flashes Ness a script frame early.
              * If the (rare) boot actionscript frame parks for a child modal, the
              * STEP_PUSH yield is unavoidable; resume at OWP_BOOT_FLUSH on its pop. */
@@ -1706,11 +1705,11 @@ StepResult mode_step_overworld(ModeState *mst) {
             continue;
 
         case OWP_PAUSE_MENU_RESULT:
-            /* This port's own addition -- PAUSE_MENU popped
+            /* This port's own addition, PAUSE_MENU popped
              * PAUSE_MENU_RESULT_RETURN_TO_TITLE (mode_stack.h) when the
              * player chose "Quit how?" -> Title Screen (text.c's
              * PM_QUIT_METHOD_RESULT); anything else (normal close,
-             * cancelled quit, Close Game -- which is about to exit the
+             * cancelled quit, Close Game, which is about to exit the
              * process anyway) is PAUSE_MENU_RESULT_NONE and falls through
              * to the teleport check unchanged. Reuses the exact
              * OWP_GAMEOVER_RESULT "Continue" reboot trick below: the root
@@ -1789,13 +1788,13 @@ void game_loop_step(void) {
     /* Advance the mode stack until a step consumes a displayed frame (returns
      * STEP_CONTINUE), then return so the host performs its one yield.
      *
-     * PUSH and POP are control-flow transitions — entering/leaving a child mode
+     * PUSH and POP are control-flow transitions, entering/leaving a child mode
      * was an instant function call/return in the blocking original, costing zero
      * frames. They must therefore NOT each burn a displayed frame here, or a
      * continuously-animating context visibly stutters whenever a child mode is
      * entered or left. The most visible case is the battle background: finishing
      * a piece of battle dialogue pops the text-prompt mode, then the DISPLAY_TEXT
-     * mode, then tears down its windows before the battle resumes — 2-3 transition
+     * mode, then tears down its windows before the battle resumes, 2-3 transition
      * steps that render no new background frame. One-step-per-frame turned each
      * into a held frame, so the animated background froze "for a frame or few"
      * every time text completed. Collapsing PUSH/POP into the surrounding frame
@@ -1804,7 +1803,7 @@ void game_loop_step(void) {
      * docs/plans/pump-mode-removal.md).
      *
      * Only STEP_CONTINUE marks "one frame of rendered work done" (an actionscript
-     * park returns STEP_PUSH because the render did NOT finish — its child
+     * park returns STEP_PUSH because the render did NOT finish, its child
      * completes it and the parent's flush CONTINUE owns the frame). The guard
      * bounds how many transitions fold into one frame: a healthy stack reaches a
      * CONTINUE within a few pushes/pops (bounded by stack depth), but a malformed
@@ -1852,11 +1851,11 @@ void game_init(void) {
     floating_sprite_table_load();
 
     /* Bind the compile-time ROM-asset pointers that gameplay reads on EVERY boot
-     * path. These are NOT serialized state — they are file-static caches of pointers
+     * path. These are NOT serialized state, they are file-static caches of pointers
      * into compiled-in ROM data. Normally they are bound lazily during boot
      * (overworld_boot_step / initialize_overworld_state / boot_begin), but the
      * cold-boot savestate-resume path applies the snapshot at the first root boundary
-     * and replaces the mode stack BEFORE any of those run — leaving the pointers NULL
+     * and replaces the mode stack BEFORE any of those run, leaving the pointers NULL
      * for the whole resumed session. Binding them here covers every path; each is
      * idempotent (re-binds the same pointers), so the normal new-game boot's repeat
      * calls and guards no-op. Any serialized side effects (load_sprite_data() clears

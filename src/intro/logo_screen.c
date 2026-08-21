@@ -44,7 +44,7 @@ void fade_out_with_mosaic(uint16_t step, uint16_t delay_frames, uint16_t mosaic_
     /* ROM spins until the next NMI fires, then immediately continues to the
        next operation (logo load, fade_in, etc.) within the SAME frame.
        In the emulator, that spin-wait + subsequent code all happen in one
-       runFrame call. So we do NOT call wait_for_vblank() here — the next
+       runFrame call. So we do NOT call wait_for_vblank() here, the next
        wait_for_vblank() in fade_in_with_mosaic will serve as that frame. */
 }
 
@@ -63,10 +63,10 @@ void logo_screen_load(uint16_t logo_id) {
     ppu.tm = 0x04;
     ppu.ts = 0x00;
 
-    /* Fill viewport — the dark background tile wraps seamlessly. The renderer's
+    /* Fill viewport, the dark background tile wraps seamlessly. The renderer's
      * FILL path now centers the native 256px content at viewport x [PAD_LEFT,
      * PAD_LEFT+256) for every explicit-FILL layer (see render_bg_scanline's
-     * fill_pad), so no manual hofs compensation is needed — doing so would
+     * fill_pad), so no manual hofs compensation is needed, doing so would
      * double-shift the logo. */
     ppu.bg_viewport_fill[2] = BG_VIEWPORT_FILL;
     ppu.bg_hofs[2] = 0;
@@ -80,7 +80,7 @@ void logo_screen_load(uint16_t logo_id) {
     ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP;
 
     /* Asset IDs for each logo.
-     * Nintendo gfx/arr are locale-specific (US/ or JP/) — locale aliases
+     * Nintendo gfx/arr are locale-specific (US/ or JP/), locale aliases
      * in asset_ids.h resolve transparently via locale aliases.
      * APE and HAL are locale-independent.
      * All palettes are locale-independent. */
@@ -112,7 +112,7 @@ void logo_screen_load(uint16_t logo_id) {
 
     /* Graphics -> VRAM $0000 (tile data)
        ROM: COPY_TO_VRAM1 BUFFER, $0000, $8000, 0
-       Decompress directly to VRAM — no intermediate buffer needed.
+       Decompress directly to VRAM, no intermediate buffer needed.
        NOTE: The ROM's BUFFER is BSS-zeroed once at boot, NOT between logo
        loads. Subsequent logos decompress on top of previous data, so leftover
        bytes from earlier logos persist beyond the new decompression output.

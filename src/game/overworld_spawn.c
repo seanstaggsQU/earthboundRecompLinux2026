@@ -2,17 +2,17 @@
  * Overworld spawn and enemy encounter functions.
  *
  * Ported from:
- *   SPAWN_BUZZ_BUZZ               — asm/overworld/spawn_buzz_buzz.asm
- *   SPAWN_DELIVERY_ENTITIES       — asm/overworld/spawn_delivery_entities.asm
- *   GET_DELIVERY_SPRITE_AND_PLACEHOLDER — asm/overworld/get_delivery_sprite_and_placeholder.asm
- *   SAVE_PHOTO_STATE              — asm/misc/save_photo_state.asm
- *   ENCOUNTER_TRAVELLING_PHOTOGRAPHER — asm/misc/encounter_travelling_photographer.asm
- *   GET_MAP_ENEMY_PLACEMENT       — asm/overworld/get_map_enemy_placement.asm
- *   CAN_ENEMY_RUN_IN_DIRECTION    — asm/overworld/can_enemy_run_in_direction.asm
- *   ATTEMPT_ENEMY_SPAWN           — asm/overworld/attempt_enemy_spawn.asm
- *   SPAWN_HORIZONTAL              — asm/overworld/spawn_horizontal.asm
- *   SPAWN_VERTICAL                — asm/overworld/spawn_vertical.asm
- *   INITIATE_ENEMY_ENCOUNTER      — asm/overworld/initiate_enemy_encounter.asm
+ *   SPAWN_BUZZ_BUZZ: asm/overworld/spawn_buzz_buzz.asm
+ *   SPAWN_DELIVERY_ENTITIES: asm/overworld/spawn_delivery_entities.asm
+ *   GET_DELIVERY_SPRITE_AND_PLACEHOLDER: asm/overworld/get_delivery_sprite_and_placeholder.asm
+ *   SAVE_PHOTO_STATE: asm/misc/save_photo_state.asm
+ *   ENCOUNTER_TRAVELLING_PHOTOGRAPHER: asm/misc/encounter_travelling_photographer.asm
+ *   GET_MAP_ENEMY_PLACEMENT: asm/overworld/get_map_enemy_placement.asm
+ *   CAN_ENEMY_RUN_IN_DIRECTION: asm/overworld/can_enemy_run_in_direction.asm
+ *   ATTEMPT_ENEMY_SPAWN: asm/overworld/attempt_enemy_spawn.asm
+ *   SPAWN_HORIZONTAL: asm/overworld/spawn_horizontal.asm
+ *   SPAWN_VERTICAL: asm/overworld/spawn_vertical.asm
+ *   INITIATE_ENEMY_ENCOUNTER: asm/overworld/initiate_enemy_encounter.asm
  */
 
 #include "game/overworld_internal.h"
@@ -39,7 +39,7 @@
 #include <stdio.h>
 #include "data/text_refs.h"
 
-/* ---- Delivery System ---- */
+/* Delivery System */
 
 #define EVENT_SCRIPT_499 499
 #define EVENT_SCRIPT_500 500
@@ -78,7 +78,7 @@ void spawn_buzz_buzz(void) {
     /* MSG_EVT0_BUZZBUZZ_CHECK is JUMP_IF_FLAG_SET -> (GENERATE_ACTIVE_SPRITE FLY,
      * EVENT_051, $01) -> END_BLOCK: no visible text, no ▼ prompt, no delay, and
      * GENERATE_ACTIVE_SPRITE (param $01) runs inline with a no-op fade-state init.
-     * It can never park, so the no-yield inline runner is exact here — and it
+     * It can never park, so the no-yield inline runner is exact here, and it
      * avoids cascading a DISPLAY_TEXT push through the synchronous boot/load setup
      * (initialize_overworld_state) this is called from. The door / teleport /
      * palette paths that ARE mode-steps push it as a child instead. */
@@ -195,11 +195,11 @@ void save_photo_state(uint16_t photo_id) {
 
 /* ---- Enemy Spawn System ----
  * Ported from:
- *   GET_MAP_ENEMY_PLACEMENT  — asm/overworld/get_map_enemy_placement.asm
- *   CAN_ENEMY_RUN_IN_DIRECTION — asm/overworld/can_enemy_run_in_direction.asm
- *   ATTEMPT_ENEMY_SPAWN      — asm/overworld/attempt_enemy_spawn.asm
- *   SPAWN_HORIZONTAL         — asm/overworld/spawn_horizontal.asm
- *   SPAWN_VERTICAL           — asm/overworld/spawn_vertical.asm
+ *   GET_MAP_ENEMY_PLACEMENT: asm/overworld/get_map_enemy_placement.asm
+ *   CAN_ENEMY_RUN_IN_DIRECTION: asm/overworld/can_enemy_run_in_direction.asm
+ *   ATTEMPT_ENEMY_SPAWN: asm/overworld/attempt_enemy_spawn.asm
+ *   SPAWN_HORIZONTAL: asm/overworld/spawn_horizontal.asm
+ *   SPAWN_VERTICAL: asm/overworld/spawn_vertical.asm
  */
 
 /* Enemy placement data tables loaded from ROM assets */
@@ -279,14 +279,14 @@ uint16_t can_enemy_run_in_direction(uint16_t surface_flags, uint16_t enemy_id) {
 }
 
 /* ATTEMPT_ENEMY_SPAWN (asm/overworld/attempt_enemy_spawn.asm).
- * Core enemy spawn logic — tries to create an enemy entity at a random position.
+ * Core enemy spawn logic, tries to create an enemy entity at a random position.
  * x, y: 64px grid coordinates (0-127, 0-159).
  * encounter_id: from MAP_ENEMY_PLACEMENT table. */
 void attempt_enemy_spawn(uint16_t x, uint16_t y, uint16_t encounter_id) {
     load_enemy_spawn_data();
     uint16_t battle_group_id = 0;
 
-    /* Assembly lines 25-35: Debug mode path — skip in C port (debug disabled) */
+    /* Assembly lines 25-35: Debug mode path, skip in C port (debug disabled) */
 
     /* Assembly lines 36-41: Increment spawn counter, check low 4 bits.
      * Every 16th call -> try magic butterfly (check sector encounter rate).
@@ -295,7 +295,7 @@ void attempt_enemy_spawn(uint16_t x, uint16_t y, uint16_t encounter_id) {
     if ((ow.enemy_spawn_counter & 0x000F) != 0)
         goto select_enemy_group;
 
-    /* --- Magic butterfly path (every 16th frame) --- */
+    /* Magic butterfly path (every 16th frame) */
     {
         /* Assembly lines 42-60: Compute sector index from 64px grid coordinates.
          * sector_x = (x * 8) / 32 = x / 4
@@ -447,7 +447,7 @@ read_group_entry_count:
         if (!battle_groups_local)
             battle_groups_local = ASSET_DATA(ASSET_DATA_ENEMY_BATTLE_GROUPS_TABLE_BIN);
 
-        /* We need the grp_ptr — but we jumped here from two different paths.
+        /* We need the grp_ptr, but we jumped here from two different paths.
          * Re-derive it from ow.spawning_enemy_group. */
         if (!btl_ptr_table_local || !battle_groups_local) return;
         uint32_t entry_off = (uint32_t)ow.spawning_enemy_group * 8;
@@ -520,7 +520,7 @@ read_group_entry_count:
                     if (can_run != 0)
                         continue;
 
-                    /* Position is valid — set entity coordinates */
+                    /* Position is valid, set entity coordinates */
                     int ent = entity_slot;
                     entities.abs_x[ent] = pixel_x;
                     entities.abs_y[ent] = pixel_y;
@@ -682,7 +682,7 @@ void spawn_vertical(uint16_t x_coord, uint16_t new_y) {
 }
 
 /*
- * initiate_enemy_encounter — Port of INITIATE_ENEMY_ENCOUNTER (C0D19B).
+ * initiate_enemy_encounter, Port of INITIATE_ENEMY_ENCOUNTER (C0D19B).
  *
  * Called by restore_camera_mode() after the 12-frame camera shake completes.
  * Determines battle initiative by comparing the enemy's movement direction
@@ -721,7 +721,7 @@ void initiate_enemy_encounter(void) {
     int16_t enemy_moving_dir = entities.moving_directions[enemy_offset];
 
     if (enemy_moving_dir == 8) {
-        /* Stationary enemy — default to player gets initiative (lines 28-32) */
+        /* Stationary enemy, default to player gets initiative (lines 28-32) */
         enemy_approaching = 0;
         player_facing_toward = 1;
     } else {
@@ -745,7 +745,7 @@ void initiate_enemy_encounter(void) {
         /* Check if player is facing toward the enemy (lines 70-84)
          * If leader_direction ~ approach_direction, player faces same direction
          * as the approach vector (enemy->player), meaning player faces AWAY.
-         * Assembly labels are misleading — X=0 means "facing away". */
+         * Assembly labels are misleading, X=0 means "facing away". */
         int16_t player_diff = (game_state.leader_direction - approach_dir) & 7;
         if (player_diff == 0 || player_diff == 1 || player_diff == 7) {
             player_facing_toward = 0;  /* player facing away from enemy */
@@ -812,7 +812,7 @@ void initiate_enemy_encounter(void) {
         int16_t enemy_id = 0;
 
         if (count == 0xFF) {
-            /* End marker (lines 178-181) — store 0 for both */
+            /* End marker (lines 178-181), store 0 for both */
             ert.pathfinding_enemy_ids[i] = 0;
             ert.pathfinding_enemy_counts[i] = 0;
             grp_ptr = NULL;  /* stop reading further entries */
@@ -820,7 +820,7 @@ void initiate_enemy_encounter(void) {
         }
 
         if (count == 0) {
-            /* Zero count — just advance pointer (lines 130-133) */
+            /* Zero count, just advance pointer (lines 130-133) */
             enemy_id = 0;
         } else {
             /* Read enemy_id from group data (lines 134-136) */
@@ -949,11 +949,11 @@ void initiate_enemy_encounter(void) {
             continue;
 
         if (entities.pathfinding_states[slot] == -1) {
-            /* Battle participant — enable tick and movement (lines 366-373) */
+            /* Battle participant, enable tick and movement (lines 366-373) */
             entities.tick_callback_hi[slot] &=
                 (uint16_t)~(uint16_t)(OBJECT_TICK_DISABLED | OBJECT_MOVE_DISABLED);
         } else {
-            /* Non-participant — hide sprite (lines 374-381) */
+            /* Non-participant, hide sprite (lines 374-381) */
             entities.spritemap_ptr_hi[slot] |= 0x8000;
         }
     }

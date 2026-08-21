@@ -105,7 +105,7 @@ uint16_t change_equipped_body(uint16_t char_id, uint16_t new_item_id);
 uint16_t change_equipped_arms(uint16_t char_id, uint16_t new_item_id);
 uint16_t change_equipped_other(uint16_t char_id, uint16_t new_item_id);
 
-/* --- Item access functions --- */
+/* Item access functions */
 
 /* GET_CHARACTER_ITEM: Port of asm/misc/get_character_item.asm.
  * Returns the item ID at the given slot for the given character.
@@ -118,7 +118,7 @@ uint16_t get_character_item(uint16_t char_id, uint16_t slot);
  * Note: original assembly only checks slots 0-12 (off-by-one, slot 13 is never checked). */
 uint16_t find_empty_inventory_slot(uint16_t char_id);
 
-/* --- Item give/remove functions --- */
+/* Item give/remove functions */
 
 /* GIVE_ITEM_TO_SPECIFIC_CHARACTER: Port of asm/misc/give_item_to_specific_character.asm.
  * Finds an empty inventory slot and places the item there.
@@ -165,7 +165,7 @@ uint16_t take_item_from_specific_character(uint16_t char_id, uint16_t item_id);
  * Returns character's member ID on success, 0 if item not found. */
 uint16_t take_item_from_character(uint16_t char_id, uint16_t item_id);
 
-/* --- Item search functions --- */
+/* Item search functions */
 
 /* IS_ITEM_EQUIPPED_BY_ID: Port of src/inventory/is_item_equipped_by_id.asm.
  * Checks if an item (by item ID) is equipped by a character.
@@ -196,7 +196,7 @@ uint16_t find_item_in_inventory(uint16_t char_id, uint16_t item_id);
 uint16_t find_item_in_inventory2(uint16_t char_id, uint16_t item_id);
 
 /* --- Key Items pool functions ---
- * Not part of the original ROM/assembly -- new infrastructure for the Key
+ * Not part of the original ROM/assembly, new infrastructure for the Key
  * Items pool feature (see game_state.h's KEY_ITEMS_POOL_SIZE/key_items_pool
  * doc comment). Quest items (ITEM_TYPE_KEY_ITEM/KEY_AREA/KEY_SOMEONE) are
  * intercepted out of the normal give/find/take choke points (see
@@ -206,7 +206,7 @@ uint16_t find_item_in_inventory2(uint16_t char_id, uint16_t item_id);
  * lookups. Modeled directly on the Escargo Express storage functions below
  * (packed array, linear scan, shift-left on removal). */
 
-/* IS_KEY_ITEM_TYPE: not a ROM/assembly port -- classifies an item by its
+/* IS_KEY_ITEM_TYPE: not a ROM/assembly port, classifies an item by its
  * ITEM_TYPE_MASK category. Returns true for KEY_ITEM/KEY_AREA/KEY_SOMEONE. */
 bool is_key_item_type(uint16_t item_id);
 
@@ -219,7 +219,7 @@ uint16_t key_items_give(uint16_t item_id);
 uint16_t key_items_find(uint16_t item_id);
 
 /* Sentinel item_slot value mode_step_use_item() (text.c) uses for a
- * pool-sourced item -- see get_character_item()'s doc comment (inventory.c)
+ * pool-sourced item, see get_character_item()'s doc comment (inventory.c)
  * for the full rationale. Never a real 1-14 inventory slot. */
 #define KEY_ITEMS_POOL_USE_SLOT_SENTINEL 0xFFFFu
 
@@ -230,12 +230,12 @@ uint16_t key_items_remove(uint16_t item_id);
 
 /* KEY_ITEMS_SET_USE_IN_PROGRESS: records which pool item is currently
  * being Used, for get_character_item()'s KEY_ITEMS_POOL_USE_SLOT_SENTINEL
- * special case (inventory.c) -- see that constant's doc comment for the
+ * special case (inventory.c), see that constant's doc comment for the
  * full rationale. Called by mode_step_use_item() (text.c) when
  * UseItemState.from_key_items_pool is set; pass 0 to clear. */
 void key_items_set_use_in_progress(uint16_t item_id);
 
-/* --- Escargo Express functions --- */
+/* Escargo Express functions */
 
 /* ESCARGO_EXPRESS_STORE: Port of asm/misc/escargo_express_store.asm.
  * Finds first empty slot in escargo_express_items[] and stores item.
@@ -263,7 +263,7 @@ uint16_t escargo_express_move(uint16_t char_id, uint16_t item_slot);
  * Returns char_id. */
 uint16_t deliver_escargo_express_item(uint16_t char_id, uint16_t escargo_slot);
 
-/* --- Item queue functions --- */
+/* Item queue functions */
 
 /* QUEUE_ITEM_FOR_CHARACTER: Port of src/inventory/queue_item_for_character.asm.
  * Stores item_id into the first empty slot of game_state.unknownB6[0..2],
@@ -273,11 +273,11 @@ uint16_t deliver_escargo_express_item(uint16_t char_id, uint16_t escargo_slot);
  * char_id: 1-indexed character or 0xFF (escargo source). item_id: item to queue. */
 void queue_item_for_character(uint16_t char_id, uint16_t item_id);
 
-/* --- Item fix functions (Jeff's repair ability) --- */
+/* Item fix functions (Jeff's repair ability) */
 
 /* (ITEM_TYPE_BROKEN is defined above with the other ITEM_TYPE constants) */
 
-/* ITEM_FIXING_CHARACTER index (0-based) — Jeff */
+/* ITEM_FIXING_CHARACTER index (0-based), Jeff */
 #define ITEM_FIXING_CHARACTER  2  /* from include/config.asm */
 
 /* GET_ITEM_EP: Port of src/inventory/get_item_ep.asm.
@@ -294,7 +294,7 @@ uint16_t get_item_ep(uint16_t item_id);
  * Returns the original broken item's ID on success, 0 if no item was fixed. */
 uint16_t try_fix_broken_item(uint16_t fix_probability);
 
-/* --- Experience functions --- */
+/* Experience functions */
 
 /* RESET_CHAR_LEVEL_ONE: Port of asm/misc/reset_char_level_one.asm.
  * Resets character to level 1 base stats, then levels up target_level times.
@@ -319,7 +319,7 @@ union ModeState;  /* forward decl (defined in core/mode_stack.h) */
 
 /* GAIN_EXP prologue (asm/misc/gain_exp.asm lines 20-66): add exp to the
  * character's EXP and check the next level threshold. Returns true when at
- * least one level-up is pending — the caller then runs GAME_MODE_LEVEL_UP
+ * least one level-up is pending, the caller then runs GAME_MODE_LEVEL_UP
  * (STEP_PUSH via level_up_make_init, or the gain_exp() bridge) for the text
  * path, or the silent loop. Used by CC_1E_09 to push the mode directly. */
 bool gain_exp_prepare(uint16_t char_id, uint32_t exp);
@@ -327,7 +327,7 @@ bool gain_exp_prepare(uint16_t char_id, uint32_t exp);
 /* Fill a GAME_MODE_LEVEL_UP child init (LU_LEVEL phase) for char_id. */
 void level_up_make_init(union ModeState *init, uint16_t char_id);
 
-/* --- Financial functions --- */
+/* Financial functions */
 
 /* INCREASE_WALLET_BALANCE: Port of asm/misc/increase_wallet_balance.asm.
  * Adds amount to money_carried, clamped to 99999. Returns new balance. */
@@ -345,14 +345,14 @@ uint32_t deposit_into_atm(uint32_t amount);
  * No-op if insufficient bank balance. */
 void withdraw_from_atm(uint32_t amount);
 
-/* --- Item usability query --- */
+/* Item usability query */
 
 /* CHECK_ITEM_USABLE_BY: Port of src/inventory/check_item_usable_by.asm.
  * Checks if char_id (1-indexed) can use item_id by ANDing item.flags
  * with the per-character usable bitmask. Returns 1 (usable) or 0. */
 uint16_t check_item_usable_by(uint16_t char_id, uint16_t item_id);
 
-/* --- Item type query --- */
+/* Item type query */
 
 /* GET_ITEM_TYPE: Port of asm/misc/get_item_type.asm.
  * Returns category: 1=consumable, 2=weapon, 3=armor, 4=accessory, 0=other. */
@@ -362,21 +362,21 @@ uint16_t get_item_type(uint16_t item_id);
  * Returns equipment slot type: 1=weapon, 2=body, 3=arms, 4=other, 0=none. */
 uint16_t get_item_subtype(uint16_t item_id);
 
-/* --- Condiment search --- */
+/* Condiment search */
 
 /* FIND_CONDIMENT: Port of asm/misc/find_condiment.asm.
  * Takes item_id; checks if food-type, then searches CURRENT_ATTACKER's inventory
  * for a condiment. Returns condiment item_id, or 0 if none. */
 uint16_t find_condiment(uint16_t item_id);
 
-/* --- Inventory space query --- */
+/* Inventory space query */
 
 /* FIND_INVENTORY_SPACE2: Port of asm/misc/find_inventory_space2.asm.
  * char_id == 0xFF searches all party members.
  * Returns char_id with space, 0 if all full. */
 uint16_t find_inventory_space2(uint16_t char_id);
 
-/* --- Party management --- */
+/* Party management */
 
 /* ADD_CHAR_TO_PARTY: Port of asm/misc/party_add_char.asm.
  * Sorted insertion into game_state.party_members[].
@@ -391,7 +391,7 @@ void add_char_to_party(uint16_t char_id);
  * char_id: 1-indexed character ID. */
 void remove_char_from_party(uint16_t char_id);
 
-/* --- Item transformation system --- */
+/* Item transformation system */
 
 /* PROCESS_ITEM_TRANSFORMATIONS: Port of asm/overworld/process_item_transformations.asm.
  * Called each frame from the overworld main loop. Manages SFX and transformation
@@ -403,7 +403,7 @@ void process_item_transformations(void);
  * Called when leaving overworld (e.g., game over screen). */
 void reset_item_transformations(void);
 
-/* --- Party utility functions --- */
+/* Party utility functions */
 
 /* COUNT_ALIVE_PARTY_MEMBERS: Port of asm/battle/count_alive_party_members.asm.
  * Counts player-controlled party members who are not unconscious or diamondized.

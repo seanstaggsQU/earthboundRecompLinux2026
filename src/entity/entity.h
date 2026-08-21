@@ -6,12 +6,12 @@
  * is a separate array indexed by entity slot number.
  *
  * Key ASM sources:
- *   INIT_ENTITY_SYSTEM     — asm/overworld/init_entity_system.asm
- *   INIT_ENTITY_WIPE       — asm/overworld/init_entity.asm
- *   INIT_ENTITY            — asm/overworld/init_entity.asm
- *   ALLOCATE_ENTITY_SLOT   — asm/overworld/allocate_entity_slot.asm
- *   LINK_ENTITY_TO_LIST    — asm/overworld/link_entity_to_list.asm
- *   DEACTIVATE_ENTITY      — deactivation + free
+ *   INIT_ENTITY_SYSTEM: asm/overworld/init_entity_system.asm
+ *   INIT_ENTITY_WIPE: asm/overworld/init_entity.asm
+ *   INIT_ENTITY: asm/overworld/init_entity.asm
+ *   ALLOCATE_ENTITY_SLOT: asm/overworld/allocate_entity_slot.asm
+ *   LINK_ENTITY_TO_LIST: asm/overworld/link_entity_to_list.asm
+ *   DEACTIVATE_ENTITY: deactivation + free
  */
 #ifndef ENTITY_ENTITY_H
 #define ENTITY_ENTITY_H
@@ -28,11 +28,11 @@
 
 /* Convert entity slot number to array index.
  * Previously (slot * 2) to mirror the ROM's word-indexed layout.
- * Now identity — arrays are packed, indexed directly by slot number. */
+ * Now identity, arrays are packed, indexed directly by slot number. */
 #define ENT(slot) (slot)
 
 /*
- * Entity tables — all arrays indexed directly by entity slot number.
+ * Entity tables, all arrays indexed directly by entity slot number.
  * Size = MAX_ENTITIES entries.
  */
 typedef struct {
@@ -42,8 +42,8 @@ typedef struct {
     int8_t next_entity[MAX_ENTITIES];          /* -1 to 29 */
 
     /* Script linkage: which script slot is assigned to this entity */
-    int16_t script_table[MAX_ENTITIES];       /* ENTITY_SCRIPT_TABLE — event script ID or -1 */
-    int8_t script_index[MAX_ENTITIES];        /* ENTITY_SCRIPT_INDEX_TABLE — -1 to 69 */
+    int16_t script_table[MAX_ENTITIES];       /* ENTITY_SCRIPT_TABLE, event script ID or -1 */
+    int8_t script_index[MAX_ENTITIES];        /* ENTITY_SCRIPT_INDEX_TABLE, -1 to 69 */
 
     /* Position (16.16 fixed-point) */
     int16_t abs_x[MAX_ENTITIES];
@@ -75,9 +75,9 @@ typedef struct {
     uint16_t spritemap_ptr_hi[MAX_ENTITIES];  /* bit 15 = hidden */
 
     /* Callbacks (stored as indices into callback tables) */
-    uint8_t move_callback[MAX_ENTITIES];       /* 0–7 */
-    uint8_t screen_pos_callback[MAX_ENTITIES]; /* 0–7 */
-    uint8_t draw_callback[MAX_ENTITIES];       /* 0–2 */
+    uint8_t move_callback[MAX_ENTITIES];       /* 0-7 */
+    uint8_t screen_pos_callback[MAX_ENTITIES]; /* 0-7 */
+    uint8_t draw_callback[MAX_ENTITIES];       /* 0-2 */
     uint16_t tick_callback_lo[MAX_ENTITIES];
     uint16_t tick_callback_hi[MAX_ENTITIES];   /* bit 15 = disabled, bit 14 = skip move */
 
@@ -88,53 +88,53 @@ typedef struct {
     int16_t sprite_ids[MAX_ENTITIES];              /* ENTITY_SPRITE_IDS */
     uint16_t vram_address[MAX_ENTITIES];           /* ENTITY_VRAM_ADDRESS */
     uint16_t byte_widths[MAX_ENTITIES];            /* ENTITY_BYTE_WIDTHS */
-    uint8_t tile_heights[MAX_ENTITIES];            /* ENTITY_TILE_HEIGHTS — 2–10 */
+    uint8_t tile_heights[MAX_ENTITIES];            /* ENTITY_TILE_HEIGHTS, 2-10 */
     uint16_t graphics_ptr_lo[MAX_ENTITIES];        /* ENTITY_GRAPHICS_PTR_LOW */
     uint16_t graphics_ptr_hi[MAX_ENTITIES];        /* ENTITY_GRAPHICS_PTR_HIGH */
-    uint8_t graphics_sprite_bank[MAX_ENTITIES];    /* ENTITY_GRAPHICS_SPRITE_BANK — 0–255 */
+    uint8_t graphics_sprite_bank[MAX_ENTITIES];    /* ENTITY_GRAPHICS_SPRITE_BANK, 0-255 */
     uint16_t spritemap_sizes[MAX_ENTITIES];        /* ENTITY_SPRITEMAP_SIZES */
     uint16_t spritemap_begin_idx[MAX_ENTITIES];    /* ENTITY_SPRITEMAP_BEGINNING_INDICES */
-    uint8_t sizes[MAX_ENTITIES];                   /* ENTITY_SIZES — 0–16 */
-#define ENTITY_SIZE_COUNT 17  /* Number of entity size codes (0–16) */
+    uint8_t sizes[MAX_ENTITIES];                   /* ENTITY_SIZES, 0-16 */
+#define ENTITY_SIZE_COUNT 17  /* Number of entity size codes (0-16) */
 
     /* Hitbox properties */
-    uint8_t hitbox_enabled[MAX_ENTITIES];          /* ENTITY_HITBOX_ENABLED — 0 or 1 */
-    uint8_t hitbox_ud_widths[MAX_ENTITIES];        /* ENTITY_HITBOX_UP_DOWN_WIDTHS — 0–32 */
-    uint8_t hitbox_ud_heights[MAX_ENTITIES];       /* ENTITY_HITBOX_UP_DOWN_HEIGHTS — 0–32 */
-    uint8_t hitbox_lr_widths[MAX_ENTITIES];        /* ENTITY_HITBOX_LEFT_RIGHT_WIDTHS — 0–32 */
-    uint8_t hitbox_lr_heights[MAX_ENTITIES];       /* ENTITY_HITBOX_LEFT_RIGHT_HEIGHTS — 0–32 */
+    uint8_t hitbox_enabled[MAX_ENTITIES];          /* ENTITY_HITBOX_ENABLED, 0 or 1 */
+    uint8_t hitbox_ud_widths[MAX_ENTITIES];        /* ENTITY_HITBOX_UP_DOWN_WIDTHS, 0-32 */
+    uint8_t hitbox_ud_heights[MAX_ENTITIES];       /* ENTITY_HITBOX_UP_DOWN_HEIGHTS, 0-32 */
+    uint8_t hitbox_lr_widths[MAX_ENTITIES];        /* ENTITY_HITBOX_LEFT_RIGHT_WIDTHS, 0-32 */
+    uint8_t hitbox_lr_heights[MAX_ENTITIES];       /* ENTITY_HITBOX_LEFT_RIGHT_HEIGHTS, 0-32 */
     uint16_t upper_lower_body_divides[MAX_ENTITIES]; /* ENTITY_UPPER_LOWER_BODY_DIVIDES */
 
     /* Movement and identity */
-    int8_t moving_directions[MAX_ENTITIES];        /* ENTITY_MOVING_DIRECTIONS — 0–7 */
-    int8_t directions[MAX_ENTITIES];               /* ENTITY_DIRECTIONS — 0–7 */
+    int8_t moving_directions[MAX_ENTITIES];        /* ENTITY_MOVING_DIRECTIONS, 0-7 */
+    int8_t directions[MAX_ENTITIES];               /* ENTITY_DIRECTIONS, 0-7 */
     uint16_t movement_speeds[MAX_ENTITIES];        /* ENTITY_MOVEMENT_SPEEDS */
     uint16_t npc_ids[MAX_ENTITIES];                /* ENTITY_NPC_IDS */
     int16_t enemy_ids[MAX_ENTITIES];               /* ENTITY_ENEMY_IDS */
     int16_t enemy_spawn_tiles[MAX_ENTITIES];       /* ENTITY_ENEMY_SPAWN_TILES */
-    int8_t collided_objects[MAX_ENTITIES];         /* ENTITY_COLLIDED_OBJECTS — -1 to 29 */
-    uint8_t surface_flags[MAX_ENTITIES];           /* ENTITY_SURFACE_FLAGS — bits 0–3 */
-    uint8_t obstacle_flags[MAX_ENTITIES];          /* ENTITY_OBSTACLE_FLAGS — bits 4,6,7 */
-    int16_t pathfinding_states[MAX_ENTITIES];       /* ENTITY_PATHFINDING_STATES — 0=inactive, 1=reset, -1=active (bit 15 used) */
-    uint8_t walking_styles[MAX_ENTITIES];          /* ENTITY_WALKING_STYLES — small enum */
+    int8_t collided_objects[MAX_ENTITIES];         /* ENTITY_COLLIDED_OBJECTS, -1 to 29 */
+    uint8_t surface_flags[MAX_ENTITIES];           /* ENTITY_SURFACE_FLAGS, bits 0-3 */
+    uint8_t obstacle_flags[MAX_ENTITIES];          /* ENTITY_OBSTACLE_FLAGS, bits 4,6,7 */
+    int16_t pathfinding_states[MAX_ENTITIES];       /* ENTITY_PATHFINDING_STATES, 0=inactive, 1=reset, -1=active (bit 15 used) */
+    uint8_t walking_styles[MAX_ENTITIES];          /* ENTITY_WALKING_STYLES, small enum */
     uint16_t animation_fingerprints[MAX_ENTITIES]; /* ENTITY_ANIMATION_FINGERPRINTS */
-    uint8_t overlay_flags[MAX_ENTITIES];           /* ENTITY_OVERLAY_FLAGS — bit 1: nausea, bit 0: mushroom */
+    uint8_t overlay_flags[MAX_ENTITIES];           /* ENTITY_OVERLAY_FLAGS, bit 1: nausea, bit 0: mushroom */
     uint8_t use_8dir_sprites[MAX_ENTITIES];        /* C port flag: 0 or 1 */
-    int8_t butterfly_orbit_direction[MAX_ENTITIES]; /* ENTITY_BUTTERFLY_ORBIT_DIRECTION — 0 or 1 */
+    int8_t butterfly_orbit_direction[MAX_ENTITIES]; /* ENTITY_BUTTERFLY_ORBIT_DIRECTION, 0 or 1 */
 
     /* Overlay animation state (4 types x 3 arrays each) */
-    uint8_t ripple_overlay_ptrs[MAX_ENTITIES];             /* ENTITY_RIPPLE_OVERLAY_PTRS — 0–211 */
-    uint8_t ripple_next_update[MAX_ENTITIES];              /* ENTITY_RIPPLE_NEXT_UPDATE_FRAMES — 0–60 */
+    uint8_t ripple_overlay_ptrs[MAX_ENTITIES];             /* ENTITY_RIPPLE_OVERLAY_PTRS, 0-211 */
+    uint8_t ripple_next_update[MAX_ENTITIES];              /* ENTITY_RIPPLE_NEXT_UPDATE_FRAMES, 0-60 */
     uint16_t ripple_spritemaps[MAX_ENTITIES];              /* ENTITY_RIPPLE_SPRITEMAPS */
-    uint8_t big_ripple_overlay_ptrs[MAX_ENTITIES];         /* ENTITY_BIG_RIPPLE_OVERLAY_PTRS — 0–211 */
-    uint8_t big_ripple_next_update[MAX_ENTITIES];          /* ENTITY_BIG_RIPPLE_NEXT_UPDATE_FRAMES — 0–60 */
+    uint8_t big_ripple_overlay_ptrs[MAX_ENTITIES];         /* ENTITY_BIG_RIPPLE_OVERLAY_PTRS, 0-211 */
+    uint8_t big_ripple_next_update[MAX_ENTITIES];          /* ENTITY_BIG_RIPPLE_NEXT_UPDATE_FRAMES, 0-60 */
     uint16_t big_ripple_spritemaps[MAX_ENTITIES];          /* ENTITY_BIG_RIPPLE_SPRITEMAPS */
     uint16_t weak_enemy_value[MAX_ENTITIES];              /* ENTITY_WEAK_ENEMY_VALUE */
-    uint8_t sweating_overlay_ptrs[MAX_ENTITIES];           /* ENTITY_SWEATING_OVERLAY_PTRS — 0–211 */
-    uint8_t sweating_next_update[MAX_ENTITIES];            /* ENTITY_SWEATING_NEXT_UPDATE_FRAMES — 0–60 */
+    uint8_t sweating_overlay_ptrs[MAX_ENTITIES];           /* ENTITY_SWEATING_OVERLAY_PTRS, 0-211 */
+    uint8_t sweating_next_update[MAX_ENTITIES];            /* ENTITY_SWEATING_NEXT_UPDATE_FRAMES, 0-60 */
     uint16_t sweating_spritemaps[MAX_ENTITIES];            /* ENTITY_SWEATING_SPRITEMAPS */
-    uint8_t mushroomized_overlay_ptrs[MAX_ENTITIES];       /* ENTITY_MUSHROOMIZED_OVERLAY_PTRS — 0–211 */
-    uint8_t mushroomized_next_update[MAX_ENTITIES];        /* ENTITY_MUSHROOMIZED_NEXT_UPDATE_FRAMES — 0–60 */
+    uint8_t mushroomized_overlay_ptrs[MAX_ENTITIES];       /* ENTITY_MUSHROOMIZED_OVERLAY_PTRS, 0-211 */
+    uint8_t mushroomized_next_update[MAX_ENTITIES];        /* ENTITY_MUSHROOMIZED_NEXT_UPDATE_FRAMES, 0-60 */
     uint16_t mushroomized_spritemaps[MAX_ENTITIES];        /* ENTITY_MUSHROOMIZED_SPRITEMAPS */
 
     /* Allocation control */
@@ -143,15 +143,15 @@ typedef struct {
 } EntitySystem;
 
 /*
- * Script tables — all arrays indexed directly by script slot number.
+ * Script tables, all arrays indexed directly by script slot number.
  * Size = MAX_SCRIPTS entries.
  */
 typedef struct {
     int8_t next_script[MAX_SCRIPTS];              /* -1 to 69 */
     int16_t sleep_frames[MAX_SCRIPTS];
     uint16_t pc[MAX_SCRIPTS];
-    uint8_t pc_bank[MAX_SCRIPTS];                 /* 0–63 bank index, 0xFF = none */
-    uint8_t stack_offset[MAX_SCRIPTS];            /* 0–SCRIPT_STACK_SIZE */
+    uint8_t pc_bank[MAX_SCRIPTS];                 /* 0-63 bank index, 0xFF = none */
+    uint8_t stack_offset[MAX_SCRIPTS];            /* 0-SCRIPT_STACK_SIZE */
     int16_t tempvar[MAX_SCRIPTS];
     uint8_t stack[MAX_SCRIPTS][SCRIPT_STACK_SIZE];
 } ScriptSystem;
@@ -170,7 +170,7 @@ typedef struct {
 /* BG scroll table layer count */
 #define MAX_BG_LAYERS 4
 
-/* BUFFER — general-purpose work area in SNES WRAM (RAM2 segment).
+/* BUFFER: general-purpose work area in SNES WRAM (RAM2 segment).
  *
  * In the original game (compiled with VUCC), this was likely multiple separate
  * C variables that the compiler placed contiguously in WRAM starting at $7F0000.
@@ -184,19 +184,19 @@ typedef struct {
  *
  * === BUFFER REGION MAP ===
  *
- * The buffer is TIME-SHARED — different game phases reuse the same offsets.
+ * The buffer is TIME-SHARED, different game phases reuse the same offsets.
  * Within a phase, regions are spatially partitioned to avoid conflicts.
  *
  * PALETTE FADE ENGINE (callroutine_palette.c, title_screen.c, gas_station.c)
  *   Assembly: prepare_palette_fade_slopes.asm, update_map_palette_animation.asm
  *   Active during: screen transitions (overworld, battle, intro)
- *   BUF_FADE_TARGET   0x0000–0x01FF  Target palette (256 × uint16)  512 B
- *   BUF_FADE_SLOPE_R  0x0200–0x03FF  Red channel slopes             512 B
- *   BUF_FADE_SLOPE_G  0x0400–0x05FF  Green channel slopes           512 B
- *   BUF_FADE_SLOPE_B  0x0600–0x07FF  Blue channel slopes            512 B
- *   BUF_FADE_ACCUM_R  0x0800–0x09FF  Red channel accumulators       512 B
- *   BUF_FADE_ACCUM_G  0x0A00–0x0BFF  Green channel accumulators     512 B
- *   BUF_FADE_ACCUM_B  0x0C00–0x0DFF  Blue channel accumulators      512 B
+ *   BUF_FADE_TARGET   0x0000-0x01FF  Target palette (256 × uint16)  512 B
+ *   BUF_FADE_SLOPE_R  0x0200-0x03FF  Red channel slopes             512 B
+ *   BUF_FADE_SLOPE_G  0x0400-0x05FF  Green channel slopes           512 B
+ *   BUF_FADE_SLOPE_B  0x0600-0x07FF  Blue channel slopes            512 B
+ *   BUF_FADE_ACCUM_R  0x0800-0x09FF  Red channel accumulators       512 B
+ *   BUF_FADE_ACCUM_G  0x0A00-0x0BFF  Green channel accumulators     512 B
+ *   BUF_FADE_ACCUM_B  0x0C00-0x0DFF  Blue channel accumulators      512 B
  *   Total: 0x0E00 = 3584 bytes
  *
  * TEXT WINDOW GFX TILE UPLOADS (text.c, battle_ui.c)
@@ -212,29 +212,29 @@ typedef struct {
  *
  * BATTLE PALETTE SAVE (battle_ui.c, battle.c)
  *   Assembly: desaturate_palettes.asm
- *   BUF_BATTLE_PALETTE_SAVE  0x2000  512 B — palettes saved for battle fade
+ *   BUF_BATTLE_PALETTE_SAVE  0x2000  512 B, palettes saved for battle fade
  *
- * ENTITY FADE SPRITE DATA (callbacks.c — double_entity_fade_state)
+ * ENTITY FADE SPRITE DATA (callbacks.c, double_entity_fade_state)
  *   Active during: overworld entity spawn/despawn wipe effects
  *   0x0000+        Bump-allocated sprite tile copies (grows upward)
- *   Typical: a few hundred bytes (one entity sprite ≈ 32–128 B × 2)
- *   NOT concurrent with palette fade — fades finish before transitions.
+ *   Typical: a few hundred bytes (one entity sprite ≈ 32-128 B × 2)
+ *   NOT concurrent with palette fade, fades finish before transitions.
  *
- * ENTITY FADE METADATA (callbacks.c — entity_fade_entries)
+ * ENTITY FADE METADATA (callbacks.c, entity_fade_entries)
  *   Assembly: init_entity_fade_states_buffer.asm
  *   Active during: overworld (concurrent with sprite data above)
- *   BUF_ENTITY_FADE_STATES  0x7C00–0x7FFF  20-byte entries     1024 B
+ *   BUF_ENTITY_FADE_STATES  0x7C00-0x7FFF  20-byte entries     1024 B
  *
- * ENTITY TILE MERGE SLOT TABLE (callbacks.c — cr_animate_entity_tile_merge)
+ * ENTITY TILE MERGE SLOT TABLE (callbacks.c, cr_animate_entity_tile_merge)
  *   Assembly: clear_spritemap_buffer.asm, animate_entity_tile_merge.asm
  *   Active during: overworld entity wipe animation
- *   BUF_TILE_MERGE_SLOTS  0x7F00–0x7F7F  64-entry slot table    128 B
+ *   BUF_TILE_MERGE_SLOTS  0x7F00-0x7F7F  64-entry slot table    128 B
  *
  * PATHFINDING COLLISION MATRIX + HEAP (pathfinding.c)
  *   Assembly: initialize_pathfinding_for_entities.asm
  *   Active during: overworld NPC pathfinding (on-demand)
- *   BUF_PATHFINDING_MATRIX  0x3000–0x4000   BFS collision grid  max 4 KB (64×64)
- *   BUF_PF_HEAP             0x4000–0x4C00   BFS heap/scratch    3 KB
+ *   BUF_PATHFINDING_MATRIX  0x3000-0x4000   BFS collision grid  max 4 KB (64×64)
+ *   BUF_PF_HEAP             0x4000-0x4C00   BFS heap/scratch    3 KB
  *
  * MAP PALETTE FADE (overworld_palette.c)
  *   Assembly: initialize_map_palette_fade.asm, update_map_palette_fade.asm
@@ -284,7 +284,7 @@ typedef struct {
  * ENDING / CREDITS (ending.c)
  *   Assembly: ending/ directory
  *   Active during: ending sequence (exclusive phase)
- *   Cast tile GFX (32 KB) composes directly in ppu.vram — no ert.buffer.
+ *   Cast tile GFX (32 KB) composes directly in ppu.vram, no ert.buffer.
  *   Credits init decomps: ~10 KB transient at 0x0000 (immediate VRAM upload)
  *   BUF_CREDITS_PALETTE  0x0E00  Special cast palette data (256 B)
  *   BUF_CREDITS_TILEMAP  0x0F00  Cast name scroll workspace (128 B)
@@ -295,7 +295,7 @@ typedef struct {
  *   BUF_TILEMAP_ANIM_UPPER  0x4000  Upper animation buffer
  *
  * INTRO/TITLE SCREEN (logo_screen.c, title_screen.c, gas_station.c)
- *   GFX and arrangements decompress directly to ppu.vram — no ert.buffer
+ *   GFX and arrangements decompress directly to ppu.vram, no ert.buffer
  *   usage. Palette fade during gas station uses BUF_FADE_* (3.5 KB).
  *   NOTE: Intentional divergence from assembly, which stages through BUFFER
  *   then DMAs to VRAM. The SNES requires DMA from a contiguous RAM source;
@@ -322,9 +322,9 @@ typedef struct {
  *
  * Suspect 1: BUF_MAP_FADE_ACCUM_R (0x7C00) vs BUF_ENTITY_FADE_STATES (0x7C00)
  *   SAFE. Two code paths use BUF_MAP_FADE_ACCUM_R:
- *   (a) animate_map_palette_change() — only called from play_comeback_sequence(),
+ *   (a) animate_map_palette_change(), only called from play_comeback_sequence(),
  *       which calls disable_all_entities() first. Entity fade data is stale.
- *   (b) load_map_palette() — C port uses compact BUF_FLASH_* layout at 0x0000,
+ *   (b) load_map_palette(), C port uses compact BUF_FLASH_* layout at 0x0000,
  *       NOT the 0x7C00 region. Avoids the conflict entirely.
  *   Both assembly and C port rely on temporal separation: fade loops call only
  *   vblank wait, never a full game tick, so entity scripts don't execute.
@@ -353,23 +353,23 @@ typedef struct {
  * Intro assets (gas_station 49 KB, title 45 KB, logo 32 KB) decompress
  * directly to ppu.vram and no longer use ert.buffer.
  *
- * The game-over asset is the largest single-decomp bottleneck — it packs
+ * The game-over asset is the largest single-decomp bottleneck, it packs
  * two sprites (normal + Paula-leader) into one blob. Splitting into two
  * 32 KB assets would halve the requirement.
  *
  * PSI arrangements 20/21 (Starstorm gamma/omega) decompress to exactly
  * 64 KB = 64 frames × 0x400 bytes. On SNES, this overflows BUFFER ($F800)
- * into TILE_COLLISION_BUFFER ($800) — benign since collision data is unused
+ * into TILE_COLLISION_BUFFER ($800), benign since collision data is unused
  * during battle. The C port uses BUFFER_SIZE (0x10000) so no overflow occurs.
  * Arrangement 0 (48 KB) and 19 (48 KB) are the next largest.
  *
  * === EMBEDDED PORT OPTIMIZATION ===
  *
  * For RAM-constrained platforms, this buffer can be split into:
- *   1. Palette fade arrays (3.5 KB, BUF_FADE_*) — union with entity fade sprite
- *   2. Entity fade metadata (1 KB, BUF_ENTITY_FADE_STATES) — always resident
- *   3. Tile merge slot table (128 B, BUF_TILE_MERGE_SLOTS) — always resident
- *   4. Decomp/phase scratch (union) — sized by largest asset needed at runtime
+ *   1. Palette fade arrays (3.5 KB, BUF_FADE_*), union with entity fade sprite
+ *   2. Entity fade metadata (1 KB, BUF_ENTITY_FADE_STATES), always resident
+ *   3. Tile merge slot table (128 B, BUF_TILE_MERGE_SLOTS), always resident
+ *   4. Decomp/phase scratch (union), sized by largest asset needed at runtime
  *
  * Peak concurrent usage by phase (after all optimizations):
  *   Overworld:   ~17 KB (palette fade + entity fade + pathfinding at 0x3000
@@ -379,7 +379,7 @@ typedef struct {
  *   Sanctuary:   ~2.3 KB (single-slot on-demand; decomp uses arrangement_buffer)
  *   Naming:      ~10 KB (relocated from 0x4000 to 0x2000)
  *   Ending:      ~10 KB transient (cast tile GFX direct to ppu.vram)
- *   Intro:       3.5 KB (palette fade only — GFX direct to ppu.vram)
+ *   Intro:       3.5 KB (palette fade only, GFX direct to ppu.vram)
  *   Game-over:   0 KB (GFX direct to ppu.vram)
  *   Map tileset: 0 KB (GFX direct to ppu.vram)
  *   PSI GFX:     0 KB (direct to ppu.vram)
@@ -397,7 +397,7 @@ typedef struct {
  * See the comment in text_load_window_gfx() for optimization notes. */
 #define BUFFER_SIZE 0x5000
 
-/* DELIVERY_PATHS — persistent path waypoint storage (C port substitute for
+/* DELIVERY_PATHS: persistent path waypoint storage (C port substitute for
  * PATHFINDING_BUFFER in WRAM). Sized to match assembly ($C00 = 3072 bytes). */
 #define DELIVERY_PATHS_SIZE 0xC00
 
@@ -407,20 +407,20 @@ typedef struct {
 #define PALETTE_UPLOAD_OBJ_ONLY 16  /* OBJ_ONLY = 2 * 8 */
 #define PALETTE_UPLOAD_FULL     24  /* FULL = 3 * 8 */
 
-/* ---- EntityRuntimeState: all entity module loose globals ---- */
+/* EntityRuntimeState: all entity module loose globals */
 typedef struct {
     /* Runtime context (mirrors ROM's zero-page / BSS work variables) */
-    int16_t current_entity_offset;   /* $88 — entity index being processed (same as slot now) */
-    int16_t current_entity_slot;     /* CURRENT_ENTITY_SLOT — same as offset after packed refactor */
-    int16_t current_script_offset;   /* $8A — script index being processed (same as slot now) */
-    int16_t current_script_slot;     /* CURRENT_SCRIPT_SLOT — same as offset after packed refactor */
+    int16_t current_entity_offset;   /* $88, entity index being processed (same as slot now) */
+    int16_t current_entity_slot;     /* CURRENT_ENTITY_SLOT, same as offset after packed refactor */
+    int16_t current_script_offset;   /* $8A, script index being processed (same as slot now) */
+    int16_t current_script_slot;     /* CURRENT_SCRIPT_SLOT, same as offset after packed refactor */
     int16_t next_active_entity;      /* NEXT_ACTIVE_ENTITY */
     int16_t actionscript_current_script; /* temp for script chain walking */
     uint16_t actionscript_state;     /* ACTIONSCRIPT_STATE: 0=running, 1=done, 2=paused */
     uint16_t disable_actionscript;   /* DISABLE_ACTIONSCRIPT */
     int16_t last_allocated_script;   /* LAST_ALLOCATED_SCRIPT */
 
-    /* BG scroll tables — indexed by BG layer (0-3), word-indexed.
+    /* BG scroll tables, indexed by BG layer (0-3), word-indexed.
      * Set by action script opcodes 0x31-0x38, zeroed by 0x3A and init. */
     int16_t entity_bg_h_offset_lo[MAX_BG_LAYERS];
     int16_t entity_bg_v_offset_lo[MAX_BG_LAYERS];
@@ -431,11 +431,11 @@ typedef struct {
     int16_t entity_bg_h_velocity_hi[MAX_BG_LAYERS];
     int16_t entity_bg_v_velocity_hi[MAX_BG_LAYERS];
 
-    /* ACTIONSCRIPT_BACKUP_X/Y — saved entity position for SAVE/RESTORE */
+    /* ACTIONSCRIPT_BACKUP_X/Y, saved entity position for SAVE/RESTORE */
     int16_t actionscript_backup_x;
     int16_t actionscript_backup_y;
 
-    /* ENTITY_CALLBACK_FLAGS_BACKUP — saved tick_callback_hi for DISABLE/RESTORE */
+    /* ENTITY_CALLBACK_FLAGS_BACKUP: saved tick_callback_hi for DISABLE/RESTORE */
     uint16_t entity_callback_flags_backup[MAX_ENTITIES];
 
     /* Pathfinding arrays */
@@ -490,7 +490,7 @@ typedef struct {
     };
 } EntityRuntimeState;
 
-/* Global entity system state (large SoA structs — kept separate) */
+/* Global entity system state (large SoA structs, kept separate) */
 extern EntitySystem entities;
 extern ScriptSystem scripts;
 extern SpritePriorityQueue sprite_priority[4];
@@ -504,7 +504,7 @@ extern EntityRuntimeState ert;
 void write_spritemap_to_oam(const uint8_t *spritemap, int16_t base_x,
                              int16_t base_y);
 
-/* --- Palette fade engine (callroutine.c) --- */
+/* Palette fade engine (callroutine.c) */
 
 /* Copy palettes[] -> buffer[0..511] (fade target setup) */
 void copy_fade_buffer_to_palettes(void);
@@ -513,7 +513,7 @@ void copy_fade_buffer_to_palettes(void);
    mask: bitmask of which 16-color groups to fade (bit 0 = group 0, etc.) */
 void prepare_palette_fade_slopes(int16_t frames, uint16_t mask);
 
-/* Advance one frame of palette fade — adds slopes, clamps, writes palettes[] */
+/* Advance one frame of palette fade, adds slopes, clamps, writes palettes[] */
 void update_map_palette_animation(void);
 
 /* Fade all 256 palette entries by a brightness level and store into buffer[0..511].
@@ -525,12 +525,12 @@ void load_palette_to_fade_buffer(uint8_t fade_style);
  * Port of FINALIZE_PALETTE_FADE (C49740). */
 void finalize_palette_fade(void);
 
-/* --- Public API --- */
+/* Public API */
 
 /* Initialize the entire entity system (INIT_ENTITY_SYSTEM, C0927C) */
 void entity_system_init(void);
 
-/* DISABLE_OTHER_ENTITY_CALLBACKS — Port of C09F43.
+/* DISABLE_OTHER_ENTITY_CALLBACKS: Port of C09F43.
  * Backs up tick_callback_hi, then disables all entities except current. */
 void disable_other_entity_callbacks(void);
 
@@ -555,7 +555,7 @@ void deactivate_entity(int16_t entity_offset);
 /* run_actionscript_frame() (blocking RUN_ACTIONSCRIPT_FRAME, pump_mode bridge)
  * deleted in the final pump_mode cutover; use run_actionscript_frame_step(). */
 
-/* Sync palettes[] to ppu.cgram — call during vblank */
+/* Sync palettes[] to ppu.cgram, call during vblank */
 void sync_palettes_to_cgram(void);
 
 /* Display animated naming sprite (DISPLAY_ANIMATED_NAMING_SPRITE) */
@@ -619,19 +619,19 @@ void setup_color_math_window(uint8_t cgadsub_val, uint8_t intensity);
  * Chains to setup_color_math_window(). */
 void setup_entity_color_math(void);
 
-/* --- Overlay system (water ripples, sweat, mushroom) --- */
+/* Overlay system (water ripples, sweat, mushroom) */
 
 /* LOAD_OVERLAY_SPRITES (C4B26B): Load overlay sprite graphics to VRAM
  * and initialize entity overlay animation state. Called during map load. */
 void load_overlay_sprites(void);
 
-/* DISPATCH_SPRITE_DRAW_BY_PRIORITY (C08C58) — queue a spritemap for OAM rendering.
+/* DISPATCH_SPRITE_DRAW_BY_PRIORITY (C08C58), queue a spritemap for OAM rendering.
  * bank: 0=title, 1=overworld, 2=overlay, 3=townmap */
 #define SMAP_BANK_TOWNMAP_ID 3
 void queue_sprite_draw(uint16_t smap_id, int16_t x, int16_t y,
                        uint16_t priority, uint16_t bank);
 
-/* RENDER_ALL_PRIORITY_SPRITES (C08B8E) — flush all priority queues to OAM. */
+/* RENDER_ALL_PRIORITY_SPRITES (C08B8E), flush all priority queues to OAM. */
 void render_all_priority_sprites(void);
 
 /* --- Entity fade state system (wipe/dissolve effects) ---
@@ -648,7 +648,7 @@ void render_all_priority_sprites(void);
  *             7=reveal-up, 8=reveal-down, 9=reveal-left, 10=reveal-right */
 void init_entity_fade_state(uint16_t entity_slot, uint16_t fade_param);
 
-/* Entity fade animation callroutines — called from EVENT_ENTITY_WIPE (859) script.
+/* Entity fade animation callroutines, called from EVENT_ENTITY_WIPE (859) script.
  * Ports of C4CB4F, C4CB8F, C4CBE3, C4CC2F, C4CD44, C4CED8. */
 void cr_clear_fade_entity_flags(void);
 void cr_update_fade_entity_sprites(void);
@@ -657,7 +657,7 @@ int16_t cr_animate_entity_tile_copy(void);
 int16_t cr_animate_entity_tile_blend(void);
 void cr_animate_entity_tile_merge(void);
 
-/* --- Floating sprites (thought bubbles, exclamation marks, etc.) --- */
+/* Floating sprites (thought bubbles, exclamation marks, etc.) */
 
 /* Load the floating sprite table from extracted binary data.
  * Call once during initialization. Returns true on success. */

@@ -2,30 +2,30 @@
  * Overworld teleport functions.
  *
  * Ported from:
- *   SETUP_TELEPORT_ENTITY_FLAGS       — asm/overworld/teleport/setup_teleport_entity_flags.asm
- *   INIT_PSI_TELEPORT_BETA            — asm/overworld/teleport/init_psi_teleport_beta.asm
- *   RESET_ENTITIES_AFTER_TELEPORT     — asm/overworld/teleport/reset_entities_after_teleport.asm
- *   RUN_TELEPORT_FAILURE_SEQUENCE     — asm/overworld/teleport/run_teleport_failure_sequence.asm
- *   UPDATE_PSI_TELEPORT_SPEED         — asm/overworld/teleport/update_psi_teleport_speed.asm
- *   RECORD_PLAYER_POSITION            — asm/overworld/record_player_position.asm
- *   SET_TELEPORT_ENTITY_SPEED_VARS    — asm/overworld/teleport/set_teleport_entity_speed_vars.asm
- *   SET_TELEPORT_VELOCITY_BY_DIRECTION — asm/overworld/teleport/set_teleport_velocity_by_direction.asm
- *   UPDATE_TELEPORT_BETA_INPUT        — asm/overworld/teleport/update_teleport_beta_input.asm
- *   CALCULATE_VELOCITY_COMPONENTS     — asm/misc/calculate_velocity_components.asm
- *   UPDATE_TELEPORT_PARTY_VISIBILITY  — asm/overworld/teleport/update_teleport_party_visibility.asm
- *   UPDATE_PARTY_ENTITY_FROM_BUFFER   — asm/overworld/party/update_party_entity_from_buffer.asm
- *   PSI_TELEPORT_ALPHA_TICK           — asm/overworld/teleport/psi_teleport_alpha_tick.asm
- *   PSI_TELEPORT_BETA_TICK            — asm/overworld/teleport/psi_teleport_beta_tick.asm
- *   PSI_TELEPORT_DECELERATE_TICK      — asm/overworld/teleport/psi_teleport_decelerate_tick.asm
- *   PSI_TELEPORT_SUCCESS_TICK         — asm/overworld/teleport/psi_teleport_success_tick.asm
- *   INIT_TELEPORT_ARRIVAL             — asm/overworld/teleport/init_teleport_arrival.asm
- *   LOAD_TELEPORT_DESTINATION         — asm/overworld/teleport/load_teleport_destination.asm
- *   INIT_TELEPORT_DEPARTURE           — asm/overworld/teleport/init_teleport_departure.asm
- *   TELEPORT_MAINLOOP                 — asm/misc/teleport_mainloop.asm
- *   GET_DIRECTION_FROM_PLAYER_TO_ENTITY — asm/overworld/get_direction_from_player_to_entity.asm
- *   GET_OPPOSITE_DIRECTION_FROM_PLAYER_TO_ENTITY — asm/overworld/get_opposite_direction_from_player_to_entity.asm
- *   CHOOSE_ENTITY_DIRECTION_TO_PLAYER — asm/overworld/entity/choose_entity_direction_to_player.asm
- *   GET_OFF_BICYCLE                   — asm/overworld/get_off_bicycle.asm
+ *   SETUP_TELEPORT_ENTITY_FLAGS: asm/overworld/teleport/setup_teleport_entity_flags.asm
+ *   INIT_PSI_TELEPORT_BETA: asm/overworld/teleport/init_psi_teleport_beta.asm
+ *   RESET_ENTITIES_AFTER_TELEPORT: asm/overworld/teleport/reset_entities_after_teleport.asm
+ *   RUN_TELEPORT_FAILURE_SEQUENCE: asm/overworld/teleport/run_teleport_failure_sequence.asm
+ *   UPDATE_PSI_TELEPORT_SPEED: asm/overworld/teleport/update_psi_teleport_speed.asm
+ *   RECORD_PLAYER_POSITION: asm/overworld/record_player_position.asm
+ *   SET_TELEPORT_ENTITY_SPEED_VARS: asm/overworld/teleport/set_teleport_entity_speed_vars.asm
+ *   SET_TELEPORT_VELOCITY_BY_DIRECTION: asm/overworld/teleport/set_teleport_velocity_by_direction.asm
+ *   UPDATE_TELEPORT_BETA_INPUT: asm/overworld/teleport/update_teleport_beta_input.asm
+ *   CALCULATE_VELOCITY_COMPONENTS: asm/misc/calculate_velocity_components.asm
+ *   UPDATE_TELEPORT_PARTY_VISIBILITY: asm/overworld/teleport/update_teleport_party_visibility.asm
+ *   UPDATE_PARTY_ENTITY_FROM_BUFFER: asm/overworld/party/update_party_entity_from_buffer.asm
+ *   PSI_TELEPORT_ALPHA_TICK: asm/overworld/teleport/psi_teleport_alpha_tick.asm
+ *   PSI_TELEPORT_BETA_TICK: asm/overworld/teleport/psi_teleport_beta_tick.asm
+ *   PSI_TELEPORT_DECELERATE_TICK: asm/overworld/teleport/psi_teleport_decelerate_tick.asm
+ *   PSI_TELEPORT_SUCCESS_TICK: asm/overworld/teleport/psi_teleport_success_tick.asm
+ *   INIT_TELEPORT_ARRIVAL: asm/overworld/teleport/init_teleport_arrival.asm
+ *   LOAD_TELEPORT_DESTINATION: asm/overworld/teleport/load_teleport_destination.asm
+ *   INIT_TELEPORT_DEPARTURE: asm/overworld/teleport/init_teleport_departure.asm
+ *   TELEPORT_MAINLOOP: asm/misc/teleport_mainloop.asm
+ *   GET_DIRECTION_FROM_PLAYER_TO_ENTITY: asm/overworld/get_direction_from_player_to_entity.asm
+ *   GET_OPPOSITE_DIRECTION_FROM_PLAYER_TO_ENTITY: asm/overworld/get_opposite_direction_from_player_to_entity.asm
+ *   CHOOSE_ENTITY_DIRECTION_TO_PLAYER: asm/overworld/entity/choose_entity_direction_to_player.asm
+ *   GET_OFF_BICYCLE: asm/overworld/get_off_bicycle.asm
  */
 
 #include "game/overworld_internal.h"
@@ -204,7 +204,7 @@ static void update_psi_teleport_speed(uint16_t direction) {
     case 5: /* DOWN_LEFT: Y=+speed, X=-speed */
         ow.psi_teleport_speed_x = -ow.psi_teleport_speed_x;
         break;
-    case 3: /* DOWN_RIGHT: Y=+speed, X=+speed — no changes needed */
+    case 3: /* DOWN_RIGHT: Y=+speed, X=+speed, no changes needed */
         break;
     }
 }
@@ -641,7 +641,7 @@ void psi_teleport_success_tick(int16_t entity_offset) {
  * For INSTANT style: complete no-op (early return → false, no fade-wait).
  * For other styles: disables collision on entities 24+, zeroes speed vars,
  * sets PSI_TELEPORT_SUCCESS_TICK callback, fades out, and returns true to signal a
- * pending fade-wait — the former trailing run_frames_until_fade_done() is now a
+ * pending fade-wait, the former trailing run_frames_until_fade_done() is now a
  * STEP_PUSH of GAME_MODE_FADE_WAIT by mode_step_teleport (TP_ARRIVE). */
 static bool init_teleport_arrival_setup(void) {
     if (ow.psi_teleport_style == TELEPORT_STYLE_INSTANT)
@@ -738,7 +738,7 @@ static void load_teleport_destination(void) {
  *
  * The blocking teleport_mainloop() pump bridge was deleted (D4b); its only
  * callers (the post-battle PSI-teleport checks in GAME_MODE_BATTLE_ENTRY /
- * GAME_MODE_BATTLE_SCRIPTED — the overworld root already STEP_PUSHed in D1)
+ * GAME_MODE_BATTLE_SCRIPTED: the overworld root already STEP_PUSHed in D1)
  * STEP_PUSH GAME_MODE_TELEPORT directly. */
 
 /* ---- GAME_MODE_TELEPORT step (run-to-completion port of TELEPORT_MAINLOOP) ----
@@ -780,7 +780,7 @@ StepResult mode_step_teleport(ModeState *st) {
                                          0xC0E3C1); /* UPDATE_PARTY_ENTITY_FROM_BUFFER */
                 break;
             case TELEPORT_STYLE_INSTANT:
-                /* Skip tick callbacks entirely — go straight to arrived state */
+                /* Skip tick callbacks entirely, go straight to arrived state */
                 ow.psi_teleport_state = 1;
                 break;
             case TELEPORT_STYLE_PSI_BETTER:
@@ -814,9 +814,9 @@ StepResult mode_step_teleport(ModeState *st) {
                 } else {
                     ts->phase = TP_CLEANUP;
                 }
-                continue;  /* no yield — fall to the chosen phase */
+                continue;  /* no yield, fall to the chosen phase */
             }
-            /* Animation frame: a SINGLE render per yield (assembly loop body —
+            /* Animation frame: a SINGLE render per yield (assembly loop body, 
              * the prior blocking C added a redundant render_frame_tick here). A
              * parked actionscript frame STEP_PUSHes ACTIONSCRIPT_FRAME and the
              * post-render work runs at TP_LOOP_FLUSH on its pop. */
@@ -866,7 +866,7 @@ StepResult mode_step_teleport(ModeState *st) {
 
         case TP_DEPART_SETUP: {
             /* Non-INSTANT departure setup (init_teleport_departure.asm lines 50-71):
-             * synchronous, no yield — falls straight to the 30-frame wait. */
+             * synchronous, no yield, falls straight to the 30-frame wait. */
             for (int i = 0; i < TOTAL_PARTY_COUNT; i++) {
                 int char_slot = i + PARTY_LEADER_ENTITY_INDEX;
                 party_characters[i].previous_walking_style = (uint16_t)-1;
@@ -909,7 +909,7 @@ StepResult mode_step_teleport(ModeState *st) {
 
         case TP_DEPART_ANIM:
             /* Animate until speed reaches 0 (asm 84-91: OAM_CLEAR; RUN_ACTIONSCRIPT_FRAME;
-             * UPDATE_SCREEN; WAIT_UNTIL_NEXT_FRAME — exactly ONE render per frame). A
+             * UPDATE_SCREEN; WAIT_UNTIL_NEXT_FRAME, exactly ONE render per frame). A
              * parked actionscript frame STEP_PUSHes ACTIONSCRIPT_FRAME and the post-render
              * update_screen runs at TP_DEPART_ANIM_FLUSH on its pop. */
             if ((ow.psi_teleport_speed >> 16) == 0) {

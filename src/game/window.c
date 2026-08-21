@@ -41,7 +41,7 @@ static const uint16_t window_configs[][4] = {
      * build_command_menu() in text.c) as a 4th row. sm_handle_input()'s
      * cursor-search bound is (height-2)/2 rows, so 8 tiles caps navigation
      * at 3 rows (0-2); 10 tiles allows the 4th row (y=3) to be reachable.
-     * Deliberate deviation from WINDOW_CONFIGURATION_TABLE -- not a porting
+     * Deliberate deviation from WINDOW_CONFIGURATION_TABLE, not a porting
      * guess, a new feature. */
     [0x00] = {  1 + WINDOW_X_NUDGE,  1, 13, 12 },  /* Command menu (Talk to, Goods, PSI, ..., Save, Config, Quit) */
     [0x01] = { 12,  1, 19,  8 },  /* Out-of-battle text / PSI ability list */
@@ -67,11 +67,11 @@ static const uint16_t window_configs[][4] = {
      * save slots, and conditionally a "Check for Updates" row below that
      * when a self-update backend is available. sm_handle_input()'s
      * cursor-search bound is (height-2)/2 rows, so 8 tiles caps navigation
-     * at 3 rows (0-2), 10 at 4 rows (0-3) -- same reasoning as the Command
+     * at 3 rows (0-2), 10 at 4 rows (0-3), same reasoning as the Command
      * Menu's own 8->10/12 height bumps this session, applied here for the
      * same reason. Harmless on builds where the Check for Updates row is
      * never added (an unreachable extra row of blank space, not a visible
-     * gap -- the window's own content never grows to fill it). */
+     * gap, the window's own content never grows to fill it). */
     [0x13] = {  1,  2, 30, 12 },  /* File Select */
     [0x14] = {  5,  9, 22,  4 },  /* Overworld Menu */
     [0x15] = { 10, 16, 12,  8 },  /* Copy Menu (2 choices) */
@@ -106,30 +106,30 @@ static const uint16_t window_configs[][4] = {
     [0x32] = { 14, 11, 15, 16 },  /* Flavour selection */
     [0x33] = { 22,  8,  9,  4 },  /* Single character select */
     [0x34] = {  7,  9, 18, 18 },  /* Debug menu (US only) */
-    /* Settings menu -- this port's own addition (WINDOW_SETTINGS_MENU,
+    /* Settings menu, this port's own addition (WINDOW_SETTINGS_MENU,
      * window.h), not from WINDOW_CONFIGURATION_TABLE. Same rect as 0x01
-     * (Text standard) -- a screen position already proven not to collide
+     * (Text standard), a screen position already proven not to collide
      * with the command menu it's opened from (0x00 occupies roughly
      * x=1..14, y=1..11; this starts at x=12 like the text window always
      * has). Height 14 = 6 content rows (Sprint Speed, HQ Audio, Alt
-     * Controls, Alternative Visuals, Logging, Auto Save -- briefly 16/7
+     * Controls, Alternative Visuals, Logging, Auto Save, briefly 16/7
      * rows when Bloom/Depth of Field/Light Shafts/Color Grading were each
      * their own row, before the latter three were folded into one
      * "Experimental Visuals" toggle and Bloom was removed; bumped from 12
-     * to 14 when Auto Save was added as a 6th row -- sm_handle_input()'s
+     * to 14 when Auto Save was added as a 6th row, sm_handle_input()'s
      * cursor bound is (height-2)/2 rows, same formula noted on
      * WINDOW_QUIT_CONFIRM below). */
     [WINDOW_SETTINGS_MENU] = { 12, 1, 19, 14 },
-    /* Self-update screen -- this port's own addition (WINDOW_UPDATE_CHECK,
+    /* Self-update screen, this port's own addition (WINDOW_UPDATE_CHECK,
      * window.h). Opened as a child over the file-select main window (0x13,
      * {1,2,30,8}) the same way file-select's own Text Speed (0x18) and
      * Music Mode (0x19) cascades already sit lower on screen rather than
-     * avoiding the parent window's rect entirely -- proven fine visually
+     * avoiding the parent window's rect entirely, proven fine visually
      * since only one window is ever the active input focus at a time.
      * Wide enough (24 tiles) to fit a release-version line without wrapping. */
     [WINDOW_UPDATE_CHECK] = { 4, 13, 24, 10 },
     /* "Really quit?" confirmation, and its follow-up "Quit how?" prompt
-     * (Close Game / Title Screen) -- this port's own addition, opened over
+     * (Close Game / Title Screen), this port's own addition, opened over
      * the Command Menu (0x00, roughly x=1..14, y=1..13 at its current
      * height-12 size). Positioned low/right of it, same reasoning as
      * WINDOW_SETTINGS_MENU's placement relative to its own parent. Height
@@ -143,9 +143,9 @@ static const uint16_t window_configs[][4] = {
      * two rows sit at text_y=2/3 (row 0 message, row 1 blank). Height 8
      * would cap navigation at rows 0-2, one short of row 3. */
     [WINDOW_QUIT_CONFIRM] = { 14, 14, 16, 10 },
-    /* Key Items pool browser -- this port's own addition (WINDOW_KEY_ITEMS,
+    /* Key Items pool browser, this port's own addition (WINDOW_KEY_ITEMS,
      * window.h), Key Items pool feature. Same rect as WINDOW_INVENTORY
-     * (0x02) / WINDOW_ESCARGO_EXPRESS_ITEM (0x0D) -- never open at the same
+     * (0x02) / WINDOW_ESCARGO_EXPRESS_ITEM (0x0D), never open at the same
      * time as either, so no collision. */
     [WINDOW_KEY_ITEMS] = { 7, 1, 24, 16 },
 };
@@ -226,7 +226,7 @@ WindowInfo *create_window(uint16_t window_id) {
     }
 
     if (!w) {
-        /* New window — allocate slot and load configuration */
+        /* New window, allocate slot and load configuration */
         if (slot < 0) return NULL; /* no free slots */
 
         w = &win.windows[slot];
@@ -249,7 +249,7 @@ WindowInfo *create_window(uint16_t window_id) {
          * lines 67-116). WINDOW::CARRIED_MONEY (id 10) links before the head so it
          * always draws at the bottom; every other window appends at the tail so the
          * newest window draws on top. The render walks head→tail, so z-order follows
-         * insertion order, not the slot index — this is what makes a window created
+         * insertion order, not the slot index, this is what makes a window created
          * into a reused (lower) slot still appear above older windows. */
         if (window_id == WINDOW_CARRIED_MONEY) {
             w->prev = -1;
@@ -270,7 +270,7 @@ WindowInfo *create_window(uint16_t window_id) {
         }
     }
 
-    /* Reinitialize window state — shared path for both new and existing windows.
+    /* Reinitialize window state, shared path for both new and existing windows.
      * Assembly (create_window.asm @UNKNOWN8): always resets text cursor, font,
      * tile attributes, menu state, tilemap ert.buffer, and cursor_move_callback,
      * even when the window was already open. */
@@ -298,14 +298,14 @@ WindowInfo *create_window(uint16_t window_id) {
             free_tile_safe(w->content_tilemap[i]);
     }
 
-    /* (Re)allocate from shared pool — size may change if window was reopened
+    /* (Re)allocate from shared pool, size may change if window was reopened
      * with different dimensions (unlikely but safe). */
     uint16_t needed = (w->width - 2) * (w->height - 2);
     if (needed > WINDOW_TILEMAP_MAX) needed = WINDOW_TILEMAP_MAX;
     if (!w->content_tilemap || w->content_tilemap_size != needed) {
         tilemap_pool_free(w);
         w->content_tilemap = tilemap_pool_alloc(needed);
-        assert(w->content_tilemap && "tilemap pool exhausted — increase WINDOW_TILEMAP_POOL_SIZE");
+        assert(w->content_tilemap && "tilemap pool exhausted, increase WINDOW_TILEMAP_POOL_SIZE");
         w->content_tilemap_size = needed;
         /* Keep the serializable pool offset in sync with the ptr (savestate D0b). */
         w->content_tilemap_offset = (uint16_t)(w->content_tilemap - win.tilemap_pool);
@@ -426,7 +426,7 @@ void close_all_windows(void) {
      * WINDOW_TICK becomes a no-actionscript render (like
      * window_tick_without_instant_printing): close_all_windows is a synchronous
      * helper called from many mode-steps, each of which advances entities and
-     * renders afterward — a nested run_actionscript_frame here would pump or,
+     * renders afterward, a nested run_actionscript_frame here would pump or,
      * parked, freeze entities. The cleared bg2 is still uploaded to VRAM. */
     clear_instant_printing();
     window_tick_no_actionscript();
@@ -457,7 +457,7 @@ WindowInfo *get_window(uint16_t window_id) {
     return NULL;
 }
 
-/* SET_WINDOW_FOCUS — Port of asm/text/set_window_focus.asm. */
+/* SET_WINDOW_FOCUS: Port of asm/text/set_window_focus.asm. */
 void set_window_focus(uint16_t window_id) {
     win.current_focus_window = window_id;
 }
@@ -526,7 +526,7 @@ void add_menu_item(const char *label, uint16_t userdata, uint16_t text_x, uint16
 }
 
 /*
- * ADD_MENU_ITEM_NO_POSITION — Port of asm/text/menu/add_menu_item_no_position.asm.
+ * ADD_MENU_ITEM_NO_POSITION: Port of asm/text/menu/add_menu_item_no_position.asm.
  *
  * Adds a menu item with auto-computed position. The actual text_x/text_y
  * are set later by open_window_and_print_menu() (LAYOUT_MENU_OPTIONS).
@@ -547,7 +547,7 @@ void add_menu_item_no_position(const char *label, uint16_t userdata) {
 }
 
 /*
- * PRINT_MENU_ITEMS — Port of asm/text/print_menu_items.asm.
+ * PRINT_MENU_ITEMS: Port of asm/text/print_menu_items.asm.
  *
  * Iterates the focus window's menu items and prints each label
  * at its pre-set text_x/text_y position. Used when items have explicit
@@ -557,14 +557,14 @@ void add_menu_item_no_position(const char *label, uint16_t userdata) {
  * for each option, and calls PRINT_TEXT_IN_WINDOW. C port: iterates the
  * menu_items array and calls print_string().
  */
-/* CLEAR_FOCUS_WINDOW_MENU_OPTIONS — Port of asm/text/window/clear_focus_window_menu_options.asm.
+/* CLEAR_FOCUS_WINDOW_MENU_OPTIONS: Port of asm/text/window/clear_focus_window_menu_options.asm.
  * Resets the menu item count of the focus window to 0. */
 void clear_focus_window_menu_options(void) {
     WindowInfo *w = get_window(win.current_focus_window);
     if (w) w->menu_count = 0;
 }
 
-/* GET_WINDOW_MENU_OPTION_COUNT — Port of asm/text/window/get_window_menu_option_count.asm.
+/* GET_WINDOW_MENU_OPTION_COUNT: Port of asm/text/window/get_window_menu_option_count.asm.
  * Returns the number of menu items in the given window. */
 uint16_t get_window_menu_option_count(uint16_t window_id) {
     WindowInfo *w = get_window(window_id);
@@ -601,7 +601,7 @@ void print_menu_items(void) {
 }
 
 /*
- * OPEN_WINDOW_AND_PRINT_MENU — Port of asm/text/window/open_window_and_print_menu.asm.
+ * OPEN_WINDOW_AND_PRINT_MENU: Port of asm/text/window/open_window_and_print_menu.asm.
  *
  * Assembly calls LAYOUT_MENU_OPTIONS (C451FA.asm) which is a complex
  * layout engine. It arranges menu items into columns/rows based on
@@ -633,7 +633,7 @@ void open_window_and_print_menu(uint16_t columns, uint16_t start_index) {
     bool needs_pagination = (rows_needed > max_rows);
 
     /* If paginated, assembly (layout_menu_options.asm lines 170-173) does
-     * DEX;DEX — reduces rows_per_page by 2 from max_rows, reserving
+     * DEX;DEX, reduces rows_per_page by 2 from max_rows, reserving
      * the last row for the overflow indicator with one blank row gap. */
     uint16_t rows_per_page = needs_pagination ? (max_rows - 2) : max_rows;
     uint16_t items_per_page = rows_per_page * columns;
@@ -686,7 +686,7 @@ void open_window_and_print_menu(uint16_t columns, uint16_t start_index) {
     print_menu_items();
 }
 
-/* LAYOUT_AND_PRINT_MENU_AT_SELECTION — Port of asm/text/menu/layout_and_print_menu_at_selection.asm (59 lines).
+/* LAYOUT_AND_PRINT_MENU_AT_SELECTION: Port of asm/text/menu/layout_and_print_menu_at_selection.asm (59 lines).
  *
  * Like open_window_and_print_menu, but also sets the initial cursor
  * position to `initial_selection` (0-based index into menu items).
@@ -726,7 +726,7 @@ void layout_and_print_menu_at_selection(uint16_t columns, uint16_t start_index,
 /* menu_backup_* now in WindowSystemState win. */
 
 /*
- * BACKUP_SELECTED_MENU_OPTION — Port of asm/misc/backup_selected_menu_option.asm.
+ * BACKUP_SELECTED_MENU_OPTION: Port of asm/misc/backup_selected_menu_option.asm.
  *
  * Saves the current focus window's cursor state so the menu can be
  * restored to the same position later. Used by the Goods menu to
@@ -741,7 +741,7 @@ void backup_selected_menu_option(void) {
      * its split-field model equals the chosen option's absolute index. In the
      * C model the confirm path sets BOTH fields to the absolute index
      * (mode_step_selection_menu: w->selected_option = w->current_option), so
-     * summing them double-counts and captures the WRONG item's position —
+     * summing them double-counts and captures the WRONG item's position, 
      * sm_setup's restore then writes that position onto the chosen item,
      * corrupting its cursor/navigation coordinates (Goods → Help! left the
      * rebuilt inventory with a misplaced cursor and unreachable items). */
@@ -755,7 +755,7 @@ void backup_selected_menu_option(void) {
 }
 
 /*
- * DISPLAY_MENU_HEADER_TEXT — Port of asm/text/menu/display_menu_header_text.asm.
+ * DISPLAY_MENU_HEADER_TEXT: Port of asm/text/menu/display_menu_header_text.asm.
  *
  * Saves text attributes, creates WINDOW::TARGETING_PROMPT, prints
  * a targeting prompt from MISC_TARGET_TEXT, then restores attributes.
@@ -776,7 +776,7 @@ void display_menu_header_text(uint16_t text_index) {
 }
 
 /*
- * CLOSE_MENU_HEADER_WINDOW — Port of asm/text/window/close_menu_header_window.asm.
+ * CLOSE_MENU_HEADER_WINDOW: Port of asm/text/window/close_menu_header_window.asm.
  *
  * Closes the WINDOW::TARGETING_PROMPT targeting prompt window.
  */
@@ -928,10 +928,10 @@ void render_all_windows(void) {
     }
 }
 
-/* ---- Tile-level rendering (WRITE_TILE_TO_WINDOW chain) ---- */
+/* Tile-level rendering (WRITE_TILE_TO_WINDOW chain) */
 
 /*
- * WRITE_TILE_TO_WINDOW — Port of asm/text/window/write_tile_to_window.asm (150 lines).
+ * WRITE_TILE_TO_WINDOW: Port of asm/text/window/write_tile_to_window.asm (150 lines).
  *
  * Writes a single tile code (16px tall = 2 stacked 8x8 tiles) to the
  * focus window's tilemap at the current text_x, text_y position, then
@@ -1024,7 +1024,7 @@ static void write_tile_to_window(uint16_t window_id, uint16_t tile_code,
 }
 
 /*
- * SET_WINDOW_TILE_ATTRIBUTE — Port of asm/text/window/set_window_tile_attribute.asm.
+ * SET_WINDOW_TILE_ATTRIBUTE: Port of asm/text/window/set_window_tile_attribute.asm.
  *
  * Calls write_tile_to_window with the focus window's curr_tile_attributes.
  */
@@ -1035,7 +1035,7 @@ static void set_window_tile_attribute(uint16_t tile_code) {
 }
 
 /*
- * SET_TILE_ATTRIBUTE_AND_REDRAW — Port of asm/text/set_tile_attribute_and_redraw.asm.
+ * SET_TILE_ATTRIBUTE_AND_REDRAW: Port of asm/text/set_tile_attribute_and_redraw.asm.
  *
  * Calls set_window_tile_attribute, then flags ow.redraw_all_windows if the
  * focus window is not the topmost (tail) window.
@@ -1048,7 +1048,7 @@ static void set_tile_attribute_and_redraw(uint16_t tile_code) {
 }
 
 /*
- * SET_WINDOW_PALETTE_INDEX — Port of asm/text/window/set_window_palette_index.asm.
+ * SET_WINDOW_PALETTE_INDEX: Port of asm/text/window/set_window_palette_index.asm.
  *
  * Sets curr_tile_attributes = palette_index * 1024 on the current focus window.
  * (1024 = 0x0400 = shift palette bits 10-12 by 10 positions in SNES tilemap).
@@ -1060,7 +1060,7 @@ void set_window_palette_index(uint16_t palette_index) {
 }
 
 /*
- * SET_FILE_SELECT_TEXT_HIGHLIGHT — Port of asm/text/set_file_select_text_highlight.asm.
+ * SET_FILE_SELECT_TEXT_HIGHLIGHT: Port of asm/text/set_file_select_text_highlight.asm.
  *
  * Modifies tilemap attribute bits for a menu item's label text to apply
  * or clear a highlight palette. Assembly walks content_tilemap entries at
@@ -1107,7 +1107,7 @@ void highlight_menu_item(WindowInfo *w, uint16_t item_index, uint16_t palette, b
 }
 
 /*
- * PRINT_CHAR_WITH_SOUND — Port of asm/text/print_char_with_sound.asm.
+ * PRINT_CHAR_WITH_SOUND: Port of asm/text/print_char_with_sound.asm.
  *
  * Writes a single tile-level character to the focus window with optional
  * sound effect and text speed delay.
@@ -1171,12 +1171,12 @@ void print_char_with_sound(uint16_t tile_code) {
      * WINDOW_TICK frames here. The only non-instant caller is DISPLAY_TEXT's
      * VWF path (vwf_render_character) for the rare direct-tile chars
      * (0x20/0x2F/EQUIPPED), and DT_RUN already runs its own per-char DT_DELAY
-     * for that same byte — so this loop was a redundant second delay (and a
+     * for that same byte, so this loop was a redundant second delay (and a
      * nested pump). Every other caller prints with instant_printing set. The
      * char is already written above; no delay/render is needed here. */
 }
 
-/* ---- Window Border Animation ---- */
+/* Window Border Animation */
 
 /* WINDOW_BORDER_ANIM_TILES data: loaded from "data/window_border_anim_tiles.bin".
  * ROW1 (offset 0, 20 bytes): 9 tiles + null terminator (0x130-0x138, 0x0000)
@@ -1202,7 +1202,7 @@ static void load_border_anim_tiles(void) {
 }
 
 /*
- * GAME_MODE_WINDOW_BORDER_ANIM — run-to-completion port of the blocking window
+ * GAME_MODE_WINDOW_BORDER_ANIM: run-to-completion port of the blocking window
  * border-flash effect.  Replaces animate_window_border() (mode 1) and
  * animate_window_border_with_hppp() (mode 2), formerly reached via
  * dispatch_window_border_animation() from CC_1C_08 (display_text_cc.c).
@@ -1210,7 +1210,7 @@ static void load_border_anim_tiles(void) {
  * mode 1 (animate_window_border.asm): SET_WINDOW_PALETTE_INDEX(3), step through
  *   the NUL-terminated ROW1 tiles one SET_TILE_ATTRIBUTE_AND_REDRAW + WINDOW_TICK
  *   each, then SET_WINDOW_PALETTE_INDEX(0).
- * mode 2 (animate_window_border_with_hppp.asm): like mode 1 but with ROW2 tiles —
+ * mode 2 (animate_window_border_with_hppp.asm): like mode 1 but with ROW2 tiles, 
  *   the first 4 tiles, then 8 UPDATE_HPPP_METER_AND_RENDER frames (so the HP/PP
  *   roller advances mid-animation), then the last 5 tiles.
  *
@@ -1323,7 +1323,7 @@ StepResult mode_step_window_border_anim(ModeState *ms) {
 #define CURSOR_TOGGLE_FRAMES 10
 
 /*
- * has_menu_item_at — Check if a selectable menu item exists at (x, y)
+ * has_menu_item_at, Check if a selectable menu item exists at (x, y)
  * on the current page.  Replaces GET_MENU_TILE_AT_POSITION tilemap scan.
  */
 static bool has_menu_item_at(WindowInfo *w, int16_t x, int16_t y) {
@@ -1338,7 +1338,7 @@ static bool has_menu_item_at(WindowInfo *w, int16_t x, int16_t y) {
 }
 
 /*
- * find_next_menu_option — Port of FIND_NEXT_MENU_OPTION
+ * find_next_menu_option, Port of FIND_NEXT_MENU_OPTION
  * (asm/battle/find_next_menu_option.asm).
  *
  * Two search modes based on delta_y:
@@ -1355,7 +1355,7 @@ static int16_t find_next_menu_option(WindowInfo *w, int16_t start_x, int16_t sta
     int16_t max_rows  = (int16_t)((w->height - 2) / 2);
 
     if (delta_y == 0) {
-        /* --- Horizontal search (LEFT / RIGHT) --- */
+        /* Horizontal search (LEFT / RIGHT) */
         /* Phase 1: same row */
         int16_t cx = start_x + direction;
         while ((uint16_t)cx < (uint16_t)content_w) {
@@ -1386,7 +1386,7 @@ static int16_t find_next_menu_option(WindowInfo *w, int16_t start_x, int16_t sta
             cx += direction;
         }
     } else {
-        /* --- Vertical search (UP / DOWN) --- */
+        /* Vertical search (UP / DOWN) */
         /* Phase 1: same column */
         int16_t cy = start_y + delta_y;
         while ((uint16_t)cy < (uint16_t)max_rows) {
@@ -1421,7 +1421,7 @@ static int16_t find_next_menu_option(WindowInfo *w, int16_t start_x, int16_t sta
 }
 
 /*
- * move_cursor — Port of MOVE_CURSOR (asm/text/move_cursor.asm).
+ * move_cursor, Port of MOVE_CURSOR (asm/text/move_cursor.asm).
  * Tries find_next_menu_option from current position; on failure retries
  * from wrap coordinates and validates the result stays on the same
  * row (horizontal) or column (vertical).
@@ -1453,7 +1453,7 @@ static int16_t move_cursor(WindowInfo *w,
 }
 
 /*
- * resolve_cursor_move — Map a packed (y << 8 | x) position back to a
+ * resolve_cursor_move, Map a packed (y << 8 | x) position back to a
  * menu_items[] index on the current page.  Port of @PROCESS_CURSOR_MOVE
  * in selection_menu.asm (lines 573-634).
  */
@@ -1525,7 +1525,7 @@ void request_cursor_move_text(uint32_t addr) {
 
 /* Consume a pending cursor-callback text request as a GAME_MODE_DISPLAY_TEXT push.
  * Returns CONTINUE (the caller's resume phase then finishes the menu) if the address
- * is unresolvable — matching the old blocking display_text_from_addr's warn+no-op. */
+ * is unresolvable, matching the old blocking display_text_from_addr's warn+no-op. */
 static StepResult sm_push_pending_text(void) {
     static ModeState init;   /* outlives this dispatch (the pump copies it) */
     uint32_t addr = sm_pending_cursor_text;
@@ -1538,7 +1538,7 @@ static StepResult sm_push_pending_text(void) {
 
 /* SM_SETUP first half (assembly lines 38-176): restore persisted selection, clear
  * the previous highlight, run the initial hover script + cursor_move_callback.
- * Returns true if the callback requested deferred (yielding) text — the caller then
+ * Returns true if the callback requested deferred (yielding) text, the caller then
  * STEP_PUSHes GAME_MODE_DISPLAY_TEXT and finishes via sm_setup_finish() on resume.
  * Non-yielding. */
 static bool sm_setup_pre(WindowInfo *w) {
@@ -1557,7 +1557,7 @@ static bool sm_setup_pre(WindowInfo *w) {
             w->selected_option = win.menu_backup_selected_option;
         /* Restore text_x/text_y for the current item (lines 162-170).
          * SETUP_MENU_OPTION_VWF clears restore_menu_backup (line 44 in
-         * setup_menu_option_vwf.asm) — mirror that by clearing it here. */
+         * setup_menu_option_vwf.asm), mirror that by clearing it here. */
         uint16_t cur = w->current_option;
         if (cur < w->menu_count) {
             w->menu_items[cur].text_x = (uint8_t)win.menu_backup_text_x;
@@ -1623,7 +1623,7 @@ static StepResult sm_setup_finish(WindowInfo *w, SelectionMenuState *st) {
     if (w->cursor_move_callback && w->current_option < w->menu_count)
         set_window_focus(w->id);
 
-    /* Assembly line 186: JSL WINDOW_TICK — render all windows, upload bg2_buffer
+    /* Assembly line 186: JSL WINDOW_TICK, render all windows, upload bg2_buffer
      * to VRAM, run one full frame. On a parked actionscript callroutine, push it
      * and finish the cursor init at the SMF_SETUP flush. */
     clear_instant_printing();
@@ -1751,7 +1751,7 @@ static StepResult sm_handle_input(WindowInfo *w, SelectionMenuState *st, bool *h
         MenuItem *sel = &w->menu_items[w->current_option];
 
         /* Assembly (selection_menu.asm lines 430-537): if the selected item has
-         * page==0, it's the overflow indicator — flip to the next page instead
+         * page==0, it's the overflow indicator, flip to the next page instead
          * of returning a selection. In assembly, LAYOUT_MENU_OPTIONS always sets
          * page>=1 for real items before SELECTION_MENU runs, so page==0
          * unambiguously identifies the overflow indicator. Detect active
@@ -1823,7 +1823,7 @@ static StepResult sm_handle_input(WindowInfo *w, SelectionMenuState *st, bool *h
 
     /* Assembly @FRAME_WAIT_CHECK (line 569-572): increment the frame counter; if
      * it reaches CURSOR_TOGGLE_FRAMES, request a cursor blink on the next draw.
-     * No actionable input — fall through to the render half of this step. */
+     * No actionable input, fall through to the render half of this step. */
     st->frame_counter++;
     if (st->frame_counter >= CURSOR_TOGGLE_FRAMES)
         st->redraw_cursor = 1;
@@ -1832,7 +1832,7 @@ static StepResult sm_handle_input(WindowInfo *w, SelectionMenuState *st, bool *h
 }
 
 /*
- * GAME_MODE_SELECTION_MENU step — run-to-completion port of selection_menu().
+ * GAME_MODE_SELECTION_MENU step, run-to-completion port of selection_menu().
  * One step == one rendered frame; the single yield is owned by the pump (today)
  * / the root loop (after cutover). See SelectionMenuState in mode_stack.h for the
  * phase machine and the `primed` frame-timing scheme.
@@ -1842,7 +1842,7 @@ StepResult mode_step_selection_menu(ModeState *ms) {
 
     /* Resuming after a deferred cursor-callback text push: the pushed DISPLAY_TEXT
      * left focus on its own (menu-less) window, so restore focus to the menu window
-     * BEFORE deriving w — otherwise the early-out below would POP and close the menu. */
+     * BEFORE deriving w, otherwise the early-out below would POP and close the menu. */
     if (st->phase == SM_SETUP_RESUME || st->phase == SM_MOVE_RESUME || st->sm_flush)
         set_window_focus(st->menu_window);
 
@@ -1958,14 +1958,14 @@ StepResult mode_step_selection_menu(ModeState *ms) {
  * The null/empty-menu early-out (return 0 without a push) is replicated inline
  * at each push site. */
 
-/* ---- BG2 Buffer (Text Layer Tilemap Shadow) ---- */
+/* BG2 Buffer (Text Layer Tilemap Shadow) */
 
 /* win.bg2_buffer, win.hppp_window_buffer, win.hppp_window_digit_buffer,
  * win.hppp_meter_area_needs_update, win.upload_hppp_meter_tiles
  * now live in WindowSystemState win (see window.h). */
 
 /*
- * CLEAR_HPPP_WINDOW_HEADER — Port of asm/battle/clear_hppp_window_header.asm.
+ * CLEAR_HPPP_WINDOW_HEADER: Port of asm/battle/clear_hppp_window_header.asm.
  * Clears 4 × 16-bit tilemap entries at the HPPP window header position in BG2_BUFFER.
  * Offset formula: ((ACTIVE_HPPP_WINDOW_Y_OFFSET * 32) - 6) * 2
  *   = ((18 * 32) - 6) * 2 = (576 - 6) * 2 = 570 * 2 = 0x474
@@ -1976,7 +1976,7 @@ void clear_hppp_window_header(void) {
 }
 
 /*
- * RENDER_HPPP_WINDOW_HEADER — Port of asm/battle/render_hppp_window_header.asm.
+ * RENDER_HPPP_WINDOW_HEADER: Port of asm/battle/render_hppp_window_header.asm.
  * Copies 4 header tile entries from HPPP_WINDOW_HEADER_TILES into BG2_BUFFER.
  * Data from asm/data/unknown/C3E40E.asm: $3A69, $3A6A, $3A6B, $3A6C
  */
@@ -1987,7 +1987,7 @@ void render_hppp_window_header(void) {
 }
 
 /*
- * COPY_HPPP_WINDOW_TO_VRAM — Port of asm/text/hp_pp_window/copy_hppp_window_to_vram.asm.
+ * COPY_HPPP_WINDOW_TO_VRAM: Port of asm/text/hp_pp_window/copy_hppp_window_to_vram.asm.
  * Transfers the HPPP window rows from BG2_BUFFER to VRAM.
  * Assembly: COPY_TO_VRAM2 BG2_BUFFER + (Y_OFFSET * 32) * 2,
  *           VRAM::TEXT_LAYER_TILEMAP + TILEMAP_COORDS(0, Y_OFFSET), $240, 0
@@ -2002,7 +2002,7 @@ void copy_hppp_window_to_vram(void) {
 }
 
 /*
- * UPLOAD_BATTLE_SCREEN_TO_VRAM — Port of asm/battle/upload_battle_screen_to_vram.asm.
+ * UPLOAD_BATTLE_SCREEN_TO_VRAM: Port of asm/battle/upload_battle_screen_to_vram.asm.
  *
  * Assembly:
  *   COPY_TO_VRAM2 BG2_BUFFER, $7C00, $700, $00
@@ -2044,7 +2044,7 @@ static uint16_t calc_character_indicator_x_offset(int16_t char_id) {
 }
 
 /*
- * SELECT_BATTLE_MENU_CHARACTER — Port of asm/battle/select_battle_menu_character.asm.
+ * SELECT_BATTLE_MENU_CHARACTER: Port of asm/battle/select_battle_menu_character.asm.
  *
  * Clears the previous character indicator (if any), then writes 7 zero
  * tilemap entries on the row below the HPPP window (row Y_OFFSET + HEIGHT)
@@ -2069,7 +2069,7 @@ void select_battle_menu_character(uint16_t party_slot) {
      * tilemap write; the C port writes bg2_buffer synchronously and the enclosing
      * menu (battle command / char-select / equip) renders the indicator on its
      * own next frame, so the render is dropped. This keeps the function a pure
-     * non-yielding draw — no nested pump and no run_actionscript_frame in a context
+     * non-yielding draw, no nested pump and no run_actionscript_frame in a context
      * (overworld equip menu) where it could park and freeze entities. The marker
      * appears one frame earlier (imperceptible). */
     uint16_t row_offset = ((ACTIVE_HPPP_WINDOW_Y_OFFSET + HPPP_WINDOW_HEIGHT) * 32) * 2;
@@ -2082,7 +2082,7 @@ void select_battle_menu_character(uint16_t party_slot) {
 }
 
 /*
- * CLEAR_BATTLE_MENU_CHARACTER_INDICATOR — Port of asm/text/clear_battle_menu_character_indicator.asm.
+ * CLEAR_BATTLE_MENU_CHARACTER_INDICATOR: Port of asm/text/clear_battle_menu_character_indicator.asm.
  *
  * If a character indicator is active, waits one frame, then clears 7
  * tilemap entries at the top of the HPPP window (row Y_OFFSET) at the
@@ -2100,7 +2100,7 @@ void clear_battle_menu_character_indicator(void) {
         return;
     }
 
-    /* WAIT_UNTIL_NEXT_FRAME dropped — see select_battle_menu_character: a pure
+    /* WAIT_UNTIL_NEXT_FRAME dropped, see select_battle_menu_character: a pure
      * synchronous buffer write, shown by the caller's next render. */
     uint16_t row_offset = (ACTIVE_HPPP_WINDOW_Y_OFFSET * 32) * 2;
     uint16_t x_offset = calc_character_indicator_x_offset(win.battle_menu_current_character_id);
@@ -2113,10 +2113,10 @@ void clear_battle_menu_character_indicator(void) {
     ow.redraw_all_windows = 1;
 }
 
-/* ---- HPPP Window Drawing ---- */
+/* HPPP Window Drawing */
 
 /*
- * UNDRAW_HP_PP_WINDOW — Port of asm/text/hp_pp_window/undraw.asm.
+ * UNDRAW_HP_PP_WINDOW: Port of asm/text/hp_pp_window/undraw.asm.
  *
  * Clears the HP/PP window tilemap entries from win.bg2_buffer for one party slot.
  *   1. Sets win.hppp_meter_area_needs_update = 1
@@ -2161,7 +2161,7 @@ static inline uint16_t digit_tile_offset(uint8_t d) {
 }
 
 /*
- * SEPARATE_DECIMAL_DIGITS — Port of asm/text/hp_pp_window/separate_decimal_digits.asm.
+ * SEPARATE_DECIMAL_DIGITS: Port of asm/text/hp_pp_window/separate_decimal_digits.asm.
  *
  * Decomposes a value into its decimal digits and stores them in
  * win.hppp_window_digit_buffer: [0]=hundreds, [1]=tens, [2]=ones.
@@ -2176,16 +2176,16 @@ void separate_decimal_digits(uint16_t value) {
 }
 
 /*
- * FILL_HP_PP_TILE_BUFFER — Port of asm/text/hp_pp_window/fill_tile_buffer.asm (181 lines).
+ * FILL_HP_PP_TILE_BUFFER: Port of asm/text/hp_pp_window/fill_tile_buffer.asm (181 lines).
  *
  * Computes tilemap entries (tile index + palette/priority attributes) for a
  * 3-digit HP or PP display.  Reads from win.hppp_window_digit_buffer and writes
  * to win.hppp_window_buffer[id].
  *
  * Parameters:
- *   id       — party slot (0-3)
- *   mode     — 0 for HP, 1 for PP
- *   fraction — roller animation fraction (16-bit); values >= 0x3000 produce
+ *   id, party slot (0-3)
+ *   mode, 0 for HP, 1 for PP
+ *   fraction, roller animation fraction (16-bit); values >= 0x3000 produce
  *              a carry that shifts digit tiles to animate rolling
  *
  * Tilemap entry format (16-bit SNES BG):
@@ -2250,7 +2250,7 @@ void fill_hp_pp_tile_buffer(uint16_t id, uint16_t mode, uint16_t fraction) {
 }
 
 /*
- * FILL_HP_PP_TILE_BUFFER_X — Port of asm/text/hp_pp_window/fill_tile_buffer_x.asm (32 lines).
+ * FILL_HP_PP_TILE_BUFFER_X: Port of asm/text/hp_pp_window/fill_tile_buffer_x.asm (32 lines).
  *
  * Writes "X" placeholder tiles into the PP row of win.hppp_window_buffer[id].
  * Used when a character is concentrating (can't use PP).
@@ -2267,7 +2267,7 @@ void fill_hp_pp_tile_buffer_x(uint16_t id) {
 }
 
 /*
- * FILL_CHARACTER_HP_TILE_BUFFER — Port of asm/text/hp_pp_window/fill_character_hp_tile_buffer.asm.
+ * FILL_CHARACTER_HP_TILE_BUFFER: Port of asm/text/hp_pp_window/fill_character_hp_tile_buffer.asm.
  *
  * Wrapper: decomposes the HP integer into digits, then fills the HP tile ert.buffer.
  *
@@ -2282,7 +2282,7 @@ void fill_character_hp_tile_buffer(uint16_t id, uint16_t integer, uint16_t fract
 }
 
 /*
- * FILL_CHARACTER_PP_TILE_BUFFER — Port of asm/text/hp_pp_window/fill_character_pp_tile_buffer.asm.
+ * FILL_CHARACTER_PP_TILE_BUFFER: Port of asm/text/hp_pp_window/fill_character_pp_tile_buffer.asm.
  *
  * If the character is concentrating (afflictions[CONCENTRATION] != 0),
  * fills the PP display with "X" tiles.  Otherwise, decomposes the PP
@@ -2303,9 +2303,9 @@ void fill_character_pp_tile_buffer(uint16_t id, uint8_t *afflictions,
 /*
  * STATUS_EQUIP_WINDOW_TEXT tile lookup tables.
  * Loaded from "data/status_equip_tile_tables.bin" (294 bytes):
- *   Offset   0: TEXT_1 (98 bytes) — mode=1 tile indices
- *   Offset  98: TEXT_2 (98 bytes) — mode=0 tile indices
- *   Offset 196: TEXT_3 (98 bytes) — palette multipliers
+ *   Offset   0: TEXT_1 (98 bytes), mode=1 tile indices
+ *   Offset  98: TEXT_2 (98 bytes), mode=0 tile indices
+ *   Offset 196: TEXT_3 (98 bytes), palette multipliers
  * Each table: 7 rows (affliction slots) × 7 columns (affliction values) × 2 bytes.
  */
 static const uint16_t *status_tile_table_1;  /* TEXT_1: mode=1 tiles */
@@ -2333,7 +2333,7 @@ static void load_status_tile_tables(void) {
  */
 static bool scan_afflictions(const uint8_t *afflictions,
                              int *out_slot, uint8_t *out_value) {
-    /* Check slot 0 first (consciousness group — unconscious, diamondized, etc.) */
+    /* Check slot 0 first (consciousness group, unconscious, diamondized, etc.) */
     if (afflictions[0] != 0) {
         *out_slot = 0;
         *out_value = afflictions[0];
@@ -2356,7 +2356,7 @@ static bool scan_afflictions(const uint8_t *afflictions,
     return false;
 }
 
-/* GET_EQUIP_WINDOW_TEXT — Port of asm/battle/get_equip_window_text.asm. */
+/* GET_EQUIP_WINDOW_TEXT: Port of asm/battle/get_equip_window_text.asm. */
 uint16_t get_equip_window_text(const uint8_t *afflictions, int mode) {
     load_status_tile_tables();
     int slot;
@@ -2368,7 +2368,7 @@ uint16_t get_equip_window_text(const uint8_t *afflictions, int mode) {
     return table[slot * STATUS_TABLE_COLS + (value - 1)];
 }
 
-/* GET_EQUIP_WINDOW_TEXT_ALT — Port of asm/battle/get_equip_window_text_alt.asm. */
+/* GET_EQUIP_WINDOW_TEXT_ALT: Port of asm/battle/get_equip_window_text_alt.asm. */
 uint16_t get_equip_window_text_alt(const uint8_t *afflictions) {
     load_status_tile_tables();
     int slot;
@@ -2380,7 +2380,7 @@ uint16_t get_equip_window_text_alt(const uint8_t *afflictions) {
 }
 
 /*
- * DRAW_HP_PP_WINDOW — Port of asm/text/hp_pp_window/draw.asm (665 lines).
+ * DRAW_HP_PP_WINDOW: Port of asm/text/hp_pp_window/draw.asm (665 lines).
  *
  * Draws the full HP/PP window (border, character name, HP digits, PP digits)
  * for one party slot into win.bg2_buffer.
@@ -2615,7 +2615,7 @@ void draw_hp_pp_window(uint16_t char_id) {
 }
 
 /*
- * DRAW_AND_MARK_HPPP_WINDOW — Port of asm/battle/draw_and_mark_hppp_window.asm.
+ * DRAW_AND_MARK_HPPP_WINDOW: Port of asm/battle/draw_and_mark_hppp_window.asm.
  *
  * Assembly:
  *   SEP #$30
@@ -2637,7 +2637,7 @@ void draw_and_mark_hppp_window(uint16_t char_id) {
 }
 
 /*
- * DRAW_ACTIVE_HPPP_WINDOWS — Port of asm/battle/draw_active_hppp_windows.asm.
+ * DRAW_ACTIVE_HPPP_WINDOWS: Port of asm/battle/draw_active_hppp_windows.asm.
  *
  * Iterates through party members. For each one whose bit is set in
  * ow.currently_drawn_hppp_windows, calls draw_hp_pp_window.
@@ -2655,7 +2655,7 @@ void draw_active_hppp_windows(void) {
 }
 
 /*
- * HIDE_HPPP_WINDOWS — Port of asm/text/hide_hppp_windows.asm.
+ * HIDE_HPPP_WINDOWS: Port of asm/text/hide_hppp_windows.asm.
  *
  * Clears the battle menu character indicator, disables HPPP window rendering,
  * then (if not in battle mode) loops through all party members to:
@@ -2689,17 +2689,17 @@ void hide_hppp_windows(void) {
 }
 
 /*
- * UPDATE_HPPP_METER_AND_RENDER — Port of asm/text/hp_pp_window/update_hppp_meter_and_render.asm (16 lines).
+ * UPDATE_HPPP_METER_AND_RENDER: Port of asm/text/hp_pp_window/update_hppp_meter_and_render.asm (16 lines).
  *
  * Per-frame orchestrator:
- *   1. HP_PP_ROLLER — animate HP/PP values toward targets
+ *   1. HP_PP_ROLLER, animate HP/PP values toward targets
  *   2. If win.bg2_buffer was modified (win.hppp_meter_area_needs_update), bulk-copy
  *      to VRAM and set win.upload_hppp_meter_tiles flag
- *   3. UPDATE_HPPP_METER_TILES — update individual digit tiles
- *   4. RENDER_FRAME_TICK — process one frame
+ *   3. UPDATE_HPPP_METER_TILES, update individual digit tiles
+ *   4. RENDER_FRAME_TICK, process one frame
  */
 /* HP/PP meter update work shared by update_hppp_meter_and_render() (blocking)
- * and update_hppp_meter_work() (run-to-completion) — everything but the render. */
+ * and update_hppp_meter_work() (run-to-completion), everything but the render. */
 static void update_hppp_meter_prepare(void) {
     hp_pp_roller();
 
@@ -2714,7 +2714,7 @@ static void update_hppp_meter_prepare(void) {
 
 void update_hppp_meter_and_render(void) {
     /* Debug-only now: the WARP HP/PP flash in mode_step_debug_menu (an accepted
-     * inline-blocking debug loop — a savestate cannot land mid-warp). Pump-free:
+     * inline-blocking debug loop, a savestate cannot land mid-warp). Pump-free:
      * a no-actionscript window render plus an explicit frame wait, so it no longer
      * routes through the blocking render_frame_tick(). */
     update_hppp_meter_prepare();
@@ -2728,7 +2728,7 @@ void update_hppp_meter_and_render(void) {
 
 /* Park-propagating split (savestate D4b): a parked
  * actionscript callroutine becomes a STEP_PUSH instead of a nested pump_mode.
- * _step() returns true iff a frame parked — the caller must push
+ * _step() returns true iff a frame parked, the caller must push
  * GAME_MODE_ACTIONSCRIPT_FRAME (actionscript_frame_take_push) and call _flush() at
  * its resume phase; on no park the tick finishes inline and _step() returns false. */
 bool update_hppp_meter_work_step(void) {
@@ -2741,7 +2741,7 @@ void update_hppp_meter_work_flush(void) {
 }
 
 /*
- * UPDATE_HPPP_METER_TILES — Port of asm/text/update_hppp_meter_tiles.asm (325 lines).
+ * UPDATE_HPPP_METER_TILES: Port of asm/text/update_hppp_meter_tiles.asm (325 lines).
  *
  * Each frame, selects one of 4 party members (FRAME_COUNTER & 3) and updates
  * their HP/PP digit tiles in win.bg2_buffer.  When the roller animation is active
@@ -2798,10 +2798,10 @@ void update_hppp_meter_tiles(void) {
     /* Get the party character struct */
     CharStruct *ch = &party_characters[member_id - 1];
 
-    /* ---- HP digit update ---- */
+    /* HP digit update */
     uint16_t hp_fraction = ch->current_hp_fraction;
     if (hp_fraction & 1) {
-        /* Roller is active — recompute HP digit tiles */
+        /* Roller is active, recompute HP digit tiles */
         fill_character_hp_tile_buffer(member_index, ch->current_hp, hp_fraction);
 
         /* Set up VRAM copies if not already bulk-uploaded */
@@ -2834,14 +2834,14 @@ void update_hppp_meter_tiles(void) {
         /* Advance to PP area (2 rows below HP top = +128 bytes) */
         bg2_off += 128;
     } else {
-        /* HP not rolling — skip 2 rows to PP area */
+        /* HP not rolling, skip 2 rows to PP area */
         bg2_off += 128;
     }
 
-    /* ---- PP digit update ---- */
+    /* PP digit update */
     uint16_t pp_fraction = ch->current_pp_fraction;
     if (pp_fraction & 1) {
-        /* Roller is active — recompute PP digit tiles */
+        /* Roller is active, recompute PP digit tiles */
         fill_character_pp_tile_buffer(member_index,
                                       ch->afflictions,
                                       ch->current_pp,
@@ -2881,7 +2881,7 @@ void update_hppp_meter_tiles(void) {
     }
 }
 
-/* ---- Window Text Scrolling ---- */
+/* Window Text Scrolling */
 
 /*
  * SCROLL_WINDOW_UP: Port of asm/text/window/scroll_window_up.asm.
@@ -2908,7 +2908,7 @@ void scroll_window_up(WindowInfo *w) {
      * NB: the memmove args are materialized into plain locals first. Passing the
      * over-aligned member `w->content_tilemap` (ABI_PTR_ALIGN = aligned(8))
      * directly into memmove made arm-none-eabi-gcc 15.2 mis-marshal the arguments
-     * (in the scroll_window_up.part.0 hot/cold split) — shifting them one register
+     * (in the scroll_window_up.part.0 hot/cold split), shifting them one register
      * over so the source POINTER landed in the size slot, giving memmove a
      * pointer-sized (~604 MB) length that ran off the tilemap pool into peripheral
      * space and took an imprecise bus fault. Plain local pointer/size variables
@@ -2953,7 +2953,7 @@ void free_window_text_row(WindowInfo *w) {
     }
 }
 
-/* ---- BG2 Tile Usage Tracking ---- */
+/* BG2 Tile Usage Tracking */
 
 /* win.used_bg2_tile_map now lives in WindowSystemState win (see window.h). */
 
@@ -3038,7 +3038,7 @@ void free_tile_safe(uint16_t tile_entry) {
  *   Entries 10-31: $0000 (all tiles free)
  */
 /*
- * ALLOC_BG2_TILEMAP_ENTRY — Port of asm/system/dma/alloc_bg2_tilemap_entry.asm.
+ * ALLOC_BG2_TILEMAP_ENTRY: Port of asm/system/dma/alloc_bg2_tilemap_entry.asm.
  *
  * Scans win.used_bg2_tile_map[] from word 4 (tile 64+) to word 31 (tile 511)
  * to find the first free bit. Sets the bit and returns the tile index.
@@ -3059,14 +3059,14 @@ uint16_t alloc_bg2_tilemap_entry(void) {
         uint16_t val = win.used_bg2_tile_map[word];
         for (int bit = 15; bit >= 0; bit--) {
             if (!(val & (1 << bit))) {
-                /* Found free tile — mark as in-use */
+                /* Found free tile, mark as in-use */
                 win.used_bg2_tile_map[word] |= (1 << bit);
                 return (uint16_t)(word * 16 + bit);
             }
         }
     }
 
-    /* Tile exhaustion — emergency recovery.
+    /* Tile exhaustion, emergency recovery.
      * Assembly: HIDE_HPPP_WINDOWS_LONG, CLOSE_ALL_WINDOWS_FAR,
      * ENABLE_ALL_ENTITIES, LONGJMP(JMP_BUF2).
      * C port: close all windows and return tile 0 as fallback. */
@@ -3090,7 +3090,7 @@ void init_used_bg2_tile_map(void) {
 }
 
 /*
- * SET_CURSOR_MOVE_CALLBACK — Port of asm/text/menu/set_cursor_move_callback.asm.
+ * SET_CURSOR_MOVE_CALLBACK: Port of asm/text/menu/set_cursor_move_callback.asm.
  *
  * Sets the cursor_move_callback for the current focus window.
  * The callback is invoked by selection_menu() when the cursor moves,
@@ -3105,7 +3105,7 @@ void set_cursor_move_callback(void (*cb)(uint16_t), CursorCallbackId id) {
 }
 
 /*
- * CLEAR_CURSOR_MOVE_CALLBACK — Port of asm/text/menu/clear_cursor_move_callback.asm.
+ * CLEAR_CURSOR_MOVE_CALLBACK: Port of asm/text/menu/clear_cursor_move_callback.asm.
  *
  * Clears the cursor_move_callback for the current focus window.
  */
@@ -3120,8 +3120,8 @@ void clear_cursor_move_callback(void) {
 /* ------------------------------------------------------------------------- *
  * Savestate pointer purge (build item #3)
  *
- * WindowInfo carries two raw pointers — content_tilemap (into win.tilemap_pool)
- * and cursor_move_callback (a function pointer) — that are meaningless after a
+ * WindowInfo carries two raw pointers, content_tilemap (into win.tilemap_pool)
+ * and cursor_move_callback (a function pointer), that are meaningless after a
  * cross-process / cross-platform load (absolute addresses shift). Each is mirrored
  * by a serializable field (content_tilemap_offset / cursor_move_callback_id) that
  * is kept in sync at every mutation site; window_savestate_rebind() rebuilds the
@@ -3156,7 +3156,7 @@ void window_savestate_rebind(void) {
 }
 
 /*
- * CLEAR_WINDOW_TILEMAP — Port of asm/text/clear_window_tilemap.asm.
+ * CLEAR_WINDOW_TILEMAP: Port of asm/text/clear_window_tilemap.asm.
  *
  * Assembly: iterates the window's tilemap ert.buffer, frees each tile via
  * FREE_TILE_SAFE, fills with tile 64 (blank). Sets REDRAW_ALL_WINDOWS=1
@@ -3184,7 +3184,7 @@ void clear_window_tilemap(uint16_t window_id) {
 }
 
 /*
- * SET_HPPP_WINDOW_MODE_ITEM — Port of asm/text/set_hppp_window_mode_item.asm (210 lines).
+ * SET_HPPP_WINDOW_MODE_ITEM: Port of asm/text/set_hppp_window_mode_item.asm (210 lines).
  *
  * For each party character, checks if the given item is usable/equippable,
  * and if equippable, compares the item's strength stat against the currently
@@ -3269,7 +3269,7 @@ void set_hppp_window_mode_item(uint16_t item_id) {
 }
 
 /*
- * PRINT_MONEY_IN_WINDOW — Port of asm/text/window/print_money_in_window.asm.
+ * PRINT_MONEY_IN_WINDOW: Port of asm/text/window/print_money_in_window.asm.
  *
  * Prints a right-aligned dollar amount ("$NNN") in the current focus window.
  * Saves/restores cursor position and VWF_INDENT_NEW_LINE.
@@ -3341,7 +3341,7 @@ void print_money_in_window(uint32_t amount) {
              * typewriter). print_money_in_window is a synchronous helper, so it
              * cannot own a yield; driving the per-digit delay would require a
              * DISPLAY_TEXT phase. The only non-instant caller is CC_1C_0B in
-             * dialogue — the money digits now render at once (on DISPLAY_TEXT's
+             * dialogue, the money digits now render at once (on DISPLAY_TEXT's
              * next frame) instead of typing out. Sound still plays per digit.
              * COSMETIC DEVIATION: money pops in rather than typing. */
         }

@@ -6,7 +6,7 @@
 /* Game RAM - mirrors key BSS sections from the SNES memory map */
 
 typedef struct {
-    /* Joypad state — port of PAD_* variables from ram.asm.
+    /* Joypad state, port of PAD_* variables from ram.asm.
      * See UPDATE_JOYPAD_STATE (asm/overworld/update_joypad_state.asm).
      * pad1_held = PAD_STATE: currently held buttons (physical state)
      * pad1_pressed = PAD_PRESS: edge-detected newly pressed buttons
@@ -21,7 +21,7 @@ typedef struct {
     uint16_t nmi_count;
     uint16_t frame_counter;
 
-    /* Play timer — 32-bit frame counter incremented every NMI.
+    /* Play timer, 32-bit frame counter incremented every NMI.
      * Port of TIMER at $7E00A7 (asm/bankconfig/common/ram.asm).
      * Copied to game_state.timer on save, restored on load. */
     uint32_t play_timer;

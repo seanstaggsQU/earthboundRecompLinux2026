@@ -1,5 +1,5 @@
 /*
- * GAME_MODE_UPDATE_CHECK — this port's own addition, not a port of any ROM
+ * GAME_MODE_UPDATE_CHECK: this port's own addition, not a port of any ROM
  * routine (there is no update screen in the original game). Reached from
  * file-select's "Check for Updates" row (fm_file_select_build(),
  * file_select.c), which is itself only shown when platform_update_supported()
@@ -8,7 +8,7 @@
  * Same build/dispatch/rebuild loop shape as mode_step_settings_menu()
  * (text.c), but the actual check/download/verify/install work happens off
  * the main thread in the platform backend (platform_update_*, always
- * non-blocking — see platform.h) since the mode stack steps one
+ * non-blocking, see platform.h) since the mode stack steps one
  * non-blocking frame at a time and a real HTTP call here would freeze
  * rendering. This file just starts that work and polls it once a frame.
  *
@@ -20,20 +20,20 @@
  * 1. clear_instant_printing() after create_window(). window_tick_prepare()
  *    (display_text.c, the per-frame renderer every window depends on)
  *    unconditionally skips rendering entirely while dt.instant_printing is
- *    set. print_menu_items() sets that flag but never clears it -- normally
+ *    set. print_menu_items() sets that flag but never clears it, normally
  *    harmless because callers follow it with a GAME_MODE_SELECTION_MENU
  *    push, whose own setup clears it as a side effect. File-select's own
  *    print_menu_items() call (building the save-slot list, before the
  *    player ever reaches this mode) leaves it stuck set otherwise.
  *
  * 2. window_tick_work_step() called every frame while idling. Rendering
- *    isn't automatic just because a window is open -- something has to
+ *    isn't automatic just because a window is open, something has to
  *    drive it each frame. The EB_UPDATE_AVAILABLE branch gets this for
  *    free by pushing GAME_MODE_SELECTION_MENU, whose own step function
  *    ticks it internally; every phase here that idles WITHOUT pushing a
  *    child (waiting on the background thread, waiting for a button) has to
  *    call it directly, exactly like mode_step_hppp_display()'s HD_TICK/
- *    HD_TICK_FLUSH does for its own idle-wait loop -- see that function
+ *    HD_TICK_FLUSH does for its own idle-wait loop, see that function
  *    (text.c) for the precedent this mirrors.
  */
 #include "core/mode_stack.h"
@@ -47,7 +47,7 @@
 #include <stdio.h>
 
 /* Shared with fm_push_selection() (file_select.c) / menu_push_selection()
- * (text.c) in spirit, not in code — this file gets its own private copy
+ * (text.c) in spirit, not in code, this file gets its own private copy
  * since both of those are static to their own translation units. */
 static ModeState upd_child_init;
 
@@ -93,7 +93,7 @@ StepResult mode_step_update_check(ModeState *ms) {
             st->phase = UPD_RESULT;
             return STEP_RESULT_CONTINUE();
         }
-        /* Still waiting on the background thread -- keep driving the
+        /* Still waiting on the background thread, keep driving the
          * window's per-frame render (see file header, point 2) until it's
          * done. */
         if (window_tick_work_step()) {
@@ -110,7 +110,7 @@ StepResult mode_step_update_check(ModeState *ms) {
 
     case UPD_RESULT: {
         if (st->progress.status == EB_UPDATE_AVAILABLE) {
-            /* WINDOW_UPDATE_CHECK is height 10 -- sm_handle_input()'s
+            /* WINDOW_UPDATE_CHECK is height 10, sm_handle_input()'s
              * cursor-search bound is (height-2)/2 rows, so only text_y
              * 0-3 are valid (same formula that caught the file-select
              * OOB bug and the Command Menu's earlier height bumps). Every
@@ -126,13 +126,13 @@ StepResult mode_step_update_check(ModeState *ms) {
             add_menu_item("No", 0, 6, 3);
             print_menu_items();
             play_sfx(27); /* SFX::MENU_OPEN_CLOSE */
-            /* No window_tick_work_step() needed here -- the SELECTION_MENU
+            /* No window_tick_work_step() needed here, the SELECTION_MENU
              * push below ticks it internally every frame from here on. */
             return upd_push_selection(st, UPD_CONFIRM_RESULT, 1);
         }
 
         /* Every other outcome (up to date / unsupported / error) is a
-         * one-shot message, not a confirm — print it once here, then just
+         * one-shot message, not a confirm, print it once here, then just
          * wait for a button in UPD_MESSAGE (which drives its own ticking). */
         close_focus_window();
         create_window(WINDOW_UPDATE_CHECK);
@@ -207,13 +207,13 @@ StepResult mode_step_update_check(ModeState *ms) {
         }
         if (st->progress.status == EB_UPDATE_DONE) {
             /* A relaunch has already been staged by the backend and quit
-             * already requested -- the frame loop is about to unwind. Fall
+             * already requested, the frame loop is about to unwind. Fall
              * through to cleanup in case a frame or two still renders
              * before that happens. */
             st->phase = UPD_CLEANUP;
             return STEP_RESULT_CONTINUE();
         }
-        /* EB_UPDATE_ERROR (download/verify/install failed) -- the running
+        /* EB_UPDATE_ERROR (download/verify/install failed), the running
          * binary was never touched; show why and let the player retry
          * later from file-select. */
         close_focus_window();

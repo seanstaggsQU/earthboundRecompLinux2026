@@ -49,7 +49,7 @@ typedef struct {
     bool active;
 } BattleBGState;
 
-/* LoadedBGData — mirrors the assembly loaded_bg_data struct (include/structs.asm).
+/* LoadedBGData, mirrors the assembly loaded_bg_data struct (include/structs.asm).
  * One instance per background layer.  Holds palette data for fade/interpolation,
  * plus animation configuration loaded from BG_DATA_TABLE. */
 typedef struct {
@@ -99,7 +99,7 @@ typedef struct {
     int16_t  distortion_comp_accel;         /* 117: compression acceleration per frame */
 } LoadedBGData;
 
-/* bg_layer_config_entry — matches the assembly struct (include/structs.asm).
+/* bg_layer_config_entry, matches the assembly struct (include/structs.asm).
  * 17-byte config loaded from BG_DATA_TABLE for each battle background layer. */
 typedef struct {
     uint8_t graphics;               /* 0: graphics asset index */
@@ -115,7 +115,7 @@ typedef struct {
     uint8_t distortion_styles[4];   /* 13: indices into BG_DISTORTION_TABLE */
 } BGLayerConfigEntry;
 
-/* Sine lookup table — 256 signed bytes, peak +/-127.
+/* Sine lookup table, 256 signed bytes, peak +/-127.
  * Precomputed to match ROM's SINE_LOOKUP_TABLE. */
 extern const int8_t sine_table[256];
 
@@ -144,29 +144,29 @@ void battle_bg_load_at(uint16_t bg_id, uint16_t gfx_vram, uint16_t arr_vram,
    Updates scrolling, distortion offsets, and palette cycling. */
 void battle_bg_update(void);
 
-/* INTERPOLATE_BG_PALETTE_COLORS — Port of asm/battle/effects/interpolate_bg_palette_colors.asm.
+/* INTERPOLATE_BG_PALETTE_COLORS: Port of asm/battle/effects/interpolate_bg_palette_colors.asm.
  * Adjusts all palette entries for the active background layer(s).
  * Special values: 0xFFFF=white, 0=black, 0x0100=restore from backup.
  * Other values = brightness multiplier (result = channel * value / 256). */
 void interpolate_bg_palette_colors(uint16_t brightness);
 
-/* INTERPOLATE_BG_PALETTE_COLOR — Port of asm/battle/effects/interpolate_bg_palette_color.asm.
+/* INTERPOLATE_BG_PALETTE_COLOR: Port of asm/battle/effects/interpolate_bg_palette_color.asm.
  * Adjusts a single palette entry in a loaded_bg_data struct.
  * index: which of 16 colors.  brightness: see above. */
 void interpolate_bg_palette_color(LoadedBGData *data, uint16_t index, uint16_t brightness);
 
-/* ROTATE_BG_DISTORTION — Port of asm/battle/rotate_bg_distortion.asm.
+/* ROTATE_BG_DISTORTION: Port of asm/battle/rotate_bg_distortion.asm.
  * Cycles distortion style entries: swaps [0] and [3], zeros [1],
  * resets distortion_duration_left to 1. Used during Giygas death. */
 void rotate_bg_distortion(void);
 
-/* LOAD_BG_LAYER_CONFIG — Port of asm/battle/load_bg_layer_config.asm.
+/* LOAD_BG_LAYER_CONFIG: Port of asm/battle/load_bg_layer_config.asm.
  * Zeroes the target loaded_bg_data struct, then copies config fields from a
  * bg_layer_config_entry: bitdepth, palette shifting params, scrolling_movements,
  * distortion_styles. Initializes all duration counters to 1. */
 void load_bg_layer_config(LoadedBGData *target, const BGLayerConfigEntry *config);
 
-/* GENERATE_BATTLEBG_FRAME — Port of asm/misc/battlebgs/generate_frame.asm.
+/* GENERATE_BATTLEBG_FRAME: Port of asm/misc/battlebgs/generate_frame.asm.
  * Per-layer animation state machine. Cycles through scrolling movements
  * and distortion styles from BG_SCROLLING_TABLE / BG_DISTORTION_TABLE,
  * updates positions and distortion parameters, applies to target BG layer,
@@ -174,16 +174,16 @@ void load_bg_layer_config(LoadedBGData *target, const BGLayerConfigEntry *config
  * layer_index: 0 = layer 1, 1 = layer 2. */
 void generate_battlebg_frame(LoadedBGData *data, int layer_index);
 
-/* DISTORT_30FPS — when set, layer 2 distortion runs at 30fps. */
+/* DISTORT_30FPS: when set, layer 2 distortion runs at 30fps. */
 extern uint16_t distort_30fps;
 
-/* DARKEN_BG_PALETTES — Port of asm/battle/effects/darken_bg_palettes.asm.
+/* DARKEN_BG_PALETTES: Port of asm/battle/effects/darken_bg_palettes.asm.
  * Halves each RGB channel of all 16 palette entries in both layers
  * (LSR + AND $3DEF), then copies the result to global palettes[].
  * Skips layer 2 if its target_layer is 0. */
 void darken_bg_palettes(void);
 
-/* RESTORE_BG_PALETTE_BACKUPS — Port of asm/battle/effects/restore_bg_palette_backups.asm.
+/* RESTORE_BG_PALETTE_BACKUPS: Port of asm/battle/effects/restore_bg_palette_backups.asm.
  * Copies palette2[] (backup) → palette[] for both layers, then copies
  * palette[] → global palettes[].  Skips layer 2's global copy if
  * target_layer is 0. */
@@ -192,7 +192,7 @@ void restore_bg_palette_backups(void);
 /* ---- Savestate snapshot ----
  * distort_30fps gates the 30fps battle-BG distortion and bg_state.active gates the
  * simplified BG-update path; both are set at BG load and read every frame, but the
- * BG isn't reloaded on a savestate restore — so capture them or a mid-battle reload
+ * BG isn't reloaded on a savestate restore, so capture them or a mid-battle reload
  * runs the distortion at the wrong rate / freezes the simplified BG animation. */
 typedef struct {
     uint16_t      distort_30fps;

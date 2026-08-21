@@ -44,23 +44,21 @@ void ppu_clear_effects(void) {
     ppu.coldata_g = 0;
     ppu.coldata_b = 0;
     ppu.mosaic = 0;
-    /* Window configuration registers (tmw, tsw, w12sel, w34sel, wobjsel,
-     * wbglog, wobjlog) are NOT cleared here.  On real hardware, the
-     * equivalent of this function runs during force-blank, but window
-     * config registers persist — HDMA re-programs WH0/WH1 per-scanline
-     * when the screen comes back.  Systems that use windowing (oval window,
-     * battle swirl) manage their own lifecycle via stop_oval_window(),
-     * stop_battle_swirl(), and update_swirl_effect() auto-restore.
-     * Clearing them here would destroy active oval window masking during
-     * attract mode teleports (overworld_setup_vram → ppu_clear_effects). */
+    /* We don't clear the window config registers (tmw, tsw, w12sel, w34sel,
+     * wobjsel, wbglog, wobjlog) here. On real hardware this runs during
+     * force-blank and window config persists through it; HDMA just
+     * re-programs WH0/WH1 per scanline once the screen's back. Oval window
+     * and battle swirl manage their own lifecycle (stop_oval_window(),
+     * stop_battle_swirl(), update_swirl_effect()), so clearing these would
+     * kill active oval masking during attract-mode teleports
+     * (overworld_setup_vram -> ppu_clear_effects). */
 
-    /* Clear per-scanline HDMA overrides for TM (layer enable per scanline).
-     * Window HDMA flags are preserved — the oval window / battle swirl
-     * systems manage those.  On real hardware, HDMAEN=0 during force blank
-     * prevents HDMA from running, so stale TM tables are harmless.  The C
-     * port's software renderer reads these flags every frame — if left set,
-     * stale per-scanline TM values cause visible stripe artifacts
-     * (e.g. on the game-over screen after a battle). */
+    /* Clear per-scanline TM HDMA overrides but leave the window HDMA flags
+     * alone (oval window / battle swirl own those). On hardware, HDMAEN=0
+     * during force blank makes stale TM tables harmless, but our software
+     * renderer reads these flags every frame, so leftover per-scanline TM
+     * values show up as visible stripes (e.g. the game-over screen after a
+     * battle). */
     ppu.tm_hdma_active = false;
 }
 

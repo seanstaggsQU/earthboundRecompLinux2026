@@ -2,15 +2,15 @@
  * Oval window / swirl effect system.
  *
  * Ported from assembly:
- *   INIT_OVAL_WINDOW        — asm/battle/init_oval_window.asm
- *   INIT_SWIRL_EFFECT       — asm/misc/init_swirl_effect.asm
- *   UPDATE_SWIRL_EFFECT     — asm/misc/update_swirl_effect.asm
- *   CLOSE_OVAL_WINDOW       — asm/battle/close_oval_window.asm
- *   STOP_OVAL_WINDOW        — asm/battle/stop_oval_window.asm
- *   GENERATE_OVAL_WINDOW_DATA — asm/text/generate_oval_window_data.asm
- *   SET_WINDOW_MASK          — asm/system/set_window_mask.asm
- *   DISABLE_WINDOWS          — asm/text/disable_windows.asm
- *   IS_PSI_ANIMATION_ACTIVE  — asm/battle/is_psi_animation_active.asm
+ *   INIT_OVAL_WINDOW: asm/battle/init_oval_window.asm
+ *   INIT_SWIRL_EFFECT: asm/misc/init_swirl_effect.asm
+ *   UPDATE_SWIRL_EFFECT: asm/misc/update_swirl_effect.asm
+ *   CLOSE_OVAL_WINDOW: asm/battle/close_oval_window.asm
+ *   STOP_OVAL_WINDOW: asm/battle/stop_oval_window.asm
+ *   GENERATE_OVAL_WINDOW_DATA: asm/text/generate_oval_window_data.asm
+ *   SET_WINDOW_MASK: asm/system/set_window_mask.asm
+ *   DISABLE_WINDOWS: asm/text/disable_windows.asm
+ *   IS_PSI_ANIMATION_ACTIVE: asm/battle/is_psi_animation_active.asm
  */
 
 #include "game/oval_window.h"
@@ -20,7 +20,7 @@
 #include "snes/ppu.h"
 #include <string.h>
 
-/* ---- Oval window animation data ---- */
+/* Oval window animation data */
 /* These are animation parameters (code constants), not ROM game data.
  * Ported from asm/data/unknown/C4A5CE.asm etc.
  * 0x8000 in initial_width/height means "keep current value". */
@@ -62,7 +62,7 @@ static const OvalWindowData oval_battle[] = {
     { 0 } /* terminator */
 };
 
-/* Arc cosine lookup table (256 entries) — mathematical table for ellipse generation.
+/* Arc cosine lookup table (256 entries), mathematical table for ellipse generation.
  * Ported from asm/data/unknown/C0B2FF.asm (OVAL_ARC_TABLE). */
 static const uint8_t arc_table[256] = {
     0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
@@ -102,10 +102,10 @@ static const uint8_t arc_table[256] = {
 /* Window mask lookup table (port of WINDOW_MASK_LOOKUP, asm/data/unknown/C0B0A6.asm) */
 static const uint8_t window_mask_lookup[4] = { 0x00, 0x0F, 0xF0, 0xFF };
 
-/* PSI animation state — zeroed at startup, populated by show_psi_animation (battle.c) */
+/* PSI animation state, zeroed at startup, populated by show_psi_animation (battle.c) */
 PsiAnimationState psi_animation_state;
 
-/* ---- State variables (BSS mirrors from globals.inc.asm) ---- */
+/* State variables (BSS mirrors from globals.inc.asm) */
 static uint8_t frames_until_next_swirl_update;
 static uint8_t frames_until_next_swirl_frame;
 static uint8_t swirl_frames_left;
@@ -137,7 +137,7 @@ static int16_t loaded_oval_window_height_acceleration;
 static uint16_t swirl_window_hdma_buffer[EB_VIEWPORT_HEIGHT];
 
 /* Sequence table for serializing the loaded_oval_window cursor as (seq id, frame
- * index) — savestate pointer purge, build item #3. Order defines the seq ids (1..N;
+ * index), savestate pointer purge, build item #3. Order defines the seq ids (1..N;
  * 0 = NULL/inactive). */
 static const struct { const OvalWindowData *base; uint16_t len; } oval_seq_table[] = {
     { oval_standard_open,  (uint16_t)(sizeof(oval_standard_open)  / sizeof(oval_standard_open[0]))  },
@@ -237,8 +237,8 @@ void oval_window_savestate_unpack(const void *in) {
  *     0x04 = 4-register mode (4 bytes/entry: WH0, WH1, WH2, WH3)
  *   Remaining: standard SNES HDMA entries:
  *     - 0x00: end of table
- *     - 0x01-0x7F: repeat mode — next N bytes for count scanlines
- *     - 0x80-0xFF: individual mode — (N & 0x7F) scanlines, N bytes each
+ *     - 0x01-0x7F: repeat mode, next N bytes for count scanlines
+ *     - 0x80-0xFF: individual mode, (N & 0x7F) scanlines, N bytes each
  *
  * Output: swirl_window_hdma_buffer[EB_VIEWPORT_HEIGHT], packed as (WH0 << 8) | WH1.
  */
@@ -301,7 +301,7 @@ static void parse_hdma_to_window_buffer(const uint8_t *data, size_t data_size) {
     }
 }
 
-/* ---- SWIRL_PRIMARY_TABLE (from asm/bankconfig/common/bank0e.asm) ---- */
+/* SWIRL_PRIMARY_TABLE (from asm/bankconfig/common/bank0e.asm) */
 /* 7 entries x 4 bytes: speed, hdma_table_id, frames_left, unused */
 static const uint8_t swirl_primary_table[] = {
     0x00, 0x00, 0x00, 0x00,
@@ -313,7 +313,7 @@ static const uint8_t swirl_primary_table[] = {
     0x03, 0x6D, 0x11, 0x00,
 };
 
-/* ---- Generate oval window HDMA data ---- */
+/* Generate oval window HDMA data */
 /* Port of GENERATE_OVAL_WINDOW_DATA (C0B149).
  * Computes per-scanline left/right window boundaries for an ellipse.
  * centre_x: screen X of ellipse centre
@@ -329,7 +329,7 @@ static void generate_oval_window_data(int16_t centre_x, int16_t centre_y,
      * The bottom-up path starts from Y=(EB_VIEWPORT_HEIGHT-1) and works up.
      * In both cases, the algorithm is the same ellipse calculation. */
 
-    /* Clear the buffer to 0xFF00 (left=0xFF, right=0x00 — window disabled).
+    /* Clear the buffer to 0xFF00 (left=0xFF, right=0x00, window disabled).
      * Assembly uses LDA #$00FF which stores little-endian as [0xFF,0x00] → WH0=0xFF, WH1=0x00.
      * C packing is (left<<8)|right, so 0xFF00 → left=0xFF, right=0x00. */
     for (int i = 0; i < EB_VIEWPORT_HEIGHT; i++)
@@ -485,7 +485,7 @@ static void apply_hdma_to_ppu(void) {
     ppu.window_hdma_active = true;
 }
 
-/* ---- SET_WINDOW_MASK (port of asm/system/set_window_mask.asm) ---- */
+/* SET_WINDOW_MASK (port of asm/system/set_window_mask.asm) */
 void set_window_mask(uint16_t config, uint16_t invert) {
     uint8_t val;
 
@@ -518,7 +518,7 @@ void set_window_mask(uint16_t config, uint16_t invert) {
     }
 }
 
-/* ---- DISABLE_WINDOWS (port of C0B0AA) ---- */
+/* DISABLE_WINDOWS (port of C0B0AA) */
 void disable_windows(void) {
     ppu.wh0 = 0xFF;
     ppu.wh1 = 0x00;
@@ -526,7 +526,7 @@ void disable_windows(void) {
     ppu.wh3 = 0x00;
 }
 
-/* ---- INIT_SWIRL_EFFECT (port of C4A67E) ---- */
+/* INIT_SWIRL_EFFECT (port of C4A67E) */
 void init_swirl_effect(uint16_t type, uint16_t options) {
     /* Decode options */
     swirl_invert_enabled = (options & 0x02) ? 1 : 0;
@@ -575,7 +575,7 @@ void start_battle_swirl(uint16_t type, uint16_t options, uint16_t padding) {
     swirl_length_padding = (uint8_t)padding;
 }
 
-/* ---- INIT_OVAL_WINDOW (port of C2EA15) ---- */
+/* INIT_OVAL_WINDOW (port of C2EA15) */
 void init_oval_window(uint16_t type) {
     active_oval_window = (uint8_t)type;
     init_swirl_effect(0, 0);
@@ -594,7 +594,7 @@ void init_oval_window(uint16_t type) {
     }
 }
 
-/* ---- CLOSE_OVAL_WINDOW (port of C2EA74) ---- */
+/* CLOSE_OVAL_WINDOW (port of C2EA74) */
 void close_oval_window(void) {
     init_swirl_effect(0, 0);
     swirl_mask_settings = 19;
@@ -606,11 +606,11 @@ void close_oval_window(void) {
     }
 }
 
-/* ---- STOP_OVAL_WINDOW (port of C2EAAA) ---- */
+/* STOP_OVAL_WINDOW (port of C2EAAA) */
 void stop_oval_window(void) {
     frames_until_next_swirl_update = 0;
     loaded_oval_window = NULL;
-    /* mask_hdma_channel(3) — in the port we just disable the HDMA */
+    /* mask_hdma_channel(3), in the port we just disable the HDMA */
     ppu.window_hdma_active = false;
     set_window_mask(0, 0);
 }
@@ -627,17 +627,17 @@ void reset_swirl_update_timer(void) {
  * clears the fixed color (COLDATA), and disables window masking. */
 void stop_battle_swirl(void) {
     frames_until_next_swirl_update = 0;
-    /* mask_hdma_channel(swirl_hdma_channel_offset+3) — disable the HDMA */
+    /* mask_hdma_channel(swirl_hdma_channel_offset+3), disable the HDMA */
     ppu.window_hdma_active = false;
-    /* SET_COLDATA(0,0,0) — clear fixed color to black */
+    /* SET_COLDATA(0,0,0): clear fixed color to black */
     ppu.coldata_r = 0;
     ppu.coldata_g = 0;
     ppu.coldata_b = 0;
-    /* SET_WINDOW_MASK(0,0) — disable window masking */
+    /* SET_WINDOW_MASK(0,0): disable window masking */
     set_window_mask(0, 0);
 }
 
-/* ---- IS_PSI_ANIMATION_ACTIVE (port of C2EACF) ---- */
+/* IS_PSI_ANIMATION_ACTIVE (port of C2EACF) */
 bool is_psi_animation_active(void) {
     /* Port of C2EACF: active if either PSI animation or swirl update is running */
     if (psi_animation_state.time_until_next_frame != 0)
@@ -671,7 +671,7 @@ void update_swirl_effect(void) {
     if (frames_until_next_swirl_update == 0)
         return;
 
-    /* ---- Path 1: Oval window animation ---- */
+    /* Path 1: Oval window animation */
     if (loaded_oval_window != NULL) {
         frames_until_next_swirl_update--;
         if (frames_until_next_swirl_update != 0)
@@ -757,7 +757,7 @@ update_position:
         return;
     }
 
-    /* ---- Path 2: Battle swirl (SWIRL_DATA playback) ---- */
+    /* Path 2: Battle swirl (SWIRL_DATA playback) */
     /* Port of @SWIRL_FRAME_UPDATE (C4A7B0 lines 210-376).
      * Decrement counter when no oval window is loaded. */
     frames_until_next_swirl_update--;
@@ -801,7 +801,7 @@ process_swirl_frame:
         return;
     }
 
-    /* Swirl finished — check for repeat (assembly @NO_FRAMES_LEFT, lines 317-416).
+    /* Swirl finished, check for repeat (assembly @NO_FRAMES_LEFT, lines 317-416).
      * If swirl_next_swirl != 0, restart the animation from SWIRL_PRIMARY_TABLE. */
     if (swirl_next_swirl != 0) {
         /* Decrement repeats counter; speed up at 0 */

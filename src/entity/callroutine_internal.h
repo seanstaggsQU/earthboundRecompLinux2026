@@ -1,6 +1,6 @@
 /*
  * Internal header shared between callroutine*.c files.
- * Not part of the public API — only #include from callroutine implementation files.
+ * Not part of the public API, only #include from callroutine implementation files.
  */
 #ifndef CALLROUTINE_INTERNAL_H
 #define CALLROUTINE_INTERNAL_H
@@ -12,7 +12,7 @@
  * Set by callroutine_dispatch() before each callroutine invocation. */
 extern int cr_bank_idx;
 
-/* Convenience read helpers — read from the current script bank. */
+/* Convenience read helpers, read from the current script bank. */
 static inline uint8_t sb(uint16_t pc) {
     return script_bank_read_byte(cr_bank_idx, pc);
 }
@@ -20,7 +20,7 @@ static inline uint16_t sw(uint16_t pc) {
     return script_bank_read_word(cr_bank_idx, pc);
 }
 
-/* ---- Movement helpers (callroutine_movement.c) ---- */
+/* Movement helpers (callroutine_movement.c) */
 void set_velocity_from_direction(int16_t ent, int16_t direction);
 int16_t quantize_direction(int16_t raw_dir);
 int16_t quantize_fine_direction(uint16_t fine_dir);
@@ -129,7 +129,7 @@ int16_t cr_move_toward_target_cb(int16_t ent, int16_t scr,
 int16_t cr_update_mini_ghost_position(int16_t ent, int16_t scr,
                                       uint16_t pc, uint16_t *out_pc);
 
-/* ---- Palette functions (callroutine_palette.c) ---- */
+/* Palette functions (callroutine_palette.c) */
 int16_t get_colour_fade_slope(int16_t current, int16_t target, int16_t frames);
 void copy_fade_buffer_to_palettes(void);
 void prepare_palette_fade_slopes(int16_t frames, uint16_t mask);
@@ -164,7 +164,7 @@ int16_t cr_load_gas_station_palette(int16_t ent, int16_t scr,
 int16_t cr_load_gas_station_flash_palette(int16_t ent, int16_t scr,
                                            uint16_t pc, uint16_t *out_pc);
 
-/* ---- Screen/display functions (callroutine_screen.c) ---- */
+/* Screen/display functions (callroutine_screen.c) */
 int16_t cr_decompress_title_data(int16_t ent, int16_t scr,
                                  uint16_t pc, uint16_t *out_pc);
 int16_t cr_load_title_palette(int16_t ent, int16_t scr,
@@ -198,7 +198,7 @@ int16_t cr_movement_cmd_return_2(int16_t ent, int16_t scr,
 int16_t cr_is_entity_near_leader(int16_t ent, int16_t scr,
                                  uint16_t pc, uint16_t *out_pc);
 
-/* ---- Sprite functions (callroutine_sprite.c) ---- */
+/* Sprite functions (callroutine_sprite.c) */
 int16_t cr_set_entity_direction_and_frame(int16_t ent, int16_t scr,
                                           uint16_t pc, uint16_t *out_pc);
 int16_t cr_deallocate_entity_sprite(int16_t ent, int16_t scr,
@@ -234,7 +234,7 @@ int16_t cr_check_prospective_entity_collision(int16_t ent, int16_t scr,
 int16_t cr_render_entity_sprite_me3(int16_t ent, int16_t scr,
                                     uint16_t pc, uint16_t *out_pc);
 
-/* ---- Action script functions (callroutine_action.c) ---- */
+/* Action script functions (callroutine_action.c) */
 int16_t cr_actionscript_prepare_entity(int16_t ent, int16_t scr,
                                        uint16_t pc, uint16_t *out_pc);
 int16_t cr_actionscript_prepare_at_leader(int16_t ent, int16_t scr,

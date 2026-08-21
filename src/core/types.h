@@ -6,7 +6,7 @@
 #include <stddef.h>
 #include <string.h>
 
-/* SNES screen dimensions (hardware constants — do not change) */
+/* SNES screen dimensions (hardware constants, do not change) */
 #define SNES_WIDTH  256
 #define SNES_HEIGHT 224
 
@@ -44,20 +44,20 @@
 #define OAM_SIZE     544      /* 512 + 32 bytes */
 #define WRAM_SIZE    0x20000  /* 128KB */
 
-/* Framebuffer pixel type — 16-bit. Default layout is BGR565; ports whose
+/* Framebuffer pixel type, 16-bit. Default layout is BGR565; ports whose
  * panel hardware expects RGB565 can compile with -DEB_PIXEL_RGB565=1 to
  * swap the red/blue channel positions everywhere a pixel is *constructed*
  * (palette conversion, PIXEL_RGB literals). The arithmetic operators on
  * pixel_t (blend_colors, pixel_apply_brightness) are bit-position symmetric
- * and work for either layout unchanged — green stays at bits [10:5] in both.
+ * and work for either layout unchanged, green stays at bits [10:5] in both.
  *
  * Cost of the toggle: a one-time tweak of bgr555_to_pixel() and PIXEL_RGB();
  * the per-frame palette shadow (ppu_render.c::cgram_render) carries the chosen
  * layout into every downstream pixel for free, saving the port a per-pixel
  * swap in send_scanline().
  *
- * BGR565 layout: BBBBBGGGGGGRRRRR — R[4:0], G[10:5], B[15:11]
- * RGB565 layout: RRRRRGGGGGGBBBBB — R[15:11], G[10:5], B[4:0] */
+ * BGR565 layout: BBBBBGGGGGGRRRRR, R[4:0], G[10:5], B[15:11]
+ * RGB565 layout: RRRRRGGGGGGBBBBB, R[15:11], G[10:5], B[4:0] */
 typedef uint16_t pixel_t;
 
 /* Colour helpers (SNES BGR555 format) */
@@ -88,7 +88,7 @@ static inline pixel_t bgr555_to_pixel(uint16_t bgr) {
 #endif
 }
 
-/* Apply SNES brightness (0-15) to a pixel. Bit-position symmetric — works
+/* Apply SNES brightness (0-15) to a pixel. Bit-position symmetric, works
  * for both BGR565 and RGB565 because green is at [10:5] in both and the
  * outer 5-bit fields are treated identically. */
 static inline pixel_t pixel_apply_brightness(pixel_t px, uint8_t brightness) {
@@ -147,7 +147,7 @@ static inline uint32_t pixel_to_rgb888(pixel_t px) {
  * byte-identical on both. Declaring a pointer field with ABI_PTR_ALIGN (force 8-byte
  * alignment on every ABI) followed by ABI_PTR_PAD(name) (a 4-byte tail filler on
  * 32-bit only) makes the field occupy the SAME 8-byte, 8-aligned slot everywhere, so
- * the enclosing struct's size + every field offset match across ABIs — with no change
+ * the enclosing struct's size + every field offset match across ABIs, with no change
  * at the pointer's use sites. The slot's bytes are meaningless across a load anyway
  * (the live pointer is rebound from a serializable companion; see state_dump_load).
  * Usage:

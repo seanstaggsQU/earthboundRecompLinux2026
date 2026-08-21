@@ -91,8 +91,8 @@ void check_door_in_direction(uint16_t direction);
 void check_door_near_leader(uint16_t direction);
 
 /* Full door transition sequence (port of DOOR_TRANSITION,
- * asm/overworld/door_transition.asm) — text display, event flag checks, screen
- * transition, map loading, music resolution, party placement — runs as
+ * asm/overworld/door_transition.asm), text display, event flag checks, screen
+ * transition, map loading, music resolution, party placement, runs as
  * GAME_MODE_DOOR_TRANSITION (mode_step_door_transition), STEP_PUSHed directly by
  * GAME_MODE_PROCESS_INTERACTION. The blocking door_transition() pump bridge was
  * deleted in D4b. */

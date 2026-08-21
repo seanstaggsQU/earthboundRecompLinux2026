@@ -28,7 +28,7 @@
 #include <string.h>
 #include <math.h>
 
-/* ---- Static cr_* functions moved from callroutine.c ---- */
+/* Static cr_* functions moved from callroutine.c */
 
 int16_t cr_decompress_title_data(int16_t ent, int16_t scr,
                                  uint16_t pc, uint16_t *out_pc) {
@@ -57,7 +57,7 @@ int16_t cr_load_title_palette(int16_t ent, int16_t scr,
         /* Decompress directly into ert.palettes, matching the assembly which
          * writes to PALETTES in-place.  The decompressed palette is only 256
          * bytes (128 colors, indices 0-127).  Colors 128-255 must NOT be
-         * zeroed — they retain the sprite palette from the initial load. */
+         * zeroed, they retain the sprite palette from the initial load. */
         decomp(comp_data, comp_size, (uint8_t *)ert.palettes,
                sizeof(ert.palettes));
     }
@@ -78,13 +78,13 @@ int16_t cr_show_entity_sprite(int16_t ent, int16_t scr,
     return 0;
 }
 
-/* ENTITY_HDMA_SCANLINE_WIDTH_TABLE (C474F6) — half-width of oval window
+/* ENTITY_HDMA_SCANLINE_WIDTH_TABLE (C474F6), half-width of oval window
  * at each of the 11 scanline rows around an entity sprite. */
 static const uint8_t entity_hdma_scanline_width[11] = {
     0x10, 0x10, 0x0F, 0x0F, 0x0E, 0x0D, 0x0C, 0x0B, 0x09, 0x06, 0x03
 };
 
-/* render_entity_hdma_window — Port of RENDER_ENTITY_HDMA_WINDOW.
+/* render_entity_hdma_window, Port of RENDER_ENTITY_HDMA_WINDOW.
  * Builds per-scanline window tables creating a vertical beam above the entity
  * that narrows into an oval at the entity position.
  *
@@ -167,12 +167,12 @@ void render_entity_hdma_window(int16_t entity_offset,
             wh_left_table[s] = 0;
             wh_right_table[s] = (uint8_t)right;
         }
-        /* else both off screen — keep 128/127 */
+        /* else both off screen, keep 128/127 */
     }
 }
 
 /*
- * Tick callback ROM addresses — used by dispatch_tick_callback.
+ * Tick callback ROM addresses, used by dispatch_tick_callback.
  */
 #define TICK_ADDR_UPDATE_OVERWORLD_FRAME            0xC05200
 #define TICK_ADDR_UPDATE_LEADER_MOVEMENT            0xC04236
@@ -201,7 +201,7 @@ void render_entity_hdma_window(int16_t entity_offset,
 #define TICK_ADDR_UPDATE_PARTY_FOLLOWER_MOVEMENT 0xEF031E
 
 /*
- * dispatch_tick_callback — called from script.c after running all scripts
+ * dispatch_tick_callback, called from script.c after running all scripts
  * for an entity. Dispatches the entity's tick callback by ROM address.
  *
  * Port of the JUMP_TO_LOADED_MOVEMENT_PTR call in RUN_ENTITY_SCRIPTS_AND_TICK.
@@ -210,13 +210,13 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
     uint16_t dummy_pc;
     switch (rom_addr) {
     case TICK_ADDR_UPDATE_OVERWORLD_FRAME:
-        /* C05200: UPDATE_OVERWORLD_FRAME — init entity (slot 23) tick callback.
+        /* C05200: UPDATE_OVERWORLD_FRAME, init entity (slot 23) tick callback.
          * Set by EVENT_001 (main overworld tick). Handles animated tiles/ert.palettes, then calls
          * UPDATE_LEADER_MOVEMENT internally. */
         update_overworld_frame(entity_offset);
         break;
     case TICK_ADDR_UPDATE_LEADER_MOVEMENT:
-        /* C04236: UPDATE_LEADER_MOVEMENT — leader entity tick callback.
+        /* C04236: UPDATE_LEADER_MOVEMENT, leader entity tick callback.
          * Syncs position_index, checks tile collision, writes ert.buffer.
          * NOTE: In normal gameplay this is NOT set as a tick callback directly.
          * UPDATE_OVERWORLD_FRAME calls it. This case exists for completeness. */
@@ -226,7 +226,7 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
         cr_update_entity_animation(entity_offset, -1, 0, &dummy_pc);
         break;
     case TICK_ADDR_UPDATE_FOLLOWER_STATE:
-        /* C04D78: UPDATE_FOLLOWER_STATE — reads position from
+        /* C04D78: UPDATE_FOLLOWER_STATE, reads position from
          * PLAYER_POSITION_BUFFER and updates follower entity. */
         update_follower_state(entity_offset);
         break;
@@ -250,13 +250,13 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
                                           + entities.var[1][entity_offset];
         break;
     case TICK_ADDR_RESET_ENTITY_PATHFINDING:
-        /* C0D7E0: RESET_ENTITY_PATHFINDING — if pathfinding state is non-zero,
+        /* C0D7E0: RESET_ENTITY_PATHFINDING, if pathfinding state is non-zero,
          * set it to 1 (request reset). Used as tick callback by event 026. */
         if (entities.pathfinding_states[entity_offset] != 0)
             entities.pathfinding_states[entity_offset] = 1;
         break;
     case TICK_ADDR_ENTITY_PATHFINDING_STEP: {
-        /* C0D7F7: ENTITY_PATHFINDING_STEP — execute one frame of pathfinding
+        /* C0D7F7: ENTITY_PATHFINDING_STEP, execute one frame of pathfinding
          * movement toward the next waypoint in the entity's path.
          *
          * Checks if entity is within 3 pixels of current target. If so,
@@ -289,7 +289,7 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
         int16_t diff_x = from_x - target_x;
         int16_t diff_y = from_y - target_y;
         if (abs(diff_x) < 3 && abs(diff_y) < 3) {
-            /* Reached waypoint — advance to next */
+            /* Reached waypoint, advance to next */
             ert.entity_path_point_counts[ent]--;
             if (ert.entity_path_point_counts[ent] > 0) {
                 path_ptr += 4;
@@ -316,14 +316,14 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
             entities.moving_directions[ent] = dir;
             entities.directions[ent] = dir;
         } else {
-            /* Pathfinding complete — clear state, set obstacle bit 7 */
+            /* Pathfinding complete, clear state, set obstacle bit 7 */
             entities.pathfinding_states[ent] = 0;
             entities.obstacle_flags[ent] |= 0x0080;
         }
         break;
     }
     case TICK_ADDR_MAKE_PARTY_LOOK_AT_ENTITY: {
-        /* C48B3B: MAKE_PARTY_LOOK_AT_ACTIVE_ENTITY — make all party members
+        /* C48B3B: MAKE_PARTY_LOOK_AT_ACTIVE_ENTITY, make all party members
          * face toward the current entity. Assembly only runs on even frames
          * (FRAME_COUNTER & 1 == 0). Iterates party members, calculates
          * direction, and updates sprite if direction changed. */
@@ -347,19 +347,19 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
         break;
     }
     case TICK_ADDR_ANIMATED_BACKGROUND_CALLBACK:
-        /* C48BDA: ACTIONSCRIPT_ANIMATED_BACKGROUND_CALLBACK —
+        /* C48BDA: ACTIONSCRIPT_ANIMATED_BACKGROUND_CALLBACK , 
          * Just calls UPDATE_BATTLE_SCREEN_EFFECTS. */
         update_battle_screen_effects();
         break;
     case TICK_ADDR_CENTRE_SCREEN_ON_ENTITY:
-        /* C48C2B: ACTIONSCRIPT_CENTRE_SCREEN_ON_ENTITY_CALLBACK —
+        /* C48C2B: ACTIONSCRIPT_CENTRE_SCREEN_ON_ENTITY_CALLBACK , 
          * Centers camera on entity position via CENTER_SCREEN. */
         center_screen(
             (uint16_t)entities.abs_x[entity_offset],
             (uint16_t)entities.abs_y[entity_offset]);
         break;
     case TICK_ADDR_CENTRE_SCREEN_ON_ENTITY_OFS:
-        /* C48C3E: ACTIONSCRIPT_CENTRE_SCREEN_ON_ENTITY_CALLBACK_OFFSET —
+        /* C48C3E: ACTIONSCRIPT_CENTRE_SCREEN_ON_ENTITY_CALLBACK_OFFSET , 
          * Same as above but adds var0 (X offset) and var1 (Y offset). */
         center_screen(
             (uint16_t)(entities.abs_x[entity_offset] + entities.var[0][entity_offset]),
@@ -381,16 +381,16 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
         psi_teleport_decelerate_tick(entity_offset);
         break;
     case TICK_ADDR_NOP:
-        /* C0E979: TICK_CALLBACK_NOP — no-op tick callback.
+        /* C0E979: TICK_CALLBACK_NOP, no-op tick callback.
          * Used as placeholder when no per-frame handler is needed. */
         break;
     case TICK_ADDR_HANDLE_CAST_SCROLLING:
-        /* C4E51E: HANDLE_CAST_SCROLLING — cast scene tick callback.
+        /* C4E51E: HANDLE_CAST_SCROLLING, cast scene tick callback.
          * Sets BG3_Y to entity Y, clears tilemap rows as they scroll. */
         handle_cast_scrolling(entity_offset);
         break;
     case TICK_ADDR_UPDATE_ENTITY_SURFACE_AND_GRAPHICS: {
-        /* C0E97C: UPDATE_ENTITY_SURFACE_AND_GRAPHICS —
+        /* C0E97C: UPDATE_ENTITY_SURFACE_AND_GRAPHICS , 
          * Updates entity surface flags from map data, then refreshes
          * party member graphics. Used during teleport failure.
          * Port of asm/overworld/entity/update_entity_surface_and_graphics.asm. */
@@ -408,14 +408,14 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
         break;
     }
     case TICK_ADDR_APPLY_ENTITY_RECT_WINDOW: {
-        /* C479E9: APPLY_ENTITY_RECT_WINDOW — per-frame tick callback.
+        /* C479E9: APPLY_ENTITY_RECT_WINDOW, per-frame tick callback.
          * Creates a rectangular window around the entity using var0 as half-size.
          * Calls SETUP_RECT_WINDOW_HDMA → ENABLE_OBJ_HDMA which sets WOBJSEL=0xA0
          * and drives WH0/WH1 via HDMA channel 4.
          *
          * Assembly reads an uninitialized stack variable for "top" which is 0
          * on real SNES (zeroed memory), making the window span from scanline 0
-         * down to (screen_y + var0) — creating a beam from the sky. */
+         * down to (screen_y + var0), creating a beam from the sky. */
         int16_t screen_x = (int16_t)((uint16_t)entities.abs_x[entity_offset]
                            - ppu.bg_hofs[0]);
         int16_t screen_y = (int16_t)((uint16_t)entities.abs_y[entity_offset]
@@ -447,19 +447,19 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
         break;
     }
     case TICK_ADDR_SETUP_ENTITY_HDMA_WINDOW_CH4:
-        /* C476A5: SETUP_ENTITY_HDMA_WINDOW_CH4 — per-frame tick callback.
+        /* C476A5: SETUP_ENTITY_HDMA_WINDOW_CH4, per-frame tick callback.
          * Builds oval window around entity using WH0/WH1 (HDMA channel 4). */
         render_entity_hdma_window(entity_offset, ppu.wh0_table, ppu.wh1_table);
         ppu.window_hdma_active = true;
         break;
     case TICK_ADDR_SETUP_ENTITY_HDMA_WINDOW_CH5:
-        /* C47705: SETUP_ENTITY_HDMA_WINDOW_CH5 — per-frame tick callback.
+        /* C47705: SETUP_ENTITY_HDMA_WINDOW_CH5, per-frame tick callback.
          * Builds oval window around entity using WH2/WH3 (HDMA channel 5). */
         render_entity_hdma_window(entity_offset, ppu.wh2_table, ppu.wh3_table);
         ppu.window2_hdma_active = true;
         break;
     case TICK_ADDR_CENTER_CAMERA_WITH_RECT_WINDOW: {
-        /* C47A27: CENTER_CAMERA_WITH_RECT_WINDOW — per-frame tick callback.
+        /* C47A27: CENTER_CAMERA_WITH_RECT_WINDOW, per-frame tick callback.
          * Centers camera Y on the current entity, then creates a rectangular
          * HDMA window around the party leader's Y position.
          * Port of asm/text/window/center_camera_with_rect_window.asm.
@@ -499,7 +499,7 @@ void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
         break;
     }
     case TICK_ADDR_UPDATE_PARTY_FOLLOWER_MOVEMENT: {
-        /* EF031E: UPDATE_PARTY_FOLLOWER_MOVEMENT — per-frame tick callback.
+        /* EF031E: UPDATE_PARTY_FOLLOWER_MOVEMENT, per-frame tick callback.
          * Alternative follower movement for non-standard party members
          * (e.g., Bubble Monkey). Reads position from the position buffer
          * using char_struct::position_index, handles bubble monkey behavioral
@@ -616,7 +616,7 @@ follower_update_timer:
     }
 }
 
-/* ---- Inline switch case wrappers ---- */
+/* Inline switch case wrappers */
 
 int16_t cr_disable_obj_hdma(int16_t entity_offset, int16_t script_offset,
                             uint16_t pc, uint16_t *out_pc) {
@@ -653,7 +653,7 @@ int16_t cr_decomp_itoi_production(int16_t entity_offset, int16_t script_offset,
      * SET_BUFFER_TILEMAP_PRIORITY: ORs 0x2000 onto all 1024 tilemap words. */
     *out_pc = pc;
 
-    /* Step 1: Arrangement tilemap — decompress directly to VRAM $7C00 */
+    /* Step 1: Arrangement tilemap, decompress directly to VRAM $7C00 */
     size_t comp_sz = ASSET_SIZE(ASSET_INTRO_ATTRACT_PRODUCED_BY_ITOI_ARR_LZHAL);
     const uint8_t *comp = ASSET_DATA(ASSET_INTRO_ATTRACT_PRODUCED_BY_ITOI_ARR_LZHAL);
     if (comp) {
@@ -669,7 +669,7 @@ int16_t cr_decomp_itoi_production(int16_t entity_offset, int16_t script_offset,
         }
     }
 
-    /* Step 2: Graphics tiles — decompress directly to VRAM $6000 */
+    /* Step 2: Graphics tiles, decompress directly to VRAM $6000 */
     comp_sz = ASSET_SIZE(ASSET_INTRO_ATTRACT_PRODUCED_BY_ITOI_GFX_LZHAL);
     comp = ASSET_DATA(ASSET_INTRO_ATTRACT_PRODUCED_BY_ITOI_GFX_LZHAL);
     if (comp) {
@@ -681,7 +681,7 @@ int16_t cr_decomp_itoi_production(int16_t entity_offset, int16_t script_offset,
     comp = ASSET_DATA(ASSET_INTRO_ATTRACT_NINTENDO_ITOI_PAL_LZHAL);
     if (comp) {
         decomp(comp, comp_sz, (uint8_t *)ert.palettes, sizeof(ert.palettes));
-        ert.palettes[0] = 0;  /* STZ PALETTES — transparent color 0 */
+        ert.palettes[0] = 0;  /* STZ PALETTES, transparent color 0 */
         ert.palette_upload_mode = PALETTE_UPLOAD_FULL;
     }
     return 0;
@@ -693,7 +693,7 @@ int16_t cr_decomp_nintendo_presentation(int16_t entity_offset, int16_t script_of
      * Same structure as DECOMP_ITOI_PRODUCTION but with Nintendo assets. */
     *out_pc = pc;
 
-    /* Step 1: Arrangement tilemap — decompress directly to VRAM $7C00 */
+    /* Step 1: Arrangement tilemap, decompress directly to VRAM $7C00 */
     size_t comp_sz = ASSET_SIZE(ASSET_INTRO_ATTRACT_NINTENDO_PRESENTATION_ARR_LZHAL);
     const uint8_t *comp = ASSET_DATA(ASSET_INTRO_ATTRACT_NINTENDO_PRESENTATION_ARR_LZHAL);
     if (comp) {
@@ -707,7 +707,7 @@ int16_t cr_decomp_nintendo_presentation(int16_t entity_offset, int16_t script_of
         }
     }
 
-    /* Step 2: Graphics tiles — decompress directly to VRAM $6000 */
+    /* Step 2: Graphics tiles, decompress directly to VRAM $6000 */
     comp_sz = ASSET_SIZE(ASSET_INTRO_ATTRACT_NINTENDO_PRESENTATION_GFX_LZHAL);
     comp = ASSET_DATA(ASSET_INTRO_ATTRACT_NINTENDO_PRESENTATION_GFX_LZHAL);
     if (comp) {
@@ -727,7 +727,7 @@ int16_t cr_decomp_nintendo_presentation(int16_t entity_offset, int16_t script_of
 
 int16_t cr_play_flyover_script(int16_t entity_offset, int16_t script_offset,
                                uint16_t pc, uint16_t *out_pc) {
-    /* PLAY_FLYOVER_SCRIPT (C49EC4) — flyover text sequence.
+    /* PLAY_FLYOVER_SCRIPT (C49EC4), flyover text sequence.
      * Script ID comes from A register / tempvar. The synchronous prologue
      * runs here; the interpreter/fade/display sequence runs as a
      * GAME_MODE_FLYOVER child pushed by GAME_MODE_ACTIONSCRIPT_FRAME. */
@@ -761,7 +761,7 @@ int16_t cr_test_player_in_area(int16_t entity_offset, int16_t script_offset,
      * Assembly lines 9-12: if PSI_TELEPORT_DESTINATION != 0, return FALSE immediately. */
     *out_pc = pc;
     if (ow.psi_teleport_destination != 0)
-        return 0;  /* FALSE — player is teleporting */
+        return 0;  /* FALSE, player is teleporting */
     int16_t dx = entities.var[0][entity_offset] - (int16_t)game_state.leader_x_coord;
     int16_t dy = entities.var[1][entity_offset] - (int16_t)game_state.leader_y_coord;
     if (dx < 0) dx = -dx;
@@ -777,7 +777,7 @@ int16_t cr_make_party_look_at_entity(int16_t entity_offset, int16_t script_offse
                                      uint16_t pc, uint16_t *out_pc) {
     /* Port of C48B3B: make all party members face toward current entity.
      * Assembly checks party_order validity and only updates sprite on direction change.
-     * Assembly: LDA FRAME_COUNTER; AND #1; BNEL @RETURN — only runs on even frames. */
+     * Assembly: LDA FRAME_COUNTER; AND #1; BNEL @RETURN, only runs on even frames. */
     *out_pc = pc;
     if (core.frame_counter & 1)
         return 0;
@@ -834,7 +834,7 @@ int16_t cr_movement_cmd_calc_travel_frames(int16_t entity_offset, int16_t script
 
 int16_t cr_movement_cmd_return_2(int16_t entity_offset, int16_t script_offset,
                                  uint16_t pc, uint16_t *out_pc) {
-    /* Assembly: LDX #$0002; RTL — always returns 2. */
+    /* Assembly: LDX #$0002; RTL, always returns 2. */
     *out_pc = pc;
     return 2;
 }

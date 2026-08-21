@@ -1,4 +1,4 @@
-/* Flyover text system — port of C4 bank flyover rendering functions.
+/* Flyover text system, port of C4 bank flyover rendering functions.
  *
  * Assembly sources:
  *   BLIT_FONT_TO_VWF_BUFFER     (C49875.asm, 145 lines)
@@ -34,16 +34,16 @@
 
 #include "game_main.h"
 
-/* ======================================================================
- * Flyover VWF ert.buffer — separate from the window system's VWF ert.buffer.
+/*
+ * Flyover VWF ert.buffer, separate from the window system's VWF ert.buffer.
  * Layout: 26 tiles per row, each tile = 16 bytes (8x8 2bpp).
  *   Bytes 0-415:   Row 0 top halves (26 × 16)
  *   Bytes 416-831: Row 0 bottom halves (26 × 16)
  *   Bytes 832+:    Additional rows
  * Total: VWF_BUFFER_SIZE = 52 × 32 = 1664 bytes
- * ====================================================================== */
+ */
 
-/* Share the normal window VWF buffer — flyover is a blocking full-screen
+/* Share the normal window VWF buffer, flyover is a blocking full-screen
  * takeover that never runs render_all_windows(), so the two uses are
  * mutually exclusive.  flyover_init_screen() memsets before first use. */
 #define flyover_vwf vwf_buffer
@@ -59,7 +59,7 @@ static uint16_t flyover_screen_offset;
 static uint16_t flyover_pixel_offset;
 static uint16_t flyover_byte_offset;
 
-/* ---- Savestate snapshot (see FlyoverSaveState in flyover.h) ---- */
+/* Savestate snapshot (see FlyoverSaveState in flyover.h) */
 void flyover_savestate_pack(void *out) {
     FlyoverSaveState *s = (FlyoverSaveState *)out;
     s->flyover_vwf_x        = flyover_vwf_x;
@@ -87,7 +87,7 @@ void flyover_savestate_unpack(const void *in) {
 }
 
 /* Script asset for each flyover ID (file scope so mode_step_flyover can re-derive
- * the script pointer from the saved id). Use .bin — ebtools decodes .flyover into
+ * the script pointer from the saved id). Use .bin, ebtools decodes .flyover into
  * assembly source, but the C port needs raw binary bytecodes. */
 static const AssetId flyover_script_ids[8] = {
     ASSET_FLYOVER_INTRO1_BIN,
@@ -105,7 +105,7 @@ static const AssetId flyover_script_ids[8] = {
 /* Total VRAM size for flyover tiles: 32 rows × 416 bytes = 13312 = 0x3400 */
 #define FLYOVER_VRAM_TOTAL   0x3400
 
-/* ======================================================================
+/*
  * BLIT_FONT_TO_VWF_BUFFER (C49875)
  *
  * Blits a font glyph into the flyover VWF ert.buffer at the current position.
@@ -114,7 +114,7 @@ static const AssetId flyover_script_ids[8] = {
  * Assembly params: A=width, X=font_default_width (unused), Y=vwf_base,
  *                  @PARAM03=glyph_ptr (32-bit)
  * C port params: glyph_data=1bpp glyph, width=pixel width to blit
- * ====================================================================== */
+ */
 static void flyover_blit_font(const uint8_t *glyph_data, uint16_t width) {
     uint16_t pixel_sub = flyover_pixel_offset % 8;  /* sub-byte position */
     uint16_t base_pos = flyover_byte_offset;         /* byte offset of current tile */
@@ -146,7 +146,7 @@ static void flyover_blit_font(const uint8_t *glyph_data, uint16_t width) {
     uint16_t new_byte_offset = (flyover_pixel_offset / 8) * 16;
     if (new_byte_offset == flyover_byte_offset) return;
 
-    /* Handle overlap: glyph spans two tiles — blit remaining bits into next tile */
+    /* Handle overlap: glyph spans two tiles, blit remaining bits into next tile */
     flyover_byte_offset = new_byte_offset;
     uint16_t left_shift = 8 - pixel_sub;
 
@@ -168,12 +168,12 @@ static void flyover_blit_font(const uint8_t *glyph_data, uint16_t width) {
     }
 }
 
-/* ======================================================================
+/*
  * RENDER_LARGE_FONT_CHARACTER (C4999B)
  *
  * Renders an EB character (0x50+) using FONT_ID_LARGE into the flyover
  * VWF ert.buffer. Handles wide glyphs (>8px) by blitting in 8px chunks.
- * ====================================================================== */
+ */
 static void flyover_render_large_char(uint16_t eb_char) {
     uint8_t glyph_index = (uint8_t)((eb_char - 0x50) & 0x7F);
 
@@ -201,14 +201,14 @@ static void flyover_render_large_char(uint16_t eb_char) {
     flyover_blit_font(src, total_width);
 }
 
-/* ======================================================================
- * RENDER_FLYOVER_TEXT_CHARACTER (C49D16) — thin wrapper
- * ====================================================================== */
+/*
+ * RENDER_FLYOVER_TEXT_CHARACTER (C49D16), thin wrapper
+ */
 static void flyover_render_text_char(uint16_t eb_char) {
     flyover_render_large_char(eb_char);
 }
 
-/* ======================================================================
+/*
  * RENDER_PARTY_MEMBER_NAME (C49CC3)
  *
  * Renders up to 5 characters of a party member's name using LARGE font.
@@ -216,7 +216,7 @@ static void flyover_render_text_char(uint16_t eb_char) {
  *
  * Assembly: char_id is 1-based party member index.
  * BRANCHGTS after CLC;SBC #79: branches while char > 0x50 (0x50 = space)
- * ====================================================================== */
+ */
 static void flyover_render_party_name(uint16_t char_id) {
     if (char_id < 1 || char_id > 4) return;
     CharStruct *ch = &party_characters[char_id - 1];
@@ -229,13 +229,13 @@ static void flyover_render_party_name(uint16_t char_id) {
     }
 }
 
-/* ======================================================================
+/*
  * INVERT_VWF_BUFFER (C4984B)
  *
  * XORs entire flyover VWF ert.buffer with 0xFFFF.
  * Called before VRAM upload to convert from mask format
  * (0=glyph, 1=bg) to display format (1=glyph, 0=bg).
- * ====================================================================== */
+ */
 static void flyover_invert_vwf(void) {
     uint16_t *buf = (uint16_t *)flyover_vwf;
     /* 32 * 26 = 832 words = 1664 bytes = full ert.buffer */
@@ -244,7 +244,7 @@ static void flyover_invert_vwf(void) {
     }
 }
 
-/* ======================================================================
+/*
  * Helper: set BG3 VRAM location registers.
  * Port of SET_BG3_VRAM_LOCATION (set_bg3_vram_location.asm).
  *
@@ -252,7 +252,7 @@ static void flyover_invert_vwf(void) {
  * BG3SC = ((X>>8) & 0xFC) | (A & 0x03)
  * BG34NBA low nibble = (Y>>12) & 0x0F
  * Scroll positions reset to 0.
- * ====================================================================== */
+ */
 static void set_bg3_vram_location(uint16_t tilemap_size, uint16_t tilemap_base,
                                    uint16_t tile_base) {
     ppu.bg_sc[2] = (uint8_t)(((tilemap_base >> 8) & 0xFC) | (tilemap_size & 0x03));
@@ -261,7 +261,7 @@ static void set_bg3_vram_location(uint16_t tilemap_size, uint16_t tilemap_base,
     ppu.bg_vofs[2] = 0;
 }
 
-/* ======================================================================
+/*
  * INIT_FLYOVER_TEXT_SCREEN (C49A56)
  *
  * Initializes the flyover text display:
@@ -272,8 +272,8 @@ static void set_bg3_vram_location(uint16_t tilemap_size, uint16_t tilemap_base,
  *   5. Build BG2_BUFFER tilemap (26 usable tiles per row, 32 rows)
  *   6. Upload tilemap to VRAM
  *   7. Initialize flyover state variables
- * ====================================================================== */
-/* The synchronous middle of flyover_init_screen() — everything between the
+ */
+/* The synchronous middle of flyover_init_screen(), everything between the
  * leading force-blank and the trailing blank-screen frame. Exposed so the
  * mode-step (FOP_CT_INIT_BODY) can run it between its own park-propagating
  * force/blank frames; the blocking flyover_init_screen() wrapper below keeps it
@@ -286,7 +286,7 @@ static void flyover_init_screen_body(void) {
     /* Widescreen viewport-fill: this is the same fixed VRAM_TEXT_LAYER_TILEMAP
      * address the window system always writes to (window.c), so like every
      * other BG3-as-text-layer setup in this codebase it must CENTER, not
-     * wrap/duplicate across the wide viewport -- see the load_battle_bg()
+     * wrap/duplicate across the wide viewport, see the load_battle_bg()
      * comment in battle_ui.c for the full explanation of this bug class.
      * Never set here before, so this screen (location-name flyover text,
      * e.g. "Twoson" scrolling in when entering a new town) inherited
@@ -368,7 +368,7 @@ static void flyover_init_screen(void) {
     blank_screen_and_wait_vblank();
 }
 
-/* ======================================================================
+/*
  * UPLOAD_VWF_BUFFER_TO_VRAM (C49B6E)
  *
  * Inverts the VWF ert.buffer and uploads it to VRAM at the correct position
@@ -378,7 +378,7 @@ static void flyover_init_screen(void) {
  * VRAM layout: 32 rows of 26 tiles at TEXT_LAYER_TILES + 0x150 (word offset).
  * Each row = 0x1A0 bytes (26 tiles × 16 bytes). Total = 0x3400 bytes.
  * Upload size = 0x04E0 bytes (3 rows).
- * ====================================================================== */
+ */
 static void flyover_upload_vwf_to_vram_work(void) {
     flyover_invert_vwf();
 
@@ -413,14 +413,14 @@ static void flyover_upload_vwf_to_vram_work(void) {
     flyover_dirty_max = 0;
 }
 
-/* ======================================================================
+/*
  * SCROLL_FLYOVER_TEXT (C49C56, US version)
  *
  * Advances the text position by 'advance_y' pixels vertically.
  * Updates screen_offset for VRAM row wrapping.
  * Clears the VWF ert.buffer for the next line of text.
  * Resets horizontal position.
- * ====================================================================== */
+ */
 static void flyover_scroll_text(uint16_t advance_y) {
     flyover_vwf_y += advance_y;
     flyover_vwf_x = 0;
@@ -442,13 +442,13 @@ static void flyover_scroll_text(uint16_t advance_y) {
     flyover_byte_offset = 0;
 }
 
-/* ======================================================================
+/*
  * ADVANCE_FLYOVER_PIXEL_OFFSET (C49CA8)
  *
  * Advances the horizontal pixel position by (param + 8).
  * Updates flyover_byte_offset accordingly.
  * Used by flyover script opcode 0x01 for indentation/spacing.
- * ====================================================================== */
+ */
 static void flyover_advance_pixel_offset(uint16_t advance) {
     uint16_t val = (advance & 0xFF) + 8;
     flyover_pixel_offset += val;
@@ -456,7 +456,7 @@ static void flyover_advance_pixel_offset(uint16_t advance) {
     flyover_byte_offset = (flyover_pixel_offset >> 3) << 4;
 }
 
-/* ======================================================================
+/*
  * ADVANCE_TEXT_LINE_POSITION (C49D1E)
  *
  * Smoothly scrolls BG3 by advancing a sub-pixel accumulator.
@@ -465,7 +465,7 @@ static void flyover_advance_pixel_offset(uint16_t advance) {
  *
  * Assembly: accumulator format = low 8 bits are sub-pixel,
  * high 8 bits count whole-pixel scrolls.
- * ====================================================================== */
+ */
 static uint16_t flyover_advance_text_line(uint16_t accumulator) {
     oam_clear();
 
@@ -486,13 +486,13 @@ static uint16_t flyover_advance_text_line(uint16_t accumulator) {
     return new_accum;
 }
 
-/* ======================================================================
+/*
  * UNDRAW_FLYOVER_TEXT (undraw_flyover_text.asm)
  *
  * Restores the normal BG3 text layer configuration after flyover mode.
- * ====================================================================== */
+ */
 void undraw_flyover_text(void) {
-    /* SET_BG3_VRAM_LOCATION(NORMAL, 0x7C00, 0x6000) — same as init */
+    /* SET_BG3_VRAM_LOCATION(NORMAL, 0x7C00, 0x6000): same as init */
     set_bg3_vram_location(0, VRAM_TEXT_LAYER_TILEMAP, VRAM_TEXT_LAYER_TILES);
 
     /* Restore battle screen tilemap to VRAM */
@@ -510,12 +510,12 @@ void undraw_flyover_text(void) {
     ert.palette_upload_mode = PALETTE_UPLOAD_FULL;
 }
 
-/* ======================================================================
+/*
  * Helper: load_background_animation (load_background_animation.asm)
  *
  * Sets up BG mode 1, configures BG1/BG2 VRAM locations, loads battle BG.
  * Used by COFFEETEA_SCENE for coffee/tea animated backgrounds.
- * ====================================================================== */
+ */
 void load_background_animation(uint16_t bg1_layer, uint16_t bg2_layer) {
     force_blank_and_wait_vblank();
 
@@ -546,7 +546,7 @@ void load_background_animation(uint16_t bg1_layer, uint16_t bg2_layer) {
 #define BATTLEBG_TEA1    233
 #define BATTLEBG_TEA2    234
 
-/* ======================================================================
+/*
  * GAME_MODE_FLYOVER step
  *
  * Run-to-completion form of play_flyover_script() (FO_SCRIPT) and
@@ -556,14 +556,14 @@ void load_background_animation(uint16_t bg1_layer, uint16_t bg2_layer) {
  * (`continue`) and returns CONTINUE only at the original's yield points. The
  * flyover brightness ramps (no mosaic) are inlined; the script-render statics
  * (flyover_screen_offset, …) stay in .bss.
- * ====================================================================== */
+ */
 StepResult mode_step_flyover(ModeState *st) {
     FlyoverState *s = &st->flyover;
 
     for (;;) {
         switch ((FlyoverPhase)s->phase) {
 
-        /* ---------------- FO_SCRIPT (play_flyover_script) ---------------- */
+        /* FO_SCRIPT (play_flyover_script) */
         case FOP_S_PARSE: {
             const uint8_t *script = ASSET_DATA(flyover_script_ids[s->id]);
             /* opcode 0x09 continuation: upload (yielded) -> wait -> scroll. */
@@ -670,7 +670,7 @@ StepResult mode_step_flyover(ModeState *st) {
         case FOP_S_DONE:
             return STEP_RESULT_POP(0);
 
-        /* ---------------- FO_COFFEETEA (coffeetea_scene) ---------------- */
+        /* FO_COFFEETEA (coffeetea_scene) */
         case FOP_CT_FADEOUT1:
             /* flyover_fade_out_blocking(1, 1, 0): ramp down, delay 1, no mosaic. */
             if (s->ramp_delay_left > 0) { s->ramp_delay_left--; return STEP_RESULT_CONTINUE(); }
@@ -858,7 +858,7 @@ StepResult mode_step_flyover(ModeState *st) {
     }
 }
 
-/* ======================================================================
+/*
  * PLAY_FLYOVER_SCRIPT (C49EC4)
  *
  * Bytecode interpreter for flyover text scripts.
@@ -872,7 +872,7 @@ StepResult mode_step_flyover(ModeState *st) {
  *
  * After parsing, fades in (mosaic), displays for 180 frames, fades out.
  * Then restores normal display.
- * ====================================================================== */
+ */
 bool play_flyover_script_prepare(uint16_t id, uint16_t *saved_ent23_tick_hi,
                                  uint32_t *script_size) {
     if (id >= 8) return false;
@@ -896,7 +896,7 @@ bool play_flyover_script_prepare(uint16_t id, uint16_t *saved_ent23_tick_hi,
     return true;
 }
 
-/* ======================================================================
+/*
  * COFFEETEA_SCENE (coffee_tea_scene.asm)
  *
  * Full-screen animated text sequence for coffee/tea breaks (type 0 = coffee,
@@ -904,8 +904,8 @@ bool play_flyover_script_prepare(uint16_t id, uint16_t *saved_ent23_tick_hi,
  * (FO_COFFEETEA): fade out with mosaic, init flyover screen + load coffee/tea
  * battle BG, clear OAM, fade in, parse the smooth-scroll text script, fade out
  * and wait, reload map, clear BG2, undraw flyover, fade in. The blocking
- * coffeetea_scene() pump bridge was deleted (D4b); its sole caller — the debug
- * Tea command and CC_1F_41 cases 1/2 (GAME_MODE_SPECIAL_EVENT) — build the
+ * coffeetea_scene() pump bridge was deleted (D4b); its sole caller, the debug
+ * Tea command and CC_1F_41 cases 1/2 (GAME_MODE_SPECIAL_EVENT), build the
  * FO_COFFEETEA init and STEP_PUSH GAME_MODE_FLYOVER directly. (The script
  * null-check happens in FOP_CT_SETUP_C, after the fade/BG setup.)
- * ====================================================================== */
+ */

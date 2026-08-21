@@ -44,7 +44,7 @@ bool fade_active(void);
  * Loops until fade finishes, calling oam_clear + update_screen + wait each frame. */
 void wait_for_fade_complete(void);
 
-/* FADE_OUT_WITH_MOSAIC — fade out with optional mosaic effect.
+/* FADE_OUT_WITH_MOSAIC: fade out with optional mosaic effect.
  * step: brightness decrement per frame, delay_frames: wait between steps,
  * mosaic_enable: BG enable mask for mosaic (0 = no mosaic). */
 void fade_out_with_mosaic(uint16_t step, uint16_t delay_frames, uint16_t mosaic_enable);

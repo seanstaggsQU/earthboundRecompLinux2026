@@ -8,7 +8,7 @@
 #include <string.h>
 #include <sys/stat.h>
 
-/* Port headers FIRST — before prefix macros are active */
+/* Port headers FIRST, before prefix macros are active */
 #include "include/binary.h"
 #include "snes/ppu.h"
 
@@ -25,7 +25,7 @@
  * (decompression/DMA taking real cycles).
  *
  * We detect game frame boundaries by checking if the CPU is in the
- * WAIT_UNTIL_NEXT_FRAME spin loop — the point where game logic has
+ * WAIT_UNTIL_NEXT_FRAME spin loop, the point where game logic has
  * finished and the CPU is waiting for the next NMI.
  *
  * Phases:
@@ -111,7 +111,7 @@ static uint8_t emu_get_inidisp(void) {
 /* --- SIGTRAP / debugger break ---
  *
  * On first mismatch, raise(SIGTRAP) to break into an attached debugger.
- * If no debugger is attached, SIGTRAP would kill the process — so we
+ * If no debugger is attached, SIGTRAP would kill the process, so we
  * install a signal handler that just clears a flag and lets us continue.
  */
 static volatile sig_atomic_t debugger_available = 1;
@@ -121,7 +121,7 @@ static void sigtrap_handler(int sig) {
     debugger_available = 0;
 }
 
-/* --- Logging helpers --- */
+/* Logging helpers */
 
 static void log_mismatch(void) {
     if (mismatch_count > MISMATCH_LOG_MAX) return;
@@ -146,7 +146,7 @@ static void log_mismatch(void) {
     }
 }
 
-/* --- Dump files with port+emu frame in name --- */
+/* Dump files with port+emu frame in name */
 
 static void dump_binary(const char *name, const void *data, size_t size) {
     char path[256];
@@ -180,7 +180,7 @@ static void mirror_input(uint16_t pad_state) {
     }
 }
 
-/* --- PPU comparison functions --- */
+/* PPU comparison functions */
 
 /* Count VRAM mismatches, log and dump on first occurrence per frame */
 static bool compare_vram(void) {
@@ -297,7 +297,7 @@ static bool compare_oam(void) {
     return match;
 }
 
-/* --- Register/RAM comparison --- */
+/* Register/RAM comparison */
 
 static bool compare_ram_vars(void) {
     bool match = true;
@@ -323,7 +323,7 @@ static bool compare_ram_vars(void) {
         match = false;
     }
 
-    /* Layer enable (TM) — reconstruct from LakeSnes layer[].mainScreenEnabled */
+    /* Layer enable (TM), reconstruct from LakeSnes layer[].mainScreenEnabled */
     uint8_t emu_tm = 0;
     for (int i = 0; i < 5; i++) {
         if (emu->ppu->layer[i].mainScreenEnabled) emu_tm |= (1 << i);
@@ -338,7 +338,7 @@ static bool compare_ram_vars(void) {
     return match;
 }
 
-/* --- Orchestrator --- */
+/* Orchestrator */
 
 static bool compare_all(void) {
     bool vram_ok  = compare_vram();
@@ -374,7 +374,7 @@ static bool cgram_matches(int n) {
     return true;
 }
 
-/* --- Init / Frame / Shutdown --- */
+/* Init / Frame / Shutdown */
 
 bool verify_init(const char *rom_path) {
     FILE *f = fopen(rom_path, "rb");
@@ -475,7 +475,7 @@ bool verify_frame(uint16_t pad_state) {
                 phase = VERIFY_COMPARING;
                 /* The emu's game code has already advanced INIDISP_MIRROR
                  * for the next frame (it runs within the same runFrame after
-                 * the NMI). The port hasn't advanced yet — it's still on the
+                 * the NMI). The port hasn't advanced yet, it's still on the
                  * first sub-frame of this brightness step. Skip one emu
                  * advance so they stay aligned. */
                 skip_next_emu_advance = true;

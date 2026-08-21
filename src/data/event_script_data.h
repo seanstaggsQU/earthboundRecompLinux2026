@@ -1,5 +1,5 @@
 /*
- * Event script data — runtime-loaded from ROM binary assets.
+ * Event script data, runtime-loaded from ROM binary assets.
  *
  * The actual bytecode and spritemap data is extracted from the donor ROM
  * by ebtools and loaded at runtime from binary files.
@@ -77,7 +77,7 @@
 #define CB_DRAW_TITLE_LETTER    1  /* DRAW_TITLE_LETTER (title screen letter draw) */
 
 /* Title screen event script IDs (global ROM IDs from EVENT_SCRIPT_POINTERS).
- * These are the same IDs used by the assembly — entity_init resolves them
+ * These are the same IDs used by the assembly, entity_init resolves them
  * through the global event script pointer table, not a local lookup. */
 #define EVENT_SCRIPT_TITLE_SCREEN_BG  787  /* EVENT_BATTLE_FX (asm alias) */
 #define EVENT_SCRIPT_TITLE_SCREEN_1   788  /* TITLE_SCREEN_1 */
@@ -96,12 +96,12 @@
 /* Total entries in EVENT_SCRIPT_POINTERS table */
 #define EVENT_SCRIPT_POINTER_COUNT 895
 
-/* WRAM sentinels for WRITE_WRAM_TEMPVAR — interpreter maps to C variables */
-#define WRAM_FADE_STEP               0x0028  /* $7E0028 — FADE_PARAMETERS::step, non-zero while fading */
+/* WRAM sentinels for WRITE_WRAM_TEMPVAR, interpreter maps to C variables */
+#define WRAM_FADE_STEP               0x0028  /* $7E0028, FADE_PARAMETERS::step, non-zero while fading */
 #define WRAM_TITLE_SCREEN_QUICK_MODE 0x9F75  /* $7E9F75 */
 #define WRAM_WAIT_FOR_NAMING_SCREEN  0xB4B4  /* $7EB4B4 */
 
-/* POST_TELEPORT_CALLBACK — 4-byte function pointer at $7E9D1B.
+/* POST_TELEPORT_CALLBACK: 4-byte function pointer at $7E9D1B.
  * EVENT_WRITE_DWORD_WRAM emits two WRITE_WORD_WRAM opcodes (lo then hi). */
 #define WRAM_POST_TELEPORT_CALLBACK_LO 0x9D1B  /* $7E9D1B */
 #define WRAM_POST_TELEPORT_CALLBACK_HI 0x9D1D  /* $7E9D1D */
@@ -137,7 +137,7 @@
 #define ROM_ADDR_RENDER_ENTITY_SPRITE_ME1       0xC0A4B2
 #define ROM_ADDR_RENDER_ENTITY_SPRITE_ME2       0xC0A4BF
 #define ROM_ADDR_RESET_ENTITY_ANIMATION         0xC40015
-/* Overworld movement callroutines — extra bytes consumed from script stream noted */
+/* Overworld movement callroutines, extra bytes consumed from script stream noted */
 #define ROM_ADDR_SET_ENTITY_MOVEMENT_SPEED          0xC0A685  /* 2 extra bytes */
 #define ROM_ADDR_SET_ENTITY_MOVEMENT_SPEED_ENTRY2   0xC0A68B  /* 0 extra bytes */
 #define ROM_ADDR_GET_ENTITY_MOVEMENT_SPEED          0xC0A691  /* 0 extra bytes */
@@ -388,13 +388,13 @@
 /* Spritemap animation frame count (title screen) */
 #define ANIMATION_FRAME_COUNT 9
 
-/* ---- Script Bank System ---- */
+/* Script Bank System */
 
 /* Maximum number of loaded script bank regions */
 #define MAX_SCRIPT_BANKS 5
 
 /*
- * A loaded script bank region — a contiguous chunk of bytecode from ROM.
+ * A loaded script bank region, a contiguous chunk of bytecode from ROM.
  * Within-bank addresses in the bytecode are translated to buffer offsets
  * by subtracting rom_base_addr.
  */
@@ -408,19 +408,19 @@ typedef struct {
 extern ScriptBankInfo script_banks[MAX_SCRIPT_BANKS];
 extern int script_bank_count;
 
-/* ---- Runtime-loaded data (set by load_title_screen_script_data) ---- */
+/* Runtime-loaded data (set by load_title_screen_script_data) */
 
-/* Script bytecode bank — loaded from title_screen_scripts.bin */
+/* Script bytecode bank, loaded from title_screen_scripts.bin */
 extern const uint8_t *title_script_bank;
 extern uint16_t title_script_bank_size;
 
 /* Base address of the script bank in ROM (e.g. 0x2172 within bank $C4) */
 extern uint16_t title_script_bank_base;
 
-/* Script pointer table — local offsets into title_script_bank */
+/* Script pointer table, local offsets into title_script_bank */
 extern uint16_t title_script_pointers[TITLE_SCREEN_SCRIPT_COUNT];
 
-/* Spritemap data — loaded from title_screen_spritemaps.bin */
+/* Spritemap data, loaded from title_screen_spritemaps.bin */
 extern const uint8_t *title_spritemap_data;
 extern uint16_t title_spritemap_offsets[ANIMATION_FRAME_COUNT];
 
@@ -428,7 +428,7 @@ extern uint16_t title_spritemap_offsets[ANIMATION_FRAME_COUNT];
 extern const uint8_t *event_script_pointer_table;
 extern uint16_t event_script_pointer_count;
 
-/* ---- Naming Screen Entity Data ---- */
+/* Naming Screen Entity Data */
 
 /* Number of entries in NAMING_SCREEN_ENTITIES pointer table.
  * 7 characters × 2 variants (initial animation + return animation) = 14 */

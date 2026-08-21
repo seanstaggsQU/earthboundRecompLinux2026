@@ -2,7 +2,7 @@
  * Display text system internal header.
  *
  * Shared declarations for display_text sub-files.
- * NOT for external consumers — use display_text.h instead.
+ * NOT for external consumers, use display_text.h instead.
  */
 #ifndef GAME_DISPLAY_TEXT_INTERNAL_H
 #define GAME_DISPLAY_TEXT_INTERNAL_H
@@ -15,40 +15,40 @@
 /* TextSource and ScriptReader are defined in game/display_text.h (included above)
  * so the GAME_MODE_DISPLAY_TEXT ModeState in mode_stack.h can embed the reader. */
 
-/* ---- Script reader helpers (display_text.c) ---- */
+/* Script reader helpers (display_text.c) */
 uint8_t script_read_byte(ScriptReader *r);
 uint16_t script_read_word(ScriptReader *r);
 uint32_t script_read_dword(ScriptReader *r);
 void script_skip(ScriptReader *r, int n);
 void resolve_text_jump(ScriptReader *r, uint32_t addr);
 
-/* ---- Data helpers (display_text.c) ---- */
+/* Data helpers (display_text.c) */
 void toggle_hppp_flipout_mode(uint16_t enable);
 uint16_t is_escargo_express_full(void);
 uint16_t get_item_subtype_2(uint16_t item_id);
 void check_text_word_wrap(ScriptReader *reader);
 void cc_skip_args(ScriptReader *r, uint8_t cc);
 
-/* ---- CC table constants ---- */
+/* CC table constants */
 #define CC_TABLE_TYPE_STRING  0
 #define CC_TABLE_TYPE_INT     1
 
-/* ---- CC table stat printing (display_text.c) ---- */
+/* CC table stat printing (display_text.c) */
 uintptr_t resolve_cc_table_data(uint16_t index, int *out_type, int *out_str_len);
 uint8_t get_cc_table_entry_size(uint16_t index);
 void print_cc_table_value(uint16_t index);
 void print_enemy_article(uint16_t mode);
 
-/* ---- PSI teleport destination table constants ---- */
+/* PSI teleport destination table constants */
 #define PSI_TELEPORT_DEST_NAME_LEN    25
 #define PSI_TELEPORT_DEST_ENTRY_SIZE  31
 #define PSI_TELEPORT_DEST_MAX_ENTRIES 17
 
-/* ---- Wallet / ATM constants ---- */
+/* Wallet / ATM constants */
 #define WALLET_LIMIT  99999u
 #define ATM_LIMIT     9999999u
 
-/* ---- PSI teleport data (compile-time linked) ---- */
+/* PSI teleport data (compile-time linked) */
 #define psi_teleport_dest_data  ASSET_DATA(ASSET_DATA_PSI_TELEPORT_DEST_TABLE_BIN)
 #define psi_teleport_dest_size  ASSET_SIZE(ASSET_DATA_PSI_TELEPORT_DEST_TABLE_BIN)
 
@@ -58,10 +58,10 @@ void print_enemy_article(uint16_t mode);
  * GAME_MODE_DISPLAY_TEXT child instead of recursing on the C stack. */
 bool dt_make_child_init(ModeState *init, uint32_t addr);
 
-/* ---- Window helpers (display_text.c) ---- */
+/* Window helpers (display_text.c) */
 WindowInfo *get_focus_window_info(void);
 /* party_selector_battle_prepare: BATTLE path (mode != 1) of the former
- * party_character_selector — fills the GAME_MODE_CHAR_SELECT init (CSP_INIT phase,
+ * party_character_selector, fills the GAME_MODE_CHAR_SELECT init (CSP_INIT phase,
  * on_change = CS_ONCHANGE_PARTY_SELECT_SCRIPT) for a STEP_PUSH by cc_1a_dispatch. The
  * input loop runs in mode_step_char_select (battle.c); the per-member script display
  * is itself a STEP_PUSH, so no C-stack pump remains. The chosen member id is stored to
@@ -77,7 +77,7 @@ void party_selector_battle_prepare(uint32_t *script_ptrs, uint16_t mode,
 uint32_t party_selector_overworld_prepare(uint16_t allow_cancel, ModeState *out_init,
                                           uint16_t *out_window_id);
 
-/* ---- CC dispatch handlers (display_text_cc.c) ---- */
+/* CC dispatch handlers (display_text_cc.c) */
 void cc_set_event_flag(ScriptReader *r);
 void cc_clear_event_flag(ScriptReader *r);
 /* cc_18_dispatch: most sub-ops run inline and return false. Sub 0x08/0x09
@@ -102,13 +102,13 @@ bool cc_1a_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
 void cc_1b_dispatch(ScriptReader *r);
 /* cc_1c_dispatch: most sub-ops run inline and return false. Sub 0x08
  * (window border flash, mode 1/2) instead fills out_init/out_mode
- * (GAME_MODE_WINDOW_BORDER_ANIM to STEP_PUSH — no result to store) and returns
+ * (GAME_MODE_WINDOW_BORDER_ANIM to STEP_PUSH, no result to store) and returns
  * true. The caller (mode_step_display_text) zeroes *out_init before the call. */
 bool cc_1c_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode);
 void cc_1d_dispatch(ScriptReader *r);
 /* cc_1e_dispatch: most sub-ops run inline and return false. Sub 0x09
  * GIVE_EXPERIENCE with a level-up pending instead fills out_init/out_mode
- * (GAME_MODE_LEVEL_UP to STEP_PUSH) and out_resume (DT_RESUME_NONE — gain_exp
+ * (GAME_MODE_LEVEL_UP to STEP_PUSH) and out_resume (DT_RESUME_NONE, gain_exp
  * has no result to store) and returns true. The caller (mode_step_display_text)
  * zeroes *out_init before the call. */
 bool cc_1e_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
@@ -123,7 +123,7 @@ bool cc_1e_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
 bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
                     uint8_t *out_resume, uint16_t *out_aux);
 
-/* ---- Menu functions (display_text_menus.c) ---- */
+/* Menu functions (display_text_menus.c) */
 void show_character_inventory(uint16_t window_id, uint16_t char_source);
 /* open_store_menu / select_escargo_express_item / open_telephone_menu /
  * display_telephone_contact_text are now run-to-completion modes

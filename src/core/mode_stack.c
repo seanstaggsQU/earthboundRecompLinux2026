@@ -16,9 +16,9 @@ ModeStack g_mode_stack = {
     .depth = 0,
 };
 
-/* ---- mode step functions ------------------------------------------------- */
+/* mode step functions */
 
-/* GAME_MODE_FADE_WAIT — run per-frame "tick" work until the active brightness
+/* GAME_MODE_FADE_WAIT: run per-frame "tick" work until the active brightness
  * fade completes (fade_parameters::step == 0), then pop. The single yield is
  * owned by the root loop, so the
  * body here NEVER calls wait_for_vblank()/host_process_frame() itself.
@@ -68,7 +68,7 @@ static StepResult mode_step_fade_wait(ModeState *st) {
          * yield, which the pump now owns. Work-then-yield matches the original
          * ordering exactly (no phase shift). A parked callroutine propagates as
          * a STEP_PUSH (savestate D4b); the post-render flush runs on resume via
-         * asf_flush (shared with FADE_TICK_OVERWORLD_RENDER — a given FADE_WAIT
+         * asf_flush (shared with FADE_TICK_OVERWORLD_RENDER, a given FADE_WAIT
          * instance only ever uses one tick_kind). */
         if (st->fade_wait.asf_flush) {
             st->fade_wait.asf_flush = 0;
@@ -93,16 +93,16 @@ static StepResult mode_step_fade_wait(ModeState *st) {
     return STEP_RESULT_CONTINUE();
 }
 
-/* GAME_MODE_ENTITY_FADE_WAIT — run one window_tick per frame until the entity
+/* GAME_MODE_ENTITY_FADE_WAIT: run one window_tick per frame until the entity
  * fade-out animation finishes (ow.entity_fade_entity == -1), then pop. Replaces
  * the raw blocking loops `while (ow.entity_fade_entity != -1) { window_tick(); }`
  * (overworld_interaction.c display_text_and_wait_for_fade, text.c open_menu paths,
  * game_main.c menu cleanup). The exit is checked at the top (check-before, like
  * FADE_WAIT); window_tick_work() does window_tick()'s work without the yield,
- * which the pump owns — work-then-yield matches the original ordering exactly. */
+ * which the pump owns, work-then-yield matches the original ordering exactly. */
 static StepResult mode_step_entity_fade_wait(ModeState *st) {
     /* Park-propagating resume (savestate D4b): a callroutine parked the window
-     * frame — another entity's action script ran a nested modal while this
+     * frame, another entity's action script ran a nested modal while this
      * entity faded out (entities are NOT disabled here, so this genuinely
      * happens). Finish that frame's render, then CONTINUE to re-test the exit.
      * Reuses fade_wait.asf_flush (the mode is pushed with zeroed state). */
@@ -120,7 +120,7 @@ static StepResult mode_step_entity_fade_wait(ModeState *st) {
     return STEP_RESULT_CONTINUE();
 }
 
-/* ---- dispatch table ------------------------------------------------------ */
+/* dispatch table */
 
 typedef StepResult (*ModeStepFn)(ModeState *st);
 
@@ -209,7 +209,7 @@ StepResult mode_dispatch_step(GameMode mode, ModeState *st) {
     return mode_step[mode](st);
 }
 
-/* ---- stack management ---------------------------------------------------- */
+/* stack management */
 
 void mode_push(GameMode mode, const ModeState *init) {
     uint8_t d = g_mode_stack.depth;
@@ -243,8 +243,8 @@ int32_t mode_child_result(void) {
 
 /* ---- migration bridge (removed) -----------------------------------------
  *
- * pump_mode() — the local "drive a child mode to completion with a nested
- * host_process_frame() yield loop" bridge — was DELETED at the final cutover.
+ * pump_mode(), the local "drive a child mode to completion with a nested
+ * host_process_frame() yield loop" bridge, was DELETED at the final cutover.
  * Every former blocking caller now either runs as a mode_step_* on the single
  * root-loop mode stack, or STEP_PUSHes GAME_MODE_ACTIONSCRIPT_FRAME via the
  * park-propagating run_actionscript_frame_step() split. The program now has

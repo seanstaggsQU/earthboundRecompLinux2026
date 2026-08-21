@@ -26,7 +26,7 @@ ASSERT_STRUCT_SIZE(HotspotCoords, 8);
  * Assembly uses 0x8000; narrowed to int8_t -128 after field was shrunk to 8-bit. */
 #define ENTITY_COLLISION_DISABLED ((int8_t)-128)
 
-/* Active hotspot — runtime state for map hotspot boundaries.
+/* Active hotspot, runtime state for map hotspot boundaries.
  * Port of active_hotspot struct (include/structs.asm).
  * 2 hotspot slots, 14 bytes each. */
 typedef struct {
@@ -94,7 +94,7 @@ typedef enum {
  * after a savestate load (savestate pointer purge, build item #3). */
 void overworld_savestate_rebind(void);
 
-/* ---- OverworldState: all overworld module globals ---- */
+/* OverworldState: all overworld module globals */
 typedef struct {
     /* Entity spawn control */
     uint8_t npc_spawns_enabled;
@@ -128,7 +128,7 @@ typedef struct {
     int16_t entity_prepared_y;
     int16_t entity_prepared_direction;
 
-    /* AUTO_MOVEMENT_DIRECTION — direction used during camera mode 1 auto-movement.
+    /* AUTO_MOVEMENT_DIRECTION: direction used during camera mode 1 auto-movement.
      * When walking_style == STAIRS, this overrides leader_direction. */
     uint16_t auto_movement_direction;
 
@@ -162,10 +162,10 @@ typedef struct {
     uint8_t debug_flag;
     uint8_t debug_mode_number;
 
-    /* Overworld FOV/zoom cycle (R3, this port's own addition -- see
+    /* Overworld FOV/zoom cycle (R3, this port's own addition, see
      * platform_video_set_zoom() and AUX_ZOOM_TOGGLE in game_main.c). One of
      * the EbZoomMode values (platform.h): EB_ZOOM_OFF (default), EB_ZOOM_OUT,
-     * EB_ZOOM_IN -- R3 cycles forward through them. uint8_t, not the enum
+     * EB_ZOOM_IN, R3 cycles forward through them. uint8_t, not the enum
      * type or bool, to match this struct's other flag fields and keep the
      * size exactly 1 byte cross-platform (see the ABI _Static_assert
      * comment in state_dump.c). Always boots/resets to EB_ZOOM_OFF: on a
@@ -291,18 +291,18 @@ typedef struct {
     uint16_t bubble_monkey_distracted_next_direction_change_time;
     uint16_t bubble_monkey_distracted_direction_changes_left;
 
-    /* POST_TELEPORT_CALLBACK (ram.asm $7E9D1B) — deferred callback called
+    /* POST_TELEPORT_CALLBACK (ram.asm $7E9D1B), deferred callback called
      * after the next teleport completes.  Set by flyover/sanctuary scripts
      * to UNDRAW_FLYOVER_TEXT; TELEPORT calls it then clears it. */
     void (*ABI_PTR_ALIGN post_teleport_callback)(void); /* ABI-stable slot (item #3B) */
     ABI_PTR_PAD(post_teleport_callback)
-    uint8_t post_teleport_callback_id; /* PostTeleportCallbackId — serializable form
+    uint8_t post_teleport_callback_id; /* PostTeleportCallbackId, serializable form
                                           of the ptr above (savestate hardening, D0). */
 } OverworldState;
 
 extern OverworldState ow;
 
-/* ---- Function declarations ---- */
+/* Function declarations */
 
 /* Initialize overworld PPU settings and clear VRAM tile 0.
  * Port of OVERWORLD_INITIALIZE (asm/overworld/initialize.asm). */
@@ -339,7 +339,7 @@ void clear_map_entities(void);
 
 /* Park-propagating split of render_frame_tick_work() (savestate D4b): a parked
  * actionscript callroutine becomes a STEP_PUSH instead of a nested pump_mode.
- * _step() returns true iff a frame parked — the caller must push
+ * _step() returns true iff a frame parked, the caller must push
  * GAME_MODE_ACTIONSCRIPT_FRAME (actionscript_frame_take_push) and call _flush() at
  * its resume phase; on no park the tick finishes inline and _step() returns false. */
 bool render_frame_tick_work_step(void);
@@ -549,7 +549,7 @@ void check_hotspot_exit(uint16_t hotspot_idx);
 
 /* Per-frame overworld update tick callback for init entity (slot 23).
  * Port of UPDATE_OVERWORLD_FRAME (asm/overworld/update_overworld_frame.asm).
- * Called as a tick callback — handles animated tiles, palette animation,
+ * Called as a tick callback, handles animated tiles, palette animation,
  * then calls update_leader_movement(). */
 void update_overworld_frame(int16_t entity_offset);
 
@@ -632,7 +632,7 @@ void load_party_at_map_position(uint16_t direction);
 int16_t get_party_member_sprite_id(int16_t char_id, uint16_t walking_style,
                                     int16_t entity_offset, int16_t party_idx);
 
-/* CALCULATE_VELOCITY_COMPONENTS — Port of asm/misc/calculate_velocity_components.asm.
+/* CALCULATE_VELOCITY_COMPONENTS: Port of asm/misc/calculate_velocity_components.asm.
  * Decomposes a speed/angle pair into X/Y displacement components.
  * angle: 16-bit angle (high byte used, 0=north), speed: magnitude.
  * Returns dx and dy in screen coordinates (+Y = down). */
@@ -642,7 +642,7 @@ void calculate_velocity_components(uint16_t angle, int16_t speed,
 /* Clear all 128 OAM entries off-screen.
  * Port of OAM_CLEAR (asm/system/oam.asm). */
 void oam_clear(void);
-/* Restore the OAM Y positions blanked by the most recent oam_clear() — used when
+/* Restore the OAM Y positions blanked by the most recent oam_clear(), used when
  * an actionscript frame parks so the modal-transition frame keeps the last
  * rendered sprites (avoids a 1-frame all-sprites-invisible flash). */
 void oam_restore_displayed(void);
@@ -658,7 +658,7 @@ void update_entity_screen_positions(void);
  * which are not needed in the C port. */
 void update_screen(void);
 
-/* WAIT_FRAMES_WITH_UPDATES (asm/overworld/wait_frames_with_updates.asm) — "render N
+/* WAIT_FRAMES_WITH_UPDATES (asm/overworld/wait_frames_with_updates.asm), "render N
  * frames" is now the run-to-completion GAME_MODE_WAIT_FRAMES (mode_step_wait_frames,
  * overworld.c); STEP_PUSH it with ModeState.wait_frames.remaining = N. */
 
@@ -740,7 +740,7 @@ void queue_auto_movement_step(void);
 uint16_t calculate_movement_path_steps(int16_t src_x, int16_t src_y,
                                         int16_t dest_x, int16_t dest_y);
 
-/* Per-frame demo buffer tick — call from joypad update path.
+/* Per-frame demo buffer tick, call from joypad update path.
  * Port of READ_JOYPAD demo section. */
 void demo_playback_tick(void);
 
@@ -785,7 +785,7 @@ int16_t choose_entity_direction_to_player(void);
  * bridge was deleted in D4b; drive ow_damage_step() below directly.
  *
  * Resumable form of the update_overworld_damage party loop. The
- * GAME_MODE_OVERWORLD root mode drives it and STEP_PUSHes HP_ALERT — the
+ * GAME_MODE_OVERWORLD root mode drives it and STEP_PUSHes HP_ALERT, the
  * loop yields mid-iteration so a savestate during a low-HP warning lands on the
  * mode stack rather than the C stack. All progress lives in OwDamageState; the
  * function resumes from where it left off when re-called after the alert pops. */
@@ -838,7 +838,7 @@ void spawn_horizontal(uint16_t new_x, uint16_t y);
  * x: x coordinate, new_y: new y position (in 8px tile coords). */
 void spawn_vertical(uint16_t x, uint16_t new_y);
 
-/* PSI teleport tick callbacks — called from dispatch_tick_callback in callroutine.c */
+/* PSI teleport tick callbacks, called from dispatch_tick_callback in callroutine.c */
 void psi_teleport_alpha_tick(int16_t entity_offset);
 void psi_teleport_beta_tick(int16_t entity_offset);
 void psi_teleport_decelerate_tick(int16_t entity_offset);

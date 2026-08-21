@@ -1,5 +1,5 @@
 /*
- * Ending sequence — cast scene + staff credits.
+ * Ending sequence, cast scene + staff credits.
  *
  * Port of the asm/ending/ assembly files for EarthBound (US retail).
  * See ending.h for full list of ported routines.
@@ -28,9 +28,9 @@
 #include "include/binary.h"
 #include <string.h>
 
-/* =====================================================================
+/*
  *  State variables (ports of RAM globals from ram.asm)
- * ===================================================================== */
+ */
 
 /* Credits state */
 static uint16_t credits_current_row;
@@ -41,7 +41,7 @@ static uint16_t credits_scroll_position_frac;  /* fixed_point::fraction */
 static uint16_t credits_scroll_position_int;   /* fixed_point::integer */
 static uint16_t credits_row_wipe_threshold;
 
-/* Credits script data pointer — offset into the loaded staff_text asset */
+/* Credits script data pointer, offset into the loaded staff_text asset */
 static const uint8_t *credits_script_ptr;
 
 /* Cast scene state */
@@ -63,7 +63,7 @@ static const uint8_t *guardian_text_data;
 
 /* Resolve the credits/cast asset pointers. Like file_select.c's
  * ensure_file_select_assets(), these are link-time-constant ASSET_DATA bases,
- * but they are assigned in EN_CR_SETUP — a savestate restored into a later
+ * but they are assigned in EN_CR_SETUP, a savestate restored into a later
  * EN_CR_* phase (cross-process / cold load) would otherwise leave them NULL and
  * render the credits blank. Idempotent; the EN_CR_HOLD teardown nulls them so a
  * fresh credits run re-resolves here. */
@@ -91,7 +91,7 @@ bool ending_asset_selfheal_test(void) {
            party_cast_tile_ids_data && guardian_text_data;
 }
 
-/* Photograph map loading state — checked by map loader during photo rendering. */
+/* Photograph map loading state, checked by map loader during photo rendering. */
 uint16_t photograph_map_loading_mode;
 uint16_t cur_photo_display;
 
@@ -114,7 +114,7 @@ static const uint8_t *credits_dma_src_ptrs[CREDITS_DMA_QUEUE_SIZE];
  * this to credits_scroll_frame, then restore it back. */
 frame_callback_fn frame_callback = NULL;  /* set to process_overworld_tasks by init_overworld */
 
-/* ---- Savestate snapshot (see FrameCallbackSaveState in ending.h) ----
+/* Savestate snapshot (see FrameCallbackSaveState in ending.h) ----
  * id 0 restores process_overworld_tasks (the normal-play default; functionally
  * identical to the NULL early-boot value, which game_main also treats as
  * process_overworld_tasks). */
@@ -130,13 +130,13 @@ void frame_callback_savestate_unpack(const void *in) {
         ? credits_scroll_frame : process_overworld_tasks;
 }
 
-/* =====================================================================
+/*
  *  Helper: VRAM copy (replacement for PREPARE_VRAM_COPY)
  *
  *  In the assembly, PREPARE_VRAM_COPY queues a DMA to VRAM.
  *  In the C port, we write directly to ppu.vram[].
  *  mode: 0 = normal byte copy, 3 = word fill
- * ===================================================================== */
+ */
 static void vram_copy(const uint8_t *src, uint16_t vram_word_addr,
                       uint16_t size_bytes, uint8_t mode) {
     uint32_t byte_addr = (uint32_t)vram_word_addr * 2;
@@ -156,12 +156,12 @@ static void vram_copy(const uint8_t *src, uint16_t vram_word_addr,
     }
 }
 
-/* =====================================================================
+/*
  *  Helper: set BG VRAM locations (ports of SET_BG*_VRAM_LOCATION)
  *  tilemap_size: 0=NORMAL, 1=HORIZONTAL, 2=VERTICAL, 3=BOTH
  *  tilemap_base: VRAM word address of tilemap
  *  tile_base: VRAM word address of tile data
- * ===================================================================== */
+ */
 static void set_bg1_vram_location(uint16_t tilemap_size, uint16_t tilemap_base,
                                    uint16_t tile_base) {
     ppu.bg_sc[0] = (uint8_t)((tilemap_base >> 8) | tilemap_size);
@@ -180,21 +180,21 @@ static void set_bg3_vram_location(uint16_t tilemap_size, uint16_t tilemap_base,
     ppu.bg_nba[1] = (ppu.bg_nba[1] & 0xF0) | ((tile_base >> 12) & 0x0F);
 }
 
-/* =====================================================================
+/*
  *  Helper: set OAM size (port of SET_OAM_SIZE)
- * ===================================================================== */
+ */
 static void set_oam_size(uint16_t obsel) {
     ppu.obsel = (uint8_t)obsel;
 }
 
-/* =====================================================================
+/*
  *  CHANGE_VWF_2BPP_TO_3_COLOUR (asm/ending/change_vwf_2bpp_to_3_colour.asm)
  *
  *  Processes VWF ert.buffer: for each pair of bytes (plane0, plane1),
  *  examines each bit position. If both planes set, clears both.
  *  Otherwise: new_plane0 = old_plane0, new_plane1 = old_plane1.
  *  This converts 2bpp text into 3-colour (max) for cast name rendering.
- * ===================================================================== */
+ */
 static void change_vwf_2bpp_to_3_colour(uint16_t tile_count) {
     uint16_t total_pairs = tile_count * 16; /* 16 byte-pairs per tile */
     for (uint16_t i = 0; i < total_pairs; i++) {
@@ -218,12 +218,12 @@ static void change_vwf_2bpp_to_3_colour(uint16_t tile_count) {
     }
 }
 
-/* =====================================================================
+/*
  *  center_vwf_for_string (port of C1FF99)
  *
  *  Centers a string within a given width (in tiles) by measuring its
  *  pixel width and setting VWF_X and VWF_TILE accordingly.
- * ===================================================================== */
+ */
 static void center_vwf_for_string(const uint8_t *str, uint16_t width_tiles,
                                    int16_t font_id_or_neg1) {
     /* Measure string pixel width */
@@ -245,7 +245,7 @@ static void center_vwf_for_string(const uint8_t *str, uint16_t width_tiles,
     vwf_tile = pixel_x >> 3;
 }
 
-/* =====================================================================
+/*
  *  RENDER_CAST_NAME_TEXT (asm/ending/render_cast_name_text.asm)
  *
  *  Renders an EB-encoded string into VWF ert.buffer, converts 2bpp->3colour,
@@ -256,7 +256,7 @@ static void center_vwf_for_string(const uint8_t *str, uint16_t width_tiles,
  *    str_addr: pointer to EB-encoded null-terminated string (in WRAM)
  *    tile_count: number of VWF tiles to render
  *    tile_start_index: starting tile index in BUFFER for output
- * ===================================================================== */
+ */
 static void render_cast_name_text(const uint8_t *str_addr, uint16_t tile_count,
                                    uint16_t tile_start_index) {
     /* Assembly lines 23-31: init VWF state */
@@ -279,7 +279,7 @@ static void render_cast_name_text(const uint8_t *str_addr, uint16_t tile_count,
         uint8_t width = font_get_width(FONT_ID_NORMAL, idx) + character_padding;
         uint8_t height = font_get_height(FONT_ID_NORMAL);
 
-        /* Blit glyph — assembly does multi-column blitting for wide glyphs */
+        /* Blit glyph, assembly does multi-column blitting for wide glyphs */
         blit_vwf_glyph(glyph, height, width);
     }
 
@@ -313,7 +313,7 @@ static void render_cast_name_text(const uint8_t *str_addr, uint16_t tile_count,
     }
 }
 
-/* =====================================================================
+/*
  *  PREPARE_DYNAMIC_CAST_NAME_TEXT (asm/ending/prepare_dynamic_cast_name_text.asm)
  *
  *  Pre-renders party member names + guardian texts into BUFFER tile data
@@ -321,7 +321,7 @@ static void render_cast_name_text(const uint8_t *str_addr, uint16_t tile_count,
  *
  *  US version: renders 4 party member names at PARTY_MEMBER_CAST_TILE_IDS,
  *  pet name at tile 448, and 3 guardian texts (Paula's dad, mom, Poo's Master).
- * ===================================================================== */
+ */
 static void prepare_dynamic_cast_name_text(void) {
     if (!party_cast_tile_ids_data) return;
 
@@ -400,13 +400,13 @@ static void prepare_dynamic_cast_name_text(void) {
     }
 }
 
-/* =====================================================================
+/*
  *  PREPARE_CAST_NAME_TILEMAP (asm/ending/prepare_cast_name_tilemap.asm)
  *
  *  Writes tilemap entries for a cast name into BUFFER+$4000.
  *  Each tile gets two entries: top row and bottom row (64 bytes apart).
  *  Returns the number of tiles written (tile_count parameter, decremented).
- * ===================================================================== */
+ */
 static uint16_t prepare_cast_name_tilemap(uint16_t start_tile, uint16_t col_offset,
                                            uint16_t tile_count) {
     uint16_t *tilemap = (uint16_t *)&ert.buffer[BUF_CREDITS_TILEMAP];
@@ -432,12 +432,12 @@ static uint16_t prepare_cast_name_tilemap(uint16_t start_tile, uint16_t col_offs
     return tile_count;
 }
 
-/* =====================================================================
+/*
  *  COPY_CAST_NAME_TILEMAP (asm/ending/copy_cast_name_tilemap.asm)
  *
  *  Copies prepared tilemap data from BUFFER+$4000 to VRAM (cast tilemap).
  *  Handles BG3 scrolling wrap-around for the 32-row tilemap.
- * ===================================================================== */
+ */
 static void copy_cast_name_tilemap(uint16_t x_col, uint16_t y_row,
                                     uint16_t tile_count) {
     /* Compute tilemap row from BG3_Y_POS + y_row, wrapped to 32 rows */
@@ -466,12 +466,12 @@ static void copy_cast_name_tilemap(uint16_t x_col, uint16_t y_row,
     vram_copy(src_bot, vram_bot, tile_count * 2, 0);
 }
 
-/* =====================================================================
+/*
  *  PRINT_CAST_NAME (asm/ending/print_cast_name.asm)
  *
  *  Reads cast_index from CAST_SEQUENCE_FORMATTING to get tile position
  *  and width, then prepares and copies the tilemap.
- * ===================================================================== */
+ */
 void print_cast_name(uint16_t cast_index, uint16_t x_col, uint16_t y_row) {
     if (!cast_seq_formatting_data) return;
 
@@ -484,11 +484,11 @@ void print_cast_name(uint16_t cast_index, uint16_t x_col, uint16_t y_row) {
     copy_cast_name_tilemap(x_col, y_row, count);
 }
 
-/* =====================================================================
+/*
  *  PRINT_CAST_NAME_ENTITY_VAR0 (asm/ending/print_cast_name_entity_var0.asm)
  *
  *  US version: just reads var0 as cast_index and calls print_cast_name.
- * ===================================================================== */
+ */
 void print_cast_name_entity_var0(uint16_t cast_index, uint16_t x_col,
                                   uint16_t y_row, uint16_t current_entity_slot) {
     /* US version: var0 is the cast_index */
@@ -497,12 +497,12 @@ void print_cast_name_entity_var0(uint16_t cast_index, uint16_t x_col,
     print_cast_name(var0, x_col, y_row);
 }
 
-/* =====================================================================
+/*
  *  PRINT_CAST_NAME_PARTY (asm/ending/print_cast_name_party.asm)
  *
  *  US version: looks up party member or pet name tile IDs, then calls
  *  prepare_cast_name_tilemap + copy_cast_name_tilemap.
- * ===================================================================== */
+ */
 void print_cast_name_party(uint16_t char_id, uint16_t x_col, uint16_t y_row) {
     if (!party_cast_tile_ids_data) return;
 
@@ -526,11 +526,11 @@ void print_cast_name_party(uint16_t char_id, uint16_t x_col, uint16_t y_row) {
     copy_cast_name_tilemap(x_col, y_row, count);
 }
 
-/* =====================================================================
+/*
  *  UPLOAD_SPECIAL_CAST_PALETTE (asm/ending/upload_special_cast_palette.asm)
  *
  *  Copies a 32-byte palette from BUFFER+$7000 offset to OBJ palette 12.
- * ===================================================================== */
+ */
 void upload_special_cast_palette(uint16_t palette_index) {
     uint16_t offset = palette_index * 32;
     uint8_t *src = &ert.buffer[BUF_CREDITS_PALETTE + offset];
@@ -538,17 +538,17 @@ void upload_special_cast_palette(uint16_t palette_index) {
     ert.palette_upload_mode = 16; /* PALETTE_UPLOAD_OBJ_ONLY */
 }
 
-/* =====================================================================
+/*
  *  SET_CAST_SCROLL_THRESHOLD (asm/ending/set_cast_scroll_threshold.asm)
- * ===================================================================== */
+ */
 void set_cast_scroll_threshold(uint16_t param, uint16_t current_entity_slot) {
     int16_t ent_off = current_entity_slot;
     entities.var[0][ent_off] = (int16_t)(param * 8 + ppu.bg_vofs[2]);
 }
 
-/* =====================================================================
+/*
  *  CHECK_CAST_SCROLL_THRESHOLD (asm/ending/check_cast_scroll_threshold.asm)
- * ===================================================================== */
+ */
 uint16_t check_cast_scroll_threshold(uint16_t current_entity_slot) {
     int16_t ent_off = current_entity_slot;
     int16_t threshold = entities.var[0][ent_off];
@@ -558,9 +558,9 @@ uint16_t check_cast_scroll_threshold(uint16_t current_entity_slot) {
     return 0;
 }
 
-/* =====================================================================
+/*
  *  IS_ENTITY_STILL_ON_CAST_SCREEN (asm/ending/is_entity_still_on_cast_screen.asm)
- * ===================================================================== */
+ */
 uint16_t is_entity_still_on_cast_screen(uint16_t current_entity_slot) {
     int16_t ent_off = current_entity_slot;
     uint16_t bg3y = ppu.bg_vofs[2];
@@ -571,9 +571,9 @@ uint16_t is_entity_still_on_cast_screen(uint16_t current_entity_slot) {
     return 0;
 }
 
-/* =====================================================================
+/*
  *  CREATE_ENTITY_AT_V01_PLUS_BG3Y (asm/ending/create_entity_at_v01_plus_bg3y.asm)
- * ===================================================================== */
+ */
 void create_entity_at_v01_plus_bg3y(uint16_t sprite_id, uint16_t script_id,
                                      uint16_t current_entity_slot) {
     /* Set var0 for new entity to (counter & 3), increment counter */
@@ -587,12 +587,12 @@ void create_entity_at_v01_plus_bg3y(uint16_t sprite_id, uint16_t script_id,
     create_entity(sprite_id, script_id, -1, cx, cy);
 }
 
-/* =====================================================================
+/*
  *  HANDLE_CAST_SCROLLING (asm/ending/handle_cast_scrolling.asm)
  *
  *  Tick callback for cast scene entities. Sets BG3_Y to entity Y,
  *  clears tilemap rows as they scroll past.
- * ===================================================================== */
+ */
 void handle_cast_scrolling(uint16_t current_entity_slot) {
     int16_t ent_off = current_entity_slot;
 
@@ -617,12 +617,12 @@ void handle_cast_scrolling(uint16_t current_entity_slot) {
     vram_copy(zeros, vram_addr, 64, 3);
 }
 
-/* =====================================================================
+/*
  *  ENQUEUE_CREDITS_DMA (asm/ending/enqueue_credits_dma.asm)
  *
  *  Queues a VRAM transfer for the credits system.
  *  9 bytes per entry: mode(1) + size(2) + src_ptr(4) + vram_dest(2)
- * ===================================================================== */
+ */
 static void enqueue_credits_dma(uint8_t mode, uint16_t size_bytes,
                                  const uint8_t *src, uint16_t vram_dest) {
     uint16_t idx = credits_dma_queue_start;
@@ -637,11 +637,11 @@ static void enqueue_credits_dma(uint8_t mode, uint16_t size_bytes,
     credits_dma_queue_start = (credits_dma_queue_start + 1) & 0x7F;
 }
 
-/* =====================================================================
+/*
  *  PROCESS_CREDITS_DMA_QUEUE (asm/ending/process_credits_dma_queue.asm)
  *
  *  Executes one queued DMA transfer per call.
- * ===================================================================== */
+ */
 static void process_credits_dma_queue(void) {
     if (credits_dma_queue_start == credits_dma_queue_end) return;
 
@@ -657,11 +657,11 @@ static void process_credits_dma_queue(void) {
     credits_dma_queue_end = (credits_dma_queue_end + 1) & 0x7F;
 }
 
-/* =====================================================================
+/*
  *  COUNT_PHOTO_FLAGS (asm/ending/count_photo_flags.asm)
  *
  *  Counts how many photo event flags are set.
- * ===================================================================== */
+ */
 static uint16_t count_photo_flags(void) {
     if (!photographer_cfg_data) return 0;
 
@@ -676,12 +676,12 @@ static uint16_t count_photo_flags(void) {
     return count;
 }
 
-/* =====================================================================
+/*
  *  TRY_RENDERING_PHOTOGRAPH (asm/ending/try_rendering_photograph.asm)
  *
  *  Loads map at photo location, spawns objects and party entities.
  *  Returns 1 if photo was rendered, 0 if event flag not set.
- * ===================================================================== */
+ */
 static uint16_t try_rendering_photograph(uint16_t photo_index) {
     if (!photographer_cfg_data) return 0;
 
@@ -787,12 +787,12 @@ static uint16_t try_rendering_photograph(uint16_t photo_index) {
 /* SLIDE_CREDITS_PHOTOGRAPH (asm/ending/slide_credits_photograph.asm) is now the
  * EN_CR_SLIDE phase of mode_step_ending (GAME_MODE_ENDING), below. */
 
-/* =====================================================================
+/*
  *  CREDITS_SCROLL_FRAME (asm/ending/credits_scroll_frame.asm)
  *
  *  Per-frame callback during credits. Processes credit script commands
  *  and advances scroll position.
- * ===================================================================== */
+ */
 void credits_scroll_frame(void) {
     /* Check if we need to process a new credit entry */
     if (ppu.bg_vofs[2] <= credits_next_credit_position)
@@ -952,7 +952,7 @@ row_wipe_check:
         uint16_t clear_row = ((ppu.bg_vofs[2] >> 3) - 1) & 0x1F;
         uint16_t vram_addr = 0x6C00 + (clear_row << 5);
         /* Mode 3 = word fill; only src[0] and src[1] are read.
-         * Must be static — enqueue_credits_dma stores the raw pointer in the
+         * Must be static, enqueue_credits_dma stores the raw pointer in the
          * persistent DMA queue, which outlives this stack frame. */
         static const uint8_t blank_tile_data[2] = {0, 0};
         enqueue_credits_dma(3, 64, blank_tile_data, vram_addr);
@@ -969,9 +969,9 @@ row_wipe_check:
     ppu.bg_vofs[2] = credits_scroll_position_int;
 }
 
-/* =====================================================================
+/*
  *  LOAD_CAST_SCENE (asm/ending/load_cast_scene.asm)
- * ===================================================================== */
+ */
 static void load_cast_scene(void) {
     extern uint16_t item_transformations_loaded;
     item_transformations_loaded = 0;
@@ -1011,7 +1011,7 @@ static void load_cast_scene(void) {
 
     /* Compose cast tile data directly in ppu.vram (VRAM_CAST_TILES = 0x0000,
      * so byte offsets match). Intentional divergence from assembly, which stages
-     * through BUFFER then DMAs — we skip the intermediate 32 KB copy. */
+     * through BUFFER then DMAs, we skip the intermediate 32 KB copy. */
     uint8_t *cast_vram = &ppu.vram[VRAM_CAST_TILES * 2];
 
     /* Clear first 4096 bytes of tile data */
@@ -1081,9 +1081,9 @@ static void load_cast_scene(void) {
 /* PLAY_CAST_SCENE (asm/ending/play_cast_scene.asm) is now the EN_CAST_* phases of
  * mode_step_ending (GAME_MODE_ENDING), below. */
 
-/* =====================================================================
+/*
  *  INITIALIZE_CREDITS_SCENE (asm/ending/initialize_credits_scene.asm)
- * ===================================================================== */
+ */
 static void initialize_credits_scene(void) {
     force_blank_and_wait_vblank();
     clear_map_entities();
@@ -1126,7 +1126,7 @@ static void initialize_credits_scene(void) {
      * The source BUFFER+1 is the high byte of the word $240C stored in BUFFER, i.e. $24.
      * This writes $24 to the high byte of each VRAM word in CREDITS_LAYER_2_TILEMAP.
      * Step 2 already set all high bytes to $24 (from the $240C fill), so this is a
-     * no-op for this tilemap region — both passes write the same value.  Included here
+     * no-op for this tilemap region, both passes write the same value.  Included here
      * for assembly faithfulness. */
     {
         uint32_t byte_addr = (uint32_t)VRAM_CREDITS_LAYER_2_TILEMAP * 2;
@@ -1146,7 +1146,7 @@ static void initialize_credits_scene(void) {
     }
 
     /* Load BG2 palette from CREDITS_BG2_PALETTE_DATA+6.
-     * NOTE: This is dead code — the memset below (palette slots 1-15) will
+     * NOTE: This is dead code, the memset below (palette slots 1-15) will
      * zero this immediately.  The assembly does the same thing: MEMCPY16 to
      * PALETTES+BPP4PALETTE_SIZE*1, then MEMSET16 zeros BPP4PALETTE_SIZE*15
      * bytes starting at the same address.  Kept for assembly faithfulness. */
@@ -1219,8 +1219,8 @@ static void initialize_credits_scene(void) {
     blank_screen_and_wait_vblank();
 }
 
-/* =====================================================================
- *  GAME_MODE_ENDING step — run-to-completion port of play_cast_scene()
+/*
+ *  GAME_MODE_ENDING step, run-to-completion port of play_cast_scene()
  *  (asm/ending/play_cast_scene.asm) and play_credits()
  *  (asm/ending/play_credits.asm), with slide_credits_photograph() folded in.
  *
@@ -1231,7 +1231,7 @@ static void initialize_credits_scene(void) {
  *  GAME_MODE_WAIT_FRAMES. The credits path runs under frame_callback =
  *  credits_scroll_frame and never parks; the cast path can (cutscene scripts).
  *  See GAME_MODE_ENDING in core/mode_stack.h.
- * ===================================================================== */
+ */
 StepResult mode_step_ending(ModeState *st) {
     EndingState *s = &st->ending;
 
@@ -1243,7 +1243,7 @@ StepResult mode_step_ending(ModeState *st) {
     for (;;) {
         switch ((EndingPhase)s->phase) {
 
-        /* ---------------- cast scene (play_cast_scene) ---------------- */
+        /* cast scene (play_cast_scene) */
         case EN_CAST_SETUP:
             load_cast_scene();
             oam_clear();
@@ -1290,7 +1290,7 @@ StepResult mode_step_ending(ModeState *st) {
             ppu.tm = 0x17;
             return STEP_RESULT_POP(0);
 
-        /* ------------------- credits (play_credits) ------------------- */
+        /* credits (play_credits) */
         case EN_CR_SETUP: {
             ensure_ending_credits_assets();
 

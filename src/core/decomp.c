@@ -2,36 +2,29 @@
 #include <string.h>
 
 /*
- * EarthBound decompression algorithm.
- * Port of asm/system/decomp.asm (DECOMP function).
+ * EarthBound decompression algorithm. Port of asm/system/decomp.asm (DECOMP).
  *
- * Command byte format:
- *   Bits 7-5 = operation type
- *   Bits 4-0 = length (for non-extended commands)
+ * Command byte: bits 7-5 are the op, bits 4-0 are length (non-extended).
+ * If bits 7-5 == 0x07 (0xE0 masked), it's extended: bits 4-2 shifted left 3
+ * become the real op, bits 1-0 are extra offset bits (DECOMP_TEMP_UNREAD),
+ * the next byte is the length, and length gets +1.
  *
- * If bits 7-5 == 0x07 (0xE0 masked): extended format
- *   - Bits 4-2 of command byte, shifted left 3, become the real operation type
- *   - Bits 1-0 of command byte are extra offset bits (DECOMP_TEMP_UNREAD)
- *   - Next byte is the length
- *   - Length is incremented by 1
+ * Ops (after masking bits 7-5):
+ *   0x00: copy N bytes verbatim from stream
+ *   0x20: fill N bytes with one byte from stream
+ *   0x40: fill N words with one word from stream
+ *   0x60: fill N bytes with an incrementing byte from stream
+ *   0x80: copy N bytes forward from already-decompressed data
+ *   0xA0: copy N bytes from decompressed data, bit-reversed
+ *   0xC0: copy N bytes backwards from decompressed data
  *
- * Operations (after masking bits 7-5):
- *   0x00: Copy N bytes verbatim from stream
- *   0x20: Fill N bytes with single byte from stream
- *   0x40: Fill N words with single word from stream
- *   0x60: Fill N bytes with incrementing byte from stream
- *   0x80: Copy N bytes from previously decompressed data (forward)
- *   0xA0: Copy N bytes with bit-reversal from decompressed data
- *   0xC0: Copy N bytes backwards from decompressed data
- *
- * Stream terminator: 0xFF
+ * Stream ends at 0xFF.
  */
 
 /* Reverse bits of a byte (for the 0xA0 operation) */
 static uint8_t reverse_bits(uint8_t b) {
-    /* The ASM does 8 iterations of: ASL temp, ROR accum
-       which shifts bits from temp into accum through carry,
-       effectively reversing the bit order */
+    /* ASM does 8x (ASL temp, ROR accum), shifting bits from temp into accum
+       through carry, which reverses the bit order. */
     uint8_t result = 0;
     for (int i = 0; i < 8; i++) {
         result >>= 1;

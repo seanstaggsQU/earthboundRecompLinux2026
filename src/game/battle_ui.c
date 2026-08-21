@@ -1,7 +1,7 @@
 /*
  * Battle UI and sprite functions.
  *
- * Extracted from battle.c — sprite rendering, palette effects,
+ * Extracted from battle.c, sprite rendering, palette effects,
  * letterbox HDMA, scene loading, battle sprite management,
  * and screen effect updates.
  */
@@ -49,8 +49,8 @@ extern const uint8_t *btl_entry_bg_table;
  * (±1/±32/±0x400 for R/G/B bit positions in 15-bit BGR color).
  *
  * Parameters:
- *   palette_index — index within the battle sprite palette area (0–63)
- *   r, g, b       — target color components (0–31 each)
+ *   palette_index, index within the battle sprite palette area (0-63)
+ *   r, g, b, target color components (0-31 each)
  */
 void setup_battle_sprite_palette_effect(uint16_t palette_index,
                                          uint16_t r, uint16_t g, uint16_t b) {
@@ -208,7 +208,7 @@ static void render_battle_sprite_row(uint16_t row) {
         if (b->row != row) continue;
         if (b->sprite == 0) continue;
 
-        /* Blink timer — damage flash effect.
+        /* Blink timer, damage flash effect.
          * Decrement each frame; divide by 3, skip rendering on odd result. */
         if (b->blink_timer != 0) {
             b->blink_timer--;
@@ -226,7 +226,7 @@ static void render_battle_sprite_row(uint16_t row) {
         int16_t sx = (int16_t)b->sprite_x - bt.screen_effect_horizontal_offset + EB_VIEWPORT_PAD_LEFT;
         int16_t sy = (int16_t)b->sprite_y - bt.screen_effect_vertical_offset;
 
-        /* Shake timer — attack animation bob.
+        /* Shake timer, attack animation bob.
          * Decrement each frame; when (decremented & 4) == 0, use alt spritemap. */
         if (b->shake_timer != 0) {
             b->shake_timer--;
@@ -256,7 +256,7 @@ static void render_battle_sprite_row(uint16_t row) {
             }
         }
 
-        /* Normal rendering — draw from BATTLE_SPRITEMAPS */
+        /* Normal rendering, draw from BATTLE_SPRITEMAPS */
         write_spritemap_to_oam(bt.battle_spritemaps + smap_offset, sx, sy);
     }
 }
@@ -269,12 +269,12 @@ static void render_battle_sprite_row(uint16_t row) {
  * ert.palettes. Called each frame during battle and at battle init.
  */
 void render_all_battle_sprites(void) {
-    /* SWAP_SPRITEMAP_BANK — assembly sets bank to $7E for BSS reads.
+    /* SWAP_SPRITEMAP_BANK: assembly sets bank to $7E for BSS reads.
      * In C port, we pass pointers directly so no bank swap needed,
      * but update the variable for consistency. */
     ert.spritemap_bank = 0x7E;
 
-    /* OAM_CLEAR — hide all sprites */
+    /* OAM_CLEAR: hide all sprites */
     oam_clear();
     ert.oam_write_index = 0;
 
@@ -282,7 +282,7 @@ void render_all_battle_sprites(void) {
     render_battle_sprite_row(0);
     render_battle_sprite_row(1);
 
-    /* UPDATE_SCREEN — in battle context, sprites are written to OAM
+    /* UPDATE_SCREEN: in battle context, sprites are written to OAM
      * directly (not via priority queues), so only palette sync is needed. */
     sync_palettes_to_cgram();
 }
@@ -630,7 +630,7 @@ void clear_battle_visual_effects(void) {
         bt.hp_pp_box_blink_duration = 0;
     }
 
-    /* SET_COLDATA(0, 0, 0) — clear fixed color to black */
+    /* SET_COLDATA(0, 0, 0): clear fixed color to black */
     ppu.coldata_r = 0;
     ppu.coldata_g = 0;
     ppu.coldata_b = 0;
@@ -673,7 +673,7 @@ void load_enemy_battle_sprites(void) {
     ppu.bg_hofs[2] = 0;
     ppu.bg_vofs[2] = 0;
 
-    /* Battle's BG3 is always the fixed 32-tile text/window layer -- like the
+    /* Battle's BG3 is always the fixed 32-tile text/window layer, like the
      * overworld's BG3 (see set_bg3_vram_location in overworld.c), never a
      * filling layer. Nothing else in the battle-entry path resets
      * bg_viewport_fill[2], so it otherwise inherits whatever the *previous*
@@ -727,7 +727,7 @@ void build_letterbox_hdma_table(void);
 void apply_letterbox_to_ppu(void);
 
 /*
- * LOAD_BATTLE_BG — Port of asm/battle/load_battlebg.asm (725 lines).
+ * LOAD_BATTLE_BG: Port of asm/battle/load_battlebg.asm (725 lines).
  *
  * Loads battle background graphics, arrangement, and palette for up to 2 layers.
  * Sets up VRAM layout, palette data, letterbox parameters, and initial animation frame.
@@ -790,12 +790,12 @@ void load_battle_bg(uint16_t layer1_id, uint16_t layer2_id, uint16_t letterbox_s
     uint8_t bitdepth = bg_data_table[config_offset + 2];
 
     /* Which physical BG index is "the text/window layer" (fixed at
-     * VRAM_TEXT_LAYER_TILEMAP == $7C00, see window.c -- the window system
+     * VRAM_TEXT_LAYER_TILEMAP == $7C00, see window.c, the window system
      * always writes there regardless of which BG is currently mapped to
      * it) depends on bitdepth, decided by the branches below:
      *
      *   4bpp (mode 9, "if (bitdepth == 4)" further down): BG3 (index 2) is
-     *   pointed at $7C00 by load_enemy_battle_sprites() -- BG1/BG2 hold the
+     *   pointed at $7C00 by load_enemy_battle_sprites(), BG1/BG2 hold the
      *   actual background art (layer1 -> BG2, optional layer2 -> BG1/BG4
      *   depending on style) -> FILL. BG3 is text -> CENTER.
      *
@@ -807,7 +807,7 @@ void load_battle_bg(uint16_t layer1_id, uint16_t layer2_id, uint16_t letterbox_s
      *
      * Getting this backwards for either case wraps a FILL-mode text layer
      * across the wide viewport (visibly duplicating the window at the
-     * edges -- the Frank/first-Starman-encounter bug) or wrongly centers a
+     * edges, the Frank/first-Starman-encounter bug) or wrongly centers a
      * CENTER-mode background art layer (black gutters instead of filling
      * the screen). Every battle passes through here every time it loads
      * its background, so this needs to be right for both paths on every
@@ -1117,7 +1117,7 @@ void load_battle_bg(uint16_t layer1_id, uint16_t layer2_id, uint16_t letterbox_s
 
 
 /*
- * LOAD_BATTLE_SPRITE — Port of asm/battle/load_battle_sprite.asm (447 lines).
+ * LOAD_BATTLE_SPRITE: Port of asm/battle/load_battle_sprite.asm (447 lines).
  *
  * Initializes spritemap entries for a battle sprite, determines its size,
  * decompresses its graphics, and copies tile data to BUFFER.
@@ -1277,7 +1277,7 @@ void load_battle_sprite(uint16_t sprite_id) {
 
 
 /*
- * SETUP_BATTLE_ENEMY_SPRITES — Port of asm/battle/enemy/setup_battle_enemy_sprites.asm (116 lines).
+ * SETUP_BATTLE_ENEMY_SPRITES: Port of asm/battle/enemy/setup_battle_enemy_sprites.asm (116 lines).
  *
  * Iterates through the enemy group, loads each enemy's battle sprite palette
  * to CGRAM, records enemy IDs, and calls LOAD_BATTLE_SPRITE for each.
@@ -1385,7 +1385,7 @@ StepResult mode_step_load_battle_scene(ModeState *ms) {
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_BATTLE_WAIT, &child);
             }
             /* skip_swirl path: no yield before the load (matches the original
-             * blocking flow) — continue into LBS_LOAD in the same step. */
+             * blocking flow), continue into LBS_LOAD in the same step. */
             continue;
 
         case LBS_LOAD: {
@@ -1409,7 +1409,7 @@ StepResult mode_step_load_battle_scene(ModeState *ms) {
             }
 
             /* Load battle visuals (force_blank/blank-screen waits block via
-             * host_process_frame only — pump-free, run inline here). */
+             * host_process_frame only, pump-free, run inline here). */
             force_blank_and_wait_vblank();
             load_enemy_battle_sprites();
             text_load_window_gfx();
@@ -1431,7 +1431,7 @@ StepResult mode_step_load_battle_scene(ModeState *ms) {
             blank_screen_and_wait_vblank();
             s->phase = LBS_DONE;
             if (s->skip_swirl) {
-                /* Quick fade in (step=1, delay=4 frames) — the former
+                /* Quick fade in (step=1, delay=4 frames), the former
                  * wait_for_fade_with_tick() is a FADE_WAIT push. */
                 fade_in(1, 4);
                 memset(&child, 0, sizeof(child));
@@ -1493,14 +1493,14 @@ uint16_t layout_enemy_battle_positions(void) {
             width++;
 
         if (battle_sprite_row_width[row] + width > 30) {
-            /* Row overflow — try other row */
+            /* Row overflow, try other row */
             uint16_t alt_row = 1 - row;
             uint16_t alt_width = get_battle_sprite_width(b->sprite);
             if (battle_sprite_row_width[alt_row] != 0)
                 alt_width++;
 
             if (battle_sprite_row_width[alt_row] + alt_width > 30)
-                return 0;  /* Layout failed — no room */
+                return 0;  /* Layout failed, no room */
 
             b->row = (uint8_t)alt_row;
             battle_sprite_row_width[alt_row] += alt_width;
@@ -1510,7 +1510,7 @@ uint16_t layout_enemy_battle_positions(void) {
     }
 
     /* ================================================================
-     * Phase 2: X-position assignment — first row group (lines 143-280)
+     * Phase 2: X-position assignment, first row group (lines 143-280)
      * Position battlers in the same row as battler[8]'s row.
      * Starts at center (32), expands left and right.
      * ================================================================ */
@@ -1554,7 +1554,7 @@ uint16_t layout_enemy_battle_positions(void) {
             } else if (left_space > right_space) {
                 goto place_right;
             } else {
-                /* Equal space — random */
+                /* Equal space, random */
                 if (rand_byte() & 1)
                     goto place_left;
                 /* else fall through to place_right */
@@ -1583,7 +1583,7 @@ uint16_t layout_enemy_battle_positions(void) {
     uint16_t group1_right = right_bound;
 
     /* ================================================================
-     * Phase 3: X-position assignment — other row group (lines 281-426)
+     * Phase 3: X-position assignment, other row group (lines 281-426)
      * Position battlers NOT in the first row's group.
      * ================================================================ */
     uint16_t other_left = last_pos;
@@ -1738,11 +1738,11 @@ sort_restart:
                 /* If a.sprite_y > b.sprite_y, fall through to @COMPARE_ROW */
                 if (!need_swap) goto compare_row;
             } else if (ba->the_flag > bb->the_flag) {
-                /* a has higher letter — @COMPARE_ROW path */
+                /* a has higher letter, @COMPARE_ROW path */
 compare_row:
                 /* USA: BGT (strict greater) */
                 if (ba->the_flag <= bb->the_flag)
-                    continue;  /* equal flags — no swap */
+                    continue;  /* equal flags, no swap */
 
                 /* a.the_flag > b.the_flag: swap if a is visually below b
                  * (higher sprite_y), or same y and a is further left */
@@ -2001,7 +2001,7 @@ void clear_focus_window_content_far(void) {
 
 /*
  * SELECT_BATTLE_MENU_CHARACTER_FAR (asm/battle/select_battle_menu_character.asm)
- * Far wrapper — delegates to select_battle_menu_character() in window.c.
+ * Far wrapper, delegates to select_battle_menu_character() in window.c.
  */
 void select_battle_menu_character_far(uint16_t party_slot) {
     select_battle_menu_character(party_slot);
@@ -2010,7 +2010,7 @@ void select_battle_menu_character_far(uint16_t party_slot) {
 
 /*
  * CLEAR_BATTLE_MENU_CHARACTER_INDICATOR_FAR (asm/text/clear_battle_menu_character_indicator_redirect.asm)
- * Far wrapper — delegates to clear_battle_menu_character_indicator() in window.c.
+ * Far wrapper, delegates to clear_battle_menu_character_indicator() in window.c.
  */
 void clear_battle_menu_character_indicator_far(void) {
     clear_battle_menu_character_indicator();
@@ -2019,7 +2019,7 @@ void clear_battle_menu_character_indicator_far(void) {
 
 /*
  * SET_CURRENT_ITEM_FAR (src/inventory/set_current_item_redirect.asm)
- * Far wrapper for SET_CURRENT_ITEM — sets CITEM for battle text display.
+ * Far wrapper for SET_CURRENT_ITEM, sets CITEM for battle text display.
  */
 void set_current_item_far(uint8_t item) {
     set_current_item(item);
@@ -2062,9 +2062,9 @@ void load_attack_palette(uint16_t type) {
 
 
 /*
- * UPDATE_BATTLE_SCREEN_EFFECTS — Port of asm/battle/effects/update_battle_screen_effects.asm (296 lines).
+ * UPDATE_BATTLE_SCREEN_EFFECTS: Port of asm/battle/effects/update_battle_screen_effects.asm (296 lines).
  *
- * BUILD_LETTERBOX_HDMA_TABLE — Port of asm/battle/build_letterbox_hdma_table.asm (60 lines).
+ * BUILD_LETTERBOX_HDMA_TABLE: Port of asm/battle/build_letterbox_hdma_table.asm (60 lines).
  *
  * Builds the HDMA scanline table used for the letterbox (top/bottom black
  * bars) effect in battle. The table consists of 3-byte entries:
@@ -2140,7 +2140,7 @@ void apply_letterbox_to_ppu(void) {
 
 
 /*
- * UPDATE_BATTLE_SCREEN_EFFECTS — Port of asm/battle/effects/update_battle_screen_effects.asm.
+ * UPDATE_BATTLE_SCREEN_EFFECTS: Port of asm/battle/effects/update_battle_screen_effects.asm.
  *
  * Called every frame during battle (from RENDER_FRAME_TICK when bt.battle_mode_flag set).
  * Handles: background darkening, reflect/green-bg flashes, vertical shake,
@@ -2150,7 +2150,7 @@ void apply_letterbox_to_ppu(void) {
  * swirl effect, battle sprite palette animation, and letterbox ending.
  */
 void update_battle_screen_effects(void) {
-    /* -- Background darkening (battle intro fade) -- */
+    /* Background darkening (battle intro fade) */
     if (bt.enable_background_darkening) {
         bt.background_brightness -= 0x0555;
         /* 16-bit value sign-extended to 32-bit for comparison */
@@ -2163,7 +2163,7 @@ void update_battle_screen_effects(void) {
         interpolate_bg_palette_colors(darken_level);
     }
 
-    /* -- Reflect flash (shield reflect visual) -- */
+    /* Reflect flash (shield reflect visual) */
     if (bt.reflect_flash_duration) {
         bt.reflect_flash_duration--;
         if (bt.reflect_flash_duration & 0x0002) {
@@ -2175,7 +2175,7 @@ void update_battle_screen_effects(void) {
         }
     }
 
-    /* -- Green background flash (PSI shield) -- */
+    /* Green background flash (PSI shield) */
     if (bt.green_background_flash_duration) {
         ert.palettes[0] = 0;  /* clear BG color to black */
         if (bt.green_background_flash_duration == 3) {
@@ -2192,7 +2192,7 @@ void update_battle_screen_effects(void) {
         }
     }
 
-    /* -- Vertical shake (damage taken) -- */
+    /* Vertical shake (damage taken) */
     if (bt.vertical_shake_duration) {
         /* Index into shake amplitude table: index = 60 - duration */
         uint16_t index = 60 - bt.vertical_shake_duration;
@@ -2213,7 +2213,7 @@ void update_battle_screen_effects(void) {
         bt.screen_effect_vertical_offset = 0;
     }
 
-    /* -- Horizontal wobble (wavy screen effect) -- */
+    /* Horizontal wobble (wavy screen effect) */
     bt.screen_effect_horizontal_offset = 0;
     if (bt.wobble_duration) {
         /* Assembly: phase = duration % 72; index = (phase * 256) / 72;
@@ -2225,7 +2225,7 @@ void update_battle_screen_effects(void) {
         bt.screen_effect_horizontal_offset = (sine_val * 64) / 256;
     }
 
-    /* -- Horizontal shake (short left-right shake) -- */
+    /* Horizontal shake (short left-right shake) */
     if (bt.shake_duration) {
         uint16_t phase = bt.shake_duration & 0x0003;
         bt.shake_duration--;
@@ -2242,7 +2242,7 @@ void update_battle_screen_effects(void) {
         }
     }
 
-    /* -- Apply screen offsets to BG layers -- */
+    /* Apply screen offsets to BG layers */
     if ((loaded_bg_data_layer1.bitdepth & 0xFF) == 2) {
         /* 2bpp mode: offsets apply to BG1 */
         ppu.bg_hofs[0] = bt.screen_effect_horizontal_offset;
@@ -2253,17 +2253,17 @@ void update_battle_screen_effects(void) {
         ppu.bg_vofs[2] = bt.screen_effect_vertical_offset;
     }
 
-    /* -- Minimum wait frame countdown -- */
+    /* Minimum wait frame countdown */
     if (bt.screen_effect_minimum_wait_frames) {
         bt.screen_effect_minimum_wait_frames--;
     }
 
-    /* -- Render battle sprites (enemies on screen) -- */
+    /* Render battle sprites (enemies on screen) */
     if (bt.battle_mode_flag) {
         render_all_battle_sprites();
     }
 
-    /* -- Generate battle background animation frames --
+    /*, Generate battle background animation frames --
      * Assembly (C2DB3F.asm lines 176-187): always calls for layer 1,
      * conditionally calls for layer 2 if target_layer != 0. */
     generate_battlebg_frame(&loaded_bg_data_layer1, 0);
@@ -2271,10 +2271,10 @@ void update_battle_screen_effects(void) {
         generate_battlebg_frame(&loaded_bg_data_layer2, 1);
     }
 
-    /* -- PSI animation update -- */
+    /* PSI animation update */
     update_psi_animation();
 
-    /* -- Red flash (damage dealt) -- */
+    /* Red flash (damage dealt) */
     if (bt.red_flash_duration) {
         bt.red_flash_duration--;
         if ((bt.red_flash_duration / 12) & 1) {
@@ -2288,7 +2288,7 @@ void update_battle_screen_effects(void) {
         }
     }
 
-    /* -- Green flash (healing) -- */
+    /* Green flash (healing) */
     if (bt.green_flash_duration) {
         bt.green_flash_duration--;
         if ((bt.green_flash_duration / 12) & 1) {
@@ -2302,7 +2302,7 @@ void update_battle_screen_effects(void) {
         }
     }
 
-    /* -- HPPP box blink (target indicator) -- */
+    /* HPPP box blink (target indicator) */
     if (bt.hp_pp_box_blink_duration) {
         bt.hp_pp_box_blink_duration--;
         if ((bt.hp_pp_box_blink_duration / 3) & 1) {
@@ -2314,13 +2314,13 @@ void update_battle_screen_effects(void) {
         }
     }
 
-    /* -- Swirl effect (battle entry/exit) -- */
+    /* Swirl effect (battle entry/exit) */
     update_swirl_effect();
 
-    /* -- Battle sprite palette animation -- */
+    /* Battle sprite palette animation */
     update_battle_sprite_palette_anim();
 
-    /* -- Letterbox ending (post-battle letterbox shrink) -- */
+    /* Letterbox ending (post-battle letterbox shrink) */
     if (bt.letterbox_effect_ending && bt.letterbox_top_end) {
         if (bt.letterbox_effect_ending_top < 0x03BB) {
             /* Letterbox fully open */
@@ -2358,7 +2358,7 @@ void update_battle_screen_effects(void) {
 
 
 /*
- * WAIT_AND_UPDATE_BATTLE_EFFECTS — Port of asm/battle/wait_and_update_battle_effects.asm
+ * WAIT_AND_UPDATE_BATTLE_EFFECTS: Port of asm/battle/wait_and_update_battle_effects.asm
  * and its far wrapper C43568.asm.
  *
  * Waits one frame then processes all battle screen effects.

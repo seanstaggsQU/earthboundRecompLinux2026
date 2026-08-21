@@ -182,7 +182,7 @@ void change_music(uint16_t track_id) {
 
     audio_state.current_music_track = track_id;
 
-    /* Stop any previously-streaming MSU track unconditionally -- covers the
+    /* Stop any previously-streaming MSU track unconditionally, covers the
      * "switching to track 0 / silence" early-return below too. */
     platform_audio_msu_stop();
 
@@ -237,7 +237,7 @@ void change_music(uint16_t track_id) {
 
     /* If High Quality Audio is on (Config menu, settings.h) and an MSU1
      * pack is loaded and covers this track, let it stream the music instead
-     * of the SPC700 sequence -- sound effects still play normally (the
+     * of the SPC700 sequence, sound effects still play normally (the
      * pack/engine setup above already ran, so SFX sample data is loaded),
      * we just don't also trigger the music sequence. platform_audio_msu_stop()
      * already ran unconditionally above, so turning this off mid-track (or
@@ -290,7 +290,7 @@ void audio_resync_after_load(void) {
      * (its ~64 KB of APU RAM is not part of the snapshot). Force change_music() to
      * actually re-issue: clear its caches (the track id + the loaded-pack ids) so it
      * stops the old track, re-uploads the saved track's packs, and restarts it.
-     * Not sample-seamless — the song restarts — but the correct music plays and the
+     * Not sample-seamless, the song restarts, but the correct music plays and the
      * stale one stops. (A seamless resume would require snapshotting the full APU.) */
     if (!apu) return;
 
@@ -299,7 +299,7 @@ void audio_resync_after_load(void) {
     /* Drop any sound effects queued in the pre-load run. Do NOT restore/alter the
      * bit-flippers (sfx_upper_bit_flipper / audio_effect_bit_flipper): they track the
      * toggle parity the live, non-snapshotted SPC700 expects, so they must keep their
-     * current values — restoring save-time parity would desync the command protocol. */
+     * current values, restoring save-time parity would desync the command protocol. */
     sfx_queue_start = 0;
     sfx_queue_end   = 0;
 

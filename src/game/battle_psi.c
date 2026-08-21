@@ -1,7 +1,7 @@
 /*
  * Battle PSI functions.
  *
- * Extracted from battle.c — PSI availability checks, menu generation,
+ * Extracted from battle.c, PSI availability checks, menu generation,
  * animation playback, and PSI battle effect application.
  */
 #include "game/battle.h"
@@ -81,10 +81,10 @@ ASSERT_STRUCT_SIZE(PsiAnimConfig, 12);
 #define PSI_TARGET_ALL_ENEMIES  2
 #define PSI_TARGET_RANDOM       3
 
-/* PSI category names — loaded from ROM via asset pipeline.
+/* PSI category names, loaded from ROM via asset pipeline.
  * 4 entries × PSI_CATEGORY_NAME_SIZE bytes, EB-encoded and null-padded. */
 
-/* PSI target text — loaded from ROM via asset pipeline.
+/* PSI target text, loaded from ROM via asset pipeline.
  * 10 entries × PSI_TARGET_TEXT_LENGTH bytes, EB-encoded and null-padded.
  * Indexed as [direction * 5 + target]:
  *   direction 0 = PARTY (ally), direction 1 = ENEMY
@@ -100,12 +100,12 @@ bool ensure_battle_psi_table(void) {
 
 
 /*
- * SET_WINDOW_PALETTE_INDEX — now shared via window.h / window.c.
+ * SET_WINDOW_PALETTE_INDEX: now shared via window.h / window.c.
  * (Removed static version; callers use the shared set_window_palette_index.)
  */
 
 /* set_cursor_move_callback / clear_cursor_move_callback:
- * Now shared via window.h — see window.c for implementation. */
+ * Now shared via window.h, see window.c for implementation. */
 
 /*
  * CHECK_CHARACTER_HAS_PSI_ABILITY (asm/text/check_character_has_psi_ability.asm)
@@ -212,7 +212,7 @@ uint16_t check_psi_category_available(uint16_t category, uint16_t char_id) {
  * For now, this generates the menu items in the TEXT_STANDARD window.
  */
 /*
- * generate_psi_list_items — core PSI ability list builder.
+ * generate_psi_list_items, core PSI ability list builder.
  *
  * Populates the current focus window with PSI abilities matching the given
  * character, usability, and category filters. Adds menu items with ability
@@ -281,7 +281,7 @@ static void generate_psi_list_items(uint16_t char_id,
             last_psi_name = psi->name;
         }
 
-        /* Add menu item — suffix label printed at menu_x by print_menu_items */
+        /* Add menu item, suffix label printed at menu_x by print_menu_items */
         get_psi_suffix_label(i, suffix_label, sizeof(suffix_label));
         add_menu_item(suffix_label, i, psi->menu_x, psi->menu_y);
     }
@@ -308,7 +308,7 @@ static void generate_psi_list_items(uint16_t char_id,
 
 
 /*
- * GENERATE_BATTLE_PSI_LIST callback — Port of asm/battle/ui/generate_battle_psi_list.asm.
+ * GENERATE_BATTLE_PSI_LIST callback, Port of asm/battle/ui/generate_battle_psi_list.asm.
  *
  * Cursor move callback invoked when navigating the PSI category menu.
  * Creates/refreshes TEXT_STANDARD window and fills it with PSI abilities
@@ -349,7 +349,7 @@ void generate_battle_psi_list_callback(uint16_t category) {
 
 
 /*
- * DISPLAY_CHARACTER_PSI_LIST — Port of asm/text/menu/display_character_psi_list.asm (45 lines).
+ * DISPLAY_CHARACTER_PSI_LIST: Port of asm/text/menu/display_character_psi_list.asm (45 lines).
  *
  * Creates TEXT_STANDARD window, sets the character's name as title,
  * enables pagination (if multi-party), then generates the full PSI
@@ -366,7 +366,7 @@ void display_character_psi_list(uint16_t char_id) {
     /* Assembly line 11: create TEXT_STANDARD window */
     create_window(WINDOW_TEXT_STANDARD);
 
-    /* Assembly line 13: US only — tick one frame to show window */
+    /* Assembly line 13: US only, tick one frame to show window */
     window_tick_without_instant_printing();
 
     /* Assembly lines 15-20: if multi-party, enable pagination */
@@ -416,7 +416,7 @@ void display_psi_target_and_cost(uint16_t ability_id) {
 
     uint16_t text_idx;
     if (psi->name == 4) {
-        /* PSI_ID::THUNDER = 4 — special case: just "To enemy" */
+        /* PSI_ID::THUNDER = 4, special case: just "To enemy" */
         text_idx = 0;
     } else {
         /* Look up direction and target from battle_action_table */
@@ -449,7 +449,7 @@ void display_psi_target_and_cost(uint16_t ability_id) {
 
 
 /*
- * DISPLAY_PSI_DESCRIPTION — Port of asm/text/menu/display_psi_description.asm (46 lines).
+ * DISPLAY_PSI_DESCRIPTION: Port of asm/text/menu/display_psi_description.asm (46 lines).
  *
  * Cursor move callback for PSI ability selection in the status menu.
  * Shows the target type / PP cost window and the PSI description text.
@@ -599,7 +599,7 @@ StepResult mode_step_battle_psi_menu(ModeState *ms) {
                 uint8_t pp_cost = battle_action_table ? battle_action_table[st->battle_action_id].pp_cost : 0;
                 CharStruct *ch = &party_characters[st->char_id - 1];
                 if (pp_cost > ch->current_pp_target) {
-                    /* Not enough PP — show message (assembly lines 141-146),
+                    /* Not enough PP, show message (assembly lines 141-146),
                      * then check_result=0 -> reopen the ability list. */
                     create_window(WINDOW_TEXT_BATTLE);
                     dt.blinking_triangle_flag = 2;
@@ -757,7 +757,7 @@ void show_psi_animation(uint16_t anim_id) {
      * path runs no actionscript frame). The C port writes GFX straight to ppu.vram[]
      * synchronously above, so no real upload wait is needed; dropping the one VBlank is
      * the sanctioned battle one-frame phase shift (cf. the cb2fe3d4 sanctuary site and
-     * render_frame_tick_work's documented FADE_TICK_BATTLE_EFFECTS shift) — the anim
+     * render_frame_tick_work's documented FADE_TICK_BATTLE_EFFECTS shift), the anim
      * setup that follows is pure memory state, and playback yields via mode_step_battle_
      * wait (BW_PSI_ANIM). */
     bool psi_anim_parked = render_frame_tick_work_step();
@@ -893,7 +893,7 @@ void (*battle_psi_cursor_callback_from_id(uint8_t id))(uint16_t) {
  *
  * Game logic only ever sets arr_bundled_data/arr_bundle_buf non-NULL (at
  * show_psi_animation) and never NULLs them again, so a saved NULL means "no PSI
- * animation has ever played" — and NULL is bit-identical on every platform. Gating
+ * animation has ever played", and NULL is bit-identical on every platform. Gating
  * the rebind on "was non-NULL" therefore keeps the same-process round-trip
  * byte-identical (the rebound value equals the saved one) while still repairing the
  * stale absolute pointers on a cross-process/cross-platform load. */
@@ -911,7 +911,7 @@ void psi_animation_savestate_rebind(void) {
 
 
 /*
- * UPDATE_PSI_ANIMATION — Port of asm/battle/psi_animation_fill_data.asm (242 lines).
+ * UPDATE_PSI_ANIMATION: Port of asm/battle/psi_animation_fill_data.asm (242 lines).
  *
  * Called every frame during battle screen effects. Handles:
  *   1) Frame timer countdown → upload frame tilemap to VRAM $5800
@@ -1070,7 +1070,7 @@ void update_psi_animation(void) {
 
 
 /*
- * APPLY_PSI_BATTLE_EFFECT — Port of asm/battle/apply_psi_battle_effect.asm (135 lines).
+ * APPLY_PSI_BATTLE_EFFECT: Port of asm/battle/apply_psi_battle_effect.asm (135 lines).
  *
  * Dispatches a battle visual effect based on effect_id:
  *   <35  → PSI animation (SHOW_PSI_ANIMATION)

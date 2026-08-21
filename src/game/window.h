@@ -66,21 +66,21 @@
 #define WINDOW_FILE_SELECT_FLAVOUR    0x32
 #define WINDOW_NAMING_PROMPT           0x27
 #define WINDOW_SINGLE_CHARACTER_SELECT 0x33
-/* This port's own addition -- not in include/constants/windows.asm, which
+/* This port's own addition, not in include/constants/windows.asm, which
  * ends at WINDOW::DEBUG_MENU ($34) + a WINDOW::MAX ($35) bounds sentinel.
  * Picked $36 (one past MAX) so this can't collide with any real ROM window
  * ID, nor be confused with the ROM's own MAX sentinel value. */
 #define WINDOW_SETTINGS_MENU          0x36
-/* Self-update screen ("Check for Updates" row on file-select) -- this
+/* Self-update screen ("Check for Updates" row on file-select), this
  * port's own addition, one past WINDOW_SETTINGS_MENU for the same reason
  * that one is one past the ROM's own WINDOW::MAX sentinel. */
 #define WINDOW_UPDATE_CHECK           0x37
-/* Command Menu "Really quit?" confirmation -- this port's own addition,
+/* Command Menu "Really quit?" confirmation, this port's own addition,
  * one past WINDOW_UPDATE_CHECK for the same reason that's one past
  * WINDOW_SETTINGS_MENU. */
 #define WINDOW_QUIT_CONFIRM           0x38
 /* Key Items pool browser (Key Items pool feature, not part of the original
- * ROM/assembly) -- one past WINDOW_QUIT_CONFIRM for the same reason. Reuses
+ * ROM/assembly), one past WINDOW_QUIT_CONFIRM for the same reason. Reuses
  * WINDOW_INVENTORY/WINDOW_ESCARGO_EXPRESS_ITEM's rect (never open at the
  * same time as either). */
 #define WINDOW_KEY_ITEMS              0x39
@@ -108,18 +108,18 @@ typedef struct {
  * alongside the ptr at every set_cursor_move_callback() site and used to rebind the
  * ptr after a state load (the rebind switch lands with state_dump_load() in D5).
  * The char-select on_change values mirror the CS_ONCHANGE_* enum (core/mode_stack.h)
- * numerically — the overworld char-select path sets an on_change fn as the cursor
+ * numerically, the overworld char-select path sets an on_change fn as the cursor
  * callback, so reusing the values lets one resolver cover both. _Static_asserts in
  * text.c keep them in sync. See docs/plans/savestate-unified-loop.md (Phase D, D0). */
 typedef enum {
     CURSOR_CB_NONE = 0,
-    /* --- char-select on_change callbacks (mirror CS_ONCHANGE_*, mode_stack.h) --- */
+    /* char-select on_change callbacks (mirror CS_ONCHANGE_*, mode_stack.h) */
     CURSOR_CB_CS_EQUIPMENT   = 1,   /* show_equipment_and_stats_callback (text.c) */
     CURSOR_CB_CS_PSI_LIST    = 2,   /* display_character_psi_list        (text.c) */
     CURSOR_CB_CS_STATUS      = 3,   /* display_status_window             (text.c) */
     CURSOR_CB_CS_WEAPON_NAME = 4,   /* get_weapon_item_name_callback     (text.c) */
     CURSOR_CB_CS_BODY_NAME   = 5,   /* get_body_item_name_callback       (text.c) */
-    /* --- menu preview cursor callbacks (own numeric space, above CS_ONCHANGE_*) --- */
+    /* menu preview cursor callbacks (own numeric space, above CS_ONCHANGE_*) */
     CURSOR_CB_HPPP_MODE_ITEM = 16,  /* set_hppp_window_mode_item          (display_text_menus.c) */
     CURSOR_CB_PSI_LIST_GEN,         /* generate_battle_psi_list_callback  (battle_psi.c) */
     CURSOR_CB_PSI_TARGET_COST,      /* display_psi_target_and_cost        (battle_psi.c) */
@@ -136,7 +136,7 @@ typedef struct {
     bool     active;
     int8_t   next, prev;            /* asm window_stats::next/prev: draw-order linked list
                                        (slot indices into win.windows[], -1 = none). The list
-                                       order — not the slot index — is the z-order; render walks
+                                       order, not the slot index, is the z-order; render walks
                                        head→tail (bottom→top). See create_window/render_all_windows. */
     uint8_t  id;                    /* asm offset 4 */
     uint8_t  x, y;                  /* position in tiles (asm offset 6/8) */
@@ -160,7 +160,7 @@ typedef struct {
                                                        movement; asm passes userdata (type 2) or
                                                        index+1 (type 1). ABI-stable slot (item #3B). */
     ABI_PTR_PAD(cursor_move_callback)
-    uint8_t  cursor_move_callback_id; /* CursorCallbackId — serializable form of the
+    uint8_t  cursor_move_callback_id; /* CursorCallbackId, serializable form of the
                                          fn ptr above (savestate hardening, D0a). */
     uint8_t  title_slot;              /* asm offset 59: TITLED_WINDOWS slot index (1-5), 0=none */
     uint8_t  title_tile_count;        /* number of VWF tile columns rendered for title (set once at set_window_title time) */
@@ -173,7 +173,7 @@ typedef struct {
                                                 (win.tilemap_pool). ABI-stable slot (item #3B). */
     ABI_PTR_PAD(content_tilemap)
     uint16_t  content_tilemap_size; /* allocated entries in pool */
-    uint16_t  content_tilemap_offset; /* index of content_tilemap within win.tilemap_pool —
+    uint16_t  content_tilemap_offset; /* index of content_tilemap within win.tilemap_pool, 
                                          serializable form of the ptr above (savestate
                                          hardening, D0b). Valid only when size > 0; the ptr is
                                          rebuilt from this offset on state load (D5). */
@@ -205,7 +205,7 @@ typedef struct {
     uint8_t  current_focus_window;
 
     /* RAM shadow of BG3/text layer tilemap (32x32 = 0x800 bytes).
-     * Accessed as uint16_t* for tilemap entry writes — must be 2-byte
+     * Accessed as uint16_t* for tilemap entry writes, must be 2-byte
      * aligned (Cortex-M0+ faults on unaligned halfword access). */
     uint8_t __attribute__((aligned(4))) bg2_buffer[BG2_BUFFER_SIZE];
 
@@ -254,7 +254,7 @@ typedef struct {
 
 extern WindowSystemState win;
 
-/* SET_WINDOW_FOCUS — Port of asm/text/set_window_focus.asm.
+/* SET_WINDOW_FOCUS: Port of asm/text/set_window_focus.asm.
  * Sets the current focus window to the given window ID. */
 void set_window_focus(uint16_t window_id);
 
@@ -293,7 +293,7 @@ void highlight_menu_item(WindowInfo *w, uint16_t item_index, uint16_t palette, b
 /* Add a menu item to the focus window */
 void add_menu_item(const char *label, uint16_t userdata, uint16_t text_x, uint16_t text_y);
 
-/* PRINT_MENU_ITEMS — Port of asm/text/print_menu_items.asm.
+/* PRINT_MENU_ITEMS: Port of asm/text/print_menu_items.asm.
  * Iterates the focus window's menu items and prints each label
  * at its text_x/text_y position. Called after add_menu_item() when
  * items already have explicit positions set (unlike open_window_and_print_menu
@@ -304,7 +304,7 @@ void print_menu_items(void);
  * GAME_MODE_SELECTION_MENU (mode_step_selection_menu) instead, replicating the
  * null/empty-menu early-out (return 0, no push) inline at each push site. */
 
-/* CHAR_SELECT_PROMPT — Port of asm/text/character_select_prompt.asm.
+/* CHAR_SELECT_PROMPT: Port of asm/text/character_select_prompt.asm.
  * Creates a window listing party member names and runs selection_menu.
  * Returns 1-based character ID of the selected party member, or 0 if cancelled.
  *
@@ -503,7 +503,7 @@ void update_hppp_meter_and_render(void);
  * pump_mode cutover; use update_hppp_meter_work_step()/_flush() below. */
 
 /* Park-propagating split of update_hppp_meter_work() (savestate D4b): _step()
- * returns true iff an actionscript frame parked — the caller must push
+ * returns true iff an actionscript frame parked, the caller must push
  * GAME_MODE_ACTIONSCRIPT_FRAME (actionscript_frame_take_push) and call _flush() at
  * its resume phase; on no park the tick finishes inline and _step() returns false. */
 bool update_hppp_meter_work_step(void);
@@ -586,7 +586,7 @@ void restore_window_text_attributes(void);
  * Sets the cursor_move_callback for the current focus window.
  * The callback receives the selected item's userdata (type 2) or
  * index+1 (type 1) when the cursor moves. `id` is the serializable CursorCallbackId
- * for `cb` (savestate hardening, D0a) — stored alongside the ptr so the window
+ * for `cb` (savestate hardening, D0a), stored alongside the ptr so the window
  * system can be restored from a state dump. */
 void set_cursor_move_callback(void (*cb)(uint16_t), CursorCallbackId id);
 

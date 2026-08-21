@@ -1,7 +1,7 @@
 /*
  * Battle action handlers.
  *
- * Extracted from battle.c — contains all btlact_* action implementations,
+ * Extracted from battle.c, contains all btlact_* action implementations,
  * PSI/item/status effect handlers, and the action dispatch table.
  */
 #include "game/battle.h"
@@ -42,7 +42,7 @@ static int btlact_find(uint32_t rom_addr);
 /* display_text_from_addr as a DISPLAY_TEXT push: no battle prologue/epilogue
  * (used by steppers whose blocking form manages dt.blinking_triangle_flag
  * itself, e.g. switch_weapons/armor). Returns false (warn, like
- * display_text_from_addr) on an unresolvable address — the caller falls
+ * display_text_from_addr) on an unresolvable address, the caller falls
  * through to its resume pc inline. */
 static bool push_plain_text(ModeState *child, uint32_t addr) {
     if (dt_make_child_init(child, addr))
@@ -92,7 +92,7 @@ static uint16_t phys_attack_damage(uint16_t mult, bool variance_when_gt1) {
  *   miss check → [SMAAAASH check] → dodge check → offense*mult - defense
  *   (25% variance, floor 1) → CALC_RESIST_DAMAGE → [heal strangeness].
  * The calc pipeline stages are GAME_MODE_BATTLE_CALC pushes (value-returning
- * — see BattleCalcKind); the dodge check is pure (no text) and runs inline,
+ *, see BattleCalcKind); the dodge check is pure (no text) and runs inline,
  * with the dodge text as a DISPLAY_TEXT push. `variance_when_gt1` selects
  * the level-1/2 variance gate (raw > 1) vs the level-3/4 gate (raw > 0).
  * RNG order matches the blocking composition exactly: miss roll → smaaaash
@@ -210,7 +210,7 @@ static StepResult btlact_spy_step(BattleActionState *st) {
                                     false, true, tgt->defense))
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
             break;
-        /* Elemental resistances — display if 0xFF (complete immunity) */
+        /* Elemental resistances, display if 0xFF (complete immunity) */
         case 2:
             dt.blinking_triangle_flag = 0;
             st->pc = 3;
@@ -275,7 +275,7 @@ static StepResult btlact_spy_step(BattleActionState *st) {
 
 
 /*
- * BTLACT_LEVEL_1_ATTACK (wrapper — asm/battle/actions/level_1_attack.asm)
+ * BTLACT_LEVEL_1_ATTACK (wrapper, asm/battle/actions/level_1_attack.asm)
  *
  * Standard physical attack with miss/smaaaash/dodge checks.
  * Uses level 1 damage formula (offense - defense).
@@ -288,7 +288,7 @@ static StepResult btlact_level_1_attack_step(BattleActionState *st) {
 
 /*
  * BTLACT_LEVEL_3_ATK / BTLACT_LEVEL_4_ATK steppers (the blocking forms are
- * battle_level_3/4_attack in battle_calc.c — full attacks with the
+ * battle_level_3/4_attack in battle_calc.c, full attacks with the
  * miss/smaaaash/dodge prologue, the raw > 0 variance gate, and the
  * strangeness heal).
  */
@@ -304,7 +304,7 @@ static StepResult btlact_level_4_attack_step(BattleActionState *st) {
 
 /*
  * BTLACT_LEVEL_2_ATK tail (the bare battle_level_2_attack table row,
- * 0xC28523 — no miss/smaaaash/dodge prologue): offense*2 - defense with
+ * 0xC28523, no miss/smaaaash/dodge prologue): offense*2 - defense with
  * the raw > 1 variance gate, straight into CALC_RESIST_DAMAGE.
  */
 static StepResult btlact_level_2_attack_step(BattleActionState *st) {
@@ -325,7 +325,7 @@ static StepResult btlact_level_2_attack_step(BattleActionState *st) {
  * pop immediately); pc 1 runs the blocking display_in_battle_text epilogue
  * (the dt.blinking_triangle_flag clear) and pops. The wrapper steppers
  * MUST compute `msg` (and any state mutation deciding it) only when
- * st->pc == 0 — at later pcs the argument is unused, pass 0.
+ * st->pc == 0, at later pcs the argument is unused, pass 0.
  * ---------------------------------------------------------------------- */
 static StepResult btlact_single_text_step_ex(BattleActionState *st, uint32_t msg,
                                              bool has_cnum, uint32_t cnum) {
@@ -338,7 +338,7 @@ static StepResult btlact_single_text_step_ex(BattleActionState *st, uint32_t msg
         st->pc = 1;
         if (battle_push_text_ex(&child, msg, false, has_cnum, cnum))
             return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
-        /* FALLTHROUGH — unresolvable text: epilogue inline */
+        /* FALLTHROUGH: unresolvable text: epilogue inline */
     case 1:
     default:
         dt.blinking_triangle_flag = 0;
@@ -410,7 +410,7 @@ static uint32_t healing_alpha_decide(Battler *tgt) {
         return MSG_BTL5_CURED_ASLEEP;
     }
 
-    /* No curable status — "no effect" */
+    /* No curable status, "no effect" */
     return MSG_BTL4_RESULT_HEAL_NO_EFFECT;
 }
 
@@ -440,7 +440,7 @@ static uint32_t healing_beta_decide(Battler *tgt) {
 }
 
 /* The non-revive Healing-γ cures (paralysis, diamondize) + the Healing-β
- * fallback — the γ/Ω steppers' non-unconscious path. (The easyheal statuses
+ * fallback, the γ/Ω steppers' non-unconscious path. (The easyheal statuses
  * are one byte, so the unconscious case being checked separately first does
  * not change which cure can match.) */
 static uint32_t healing_gamma_cures(Battler *tgt) {
@@ -471,7 +471,7 @@ static StepResult btlact_healing_beta_step(BattleActionState *st) {
 }
 
 /* BTLACT_HEALING_G (asm/battle/actions/healing_gamma.asm):
- * cures paralysis, diamondize; revives (75%, hp_max/4) — the revive is a
+ * cures paralysis, diamondize; revives (75%, hp_max/4), the revive is a
  * BATTLE_REVIVE child push (it has its own text + enemy palette flash),
  * revive failure has its own text; falls back to Healing Beta. The 75% roll
  * happens at pc 0 only (the original sequence point). */
@@ -550,7 +550,7 @@ static StepResult btlact_healing_omega_step(BattleActionState *st) {
  *
  * Applies the shield type to the current target; the text picks
  * applied-vs-stronger on battle_shields_common()'s result (== 0: shield
- * already active — refreshed; assembly: BEQ).
+ * already active, refreshed; assembly: BEQ).
  * ---------------------------------------------------------------------- */
 static uint32_t shields_decide(uint16_t shield_type, uint32_t msg_applied,
                                uint32_t msg_stronger) {
@@ -711,7 +711,7 @@ static StepResult btlact_freezetime_step(BattleActionState *st) {
             st->pc = 1;
             break;
 
-        case 1: {  /* loop head — one pushed bash per hit */
+        case 1: {  /* loop head, one pushed bash per hit */
             if (st->exec_i >= st->scratch16[0]) {
                 st->pc = 2;
                 break;
@@ -788,7 +788,7 @@ static uint32_t inflict_decide(bool npc_check, uint16_t group, uint16_t value,
 
 /* inflict_decide with a success roll between the NPC check and the
  * infliction (the resist-checked family). The roll is selected by enum so
- * it only runs when reached — an NPC-target fail must NOT consume the RNG,
+ * it only runs when reached, an NPC-target fail must NOT consume the RNG,
  * exactly like the blocking forms' early return. */
 typedef enum {
     INFLICT_ROLL_NONE = 0,
@@ -874,11 +874,11 @@ static StepResult btlact_immobilize_step(BattleActionState *st) {
  * ====================================================================== */
 
 void btlact_null(void) {
-    /* No-op action — does nothing. Used as placeholder in action table. */
+    /* No-op action, does nothing. Used as placeholder in action table. */
 }
 
 void btlact_enemy_extend(void) {
-    /* No-op — placeholder for enemy extended action slot. */
+    /* No-op, placeholder for enemy extended action slot. */
 }
 
 /* BTLACT_NULL2-NULL12 (asm/battle/actions/null02.asm through null12.asm)
@@ -1046,7 +1046,7 @@ static StepResult btlact_psi_fire_step_common(BattleActionState *st,
  * Common PSI Freeze logic: NPC check → shield check → 25% variance →
  * freeze resist → damage. If damage dealt and target alive, 25% chance
  * to inflict solidified status. The solidify roll runs at pc 3, after the
- * resist-damage child pops — the same sequence point as the blocking form.
+ * resist-damage child pops, the same sequence point as the blocking form.
  */
 static StepResult btlact_psi_freeze_step_common(BattleActionState *st,
                                                 uint16_t base_damage) {
@@ -1162,7 +1162,7 @@ static StepResult btlact_psi_rockin_step_common(BattleActionState *st,
     }
 }
 
-/* PSI Thunder common — multi-hit logic (188 lines in assembly) */
+/* PSI Thunder common, multi-hit logic (188 lines in assembly) */
 /*
  * PSI_THUNDER_COMMON (asm/battle/actions/psi_thunder_common.asm)
  *
@@ -1201,7 +1201,7 @@ static StepResult btlact_psi_thunder_step_common(BattleActionState *st,
             break;
         }
 
-        case 1: {  /* loop head — one iteration per hit */
+        case 1: {  /* loop head, one iteration per hit */
             if (st->exec_i >= hits) {
                 st->pc = 9;
                 break;
@@ -1236,7 +1236,7 @@ static StepResult btlact_psi_thunder_step_common(BattleActionState *st,
 
             /* Hit/miss check */
             if (battle_success_255(st->scratch16[0])) {
-                /* Hit — display text based on damage tier */
+                /* Hit, display text based on damage tier */
                 st->pc = 2;
                 if (battle_push_text(&child, base_damage == 120
                                                  ? MSG_BTL0_PSI_THUNDER_HIT_SMALL
@@ -1265,7 +1265,7 @@ static StepResult btlact_psi_thunder_step_common(BattleActionState *st,
             Battler *target = battler_from_offset(bt.current_target);
             target->use_alt_spritemap = 0;
 
-            /* Franklin Badge check — allies only */
+            /* Franklin Badge check, allies only */
             st->scratch16[1] = 0;
             if (target->ally_or_enemy == 0) {
                 uint16_t char_id = (target->row & 0xFF) + 1;
@@ -1327,7 +1327,7 @@ static StepResult btlact_psi_thunder_step_common(BattleActionState *st,
             break;
 
         case 8:
-            /* loop end — check if either side is wiped out */
+            /* loop end, check if either side is wiped out */
             dt.blinking_triangle_flag = 0;
             if (battle_count_chars(0) == 0 || battle_count_chars(1) == 0) {
                 st->pc = 9;
@@ -1425,7 +1425,7 @@ static StepResult btlact_psi_starstorm_omega_step(BattleActionState *st) {
  * LIFEUP_COMMON (asm/battle/actions/lifeup_common.asm)
  *
  * Apply 25% variance to base healing, then recover HP (whose tail text is
- * the push — the btlact_recover_step idiom: decide + mutate at pc 0 only).
+ * the push, the btlact_recover_step idiom: decide + mutate at pc 0 only).
  */
 static StepResult btlact_lifeup_step_common(BattleActionState *st,
                                             uint16_t base_healing) {
@@ -1477,7 +1477,7 @@ static StepResult btlact_bottle_rocket_step_common(BattleActionState *st,
             st->pc = 1;
             if (battle_push_text(&child, MSG_BTL4_RESULT_DID_NOT_WORK))
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
-            /* FALLTHROUGH — unresolvable text: epilogue inline */
+            /* FALLTHROUGH: unresolvable text: epilogue inline */
             goto epilogue;
         }
         uint16_t damage = battle_25pct_variance(hits * 120);
@@ -1537,7 +1537,7 @@ static StepResult btlact_spray_step_common(BattleActionState *st,
             st->pc = 1;
             if (battle_push_text(&child, MSG_BTL4_RESULT_DID_NOT_WORK))
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
-            /* FALLTHROUGH — unresolvable text: epilogue inline */
+            /* FALLTHROUGH: unresolvable text: epilogue inline */
             goto epilogue;
         }
         uint16_t damage = battle_50pct_variance(base_damage);
@@ -1711,7 +1711,7 @@ static StepResult btlact_super_bomb_step(BattleActionState *st) {
  * On success: removes item from inventory, sets instant teleport, bt.special_defeat=1.
  *
  * Resumable: all checks + the success roll + the item removal happen at
- * pc 0 (the original sequence points — everything precedes the text in the
+ * pc 0 (the original sequence points, everything precedes the text in the
  * blocking form); the teleport-state writes follow the success text in the
  * blocking form, so they run at its resume pc.
  */
@@ -1721,7 +1721,7 @@ static StepResult btlact_teleport_box_step(BattleActionState *st) {
     for (;;) {
         switch (st->pc) {
         case 0: {
-            /* Check sector attributes — bit 7 means teleport unusable here */
+            /* Check sector attributes, bit 7 means teleport unusable here */
             uint16_t attrs = load_sector_attrs(
                 game_state.leader_x_coord, game_state.leader_y_coord);
             if (attrs & 0x0080) {
@@ -1895,13 +1895,13 @@ static uint32_t call_for_help_decide(uint16_t param) {
     uint16_t left_extend = 0x80 - same_row_left;
 
     if (left_extend >= right_extend) {
-        /* More room on the right — try placing right of rightmost sprite */
+        /* More room on the right, try placing right of rightmost sprite */
         if (same_row_right + new_full_width < 0x100) {
             new_x = same_row_right + new_full_width / 2;
             goto place_new_enemy;
         }
     } else {
-        /* More room on the left — try placing left of leftmost sprite */
+        /* More room on the left, try placing left of leftmost sprite */
         if (same_row_left > new_full_width) {
             new_x = same_row_left - new_full_width / 2;
             goto place_new_enemy;
@@ -1937,7 +1937,7 @@ no_space:
             continue;
         if ((b->afflictions[STATUS_GROUP_PERSISTENT_EASYHEAL] & 0xFF) != STATUS_0_UNCONSCIOUS)
             continue;
-        /* Dead enemy — check if sprite widths match */
+        /* Dead enemy, check if sprite widths match */
         uint16_t new_w = get_battle_sprite_width(battle_sprite);
         uint16_t dead_w = get_battle_sprite_width(b->sprite);
         if (new_w != dead_w)
@@ -2247,7 +2247,7 @@ static const uint8_t *battle_apply_condiment_prepare(uint32_t *out_msg) {
     /* Search for a condiment in the attacker's inventory */
     uint16_t condiment_id = find_condiment(food_id);
 
-    /* No condiment — return item's own params without any message */
+    /* No condiment, return item's own params without any message */
     if (condiment_id == 0) {
         return default_params;
     }
@@ -2262,7 +2262,7 @@ static const uint8_t *battle_apply_condiment_prepare(uint32_t *out_msg) {
         /* Check if condiment_id matches condiment1 or condiment2 */
         if (entry->condiment1_id == (uint8_t)condiment_id ||
             entry->condiment2_id == (uint8_t)condiment_id) {
-            /* Condiment match — "great flavor!" text + condiment params */
+            /* Condiment match, "great flavor!" text + condiment params */
             *out_msg = MSG_GOODS0_CONDIMENT_TASTED_GOOD;
             return &entry->strength;  /* points to [strength, epi, ep, special] */
         }
@@ -2271,7 +2271,7 @@ static const uint8_t *battle_apply_condiment_prepare(uint32_t *out_msg) {
         return default_params;
     }
 
-    /* Food not in condiment table — wrong condiment */
+    /* Food not in condiment table, wrong condiment */
     *out_msg = MSG_GOODS0_CONDIMENT_BAD_TASTE;
     return default_params;
 }
@@ -2304,7 +2304,7 @@ static const uint8_t *battle_apply_condiment_prepare(uint32_t *out_msg) {
 /* The @BOOST_* tails of eat_food.asm: bump the battler stat AND the
  * char_struct boosted_* field, recalc the composite stat, and hand back the
  * stat text. which: 0=IQ 1=Guts 2=Speed 3=Vitality 4=Luck (the random
- * effect rolls rand_limit(4), so it never picks Luck — matching the
+ * effect rolls rand_limit(4), so it never picks Luck, matching the
  * assembly's jump table). */
 static void eat_food_boost(uint16_t which, uint8_t amount,
                            BattleTailText *out) {
@@ -2351,7 +2351,7 @@ static StepResult btlact_eat_food_step(BattleActionState *st) {
     static ModeState child;  /* outlives the dispatch (the pump copies it) */
 
     /* scratch16[0] = amount; scratch16[1] = effect_type | (special << 8).
-     * The condiment params pointer is consumed entirely at pc 0 — no ROM
+     * The condiment params pointer is consumed entirely at pc 0, no ROM
      * pointer crosses a yield. */
     for (;;) {
         switch (st->pc) {
@@ -2409,7 +2409,7 @@ static StepResult btlact_eat_food_step(BattleActionState *st) {
                         : battle_25pct_variance(amount), &tail);
                 break;
 
-            case 2: /* HP + PP recovery — HP portion; PP portion at pc 2 */
+            case 2: /* HP + PP recovery, HP portion; PP portion at pc 2 */
                 battle_recover_hp_prepare(tgt, amount == 0
                         ? 30000
                         : battle_25pct_variance((uint16_t)amount * 6), &tail);
@@ -2485,7 +2485,7 @@ static StepResult btlact_eat_food_step(BattleActionState *st) {
             return STEP_RESULT_POP(0);
         }
 
-        case 6:  /* unconscious target — no check_special, like the blocking
+        case 6:  /* unconscious target, no check_special, like the blocking
                   * form's early return */
         default:
             dt.blinking_triangle_flag = 0;
@@ -2889,7 +2889,7 @@ static StepResult btlact_possess_step(BattleActionState *st) {
         st->pc = possessed ? 2 : 1;
         if (battle_push_text(&child, msg))
             return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
-        /* FALLTHROUGH — unresolvable text: resume inline */
+        /* FALLTHROUGH: unresolvable text: resume inline */
         if (!possessed) {
             dt.blinking_triangle_flag = 0;
             return STEP_RESULT_POP(0);
@@ -3241,7 +3241,7 @@ static StepResult btlact_fly_honey_step(BattleActionState *st) {
  * PSI Flash
  * ====================================================================== */
 
-/* FLASH_IMMUNITY_TEST (asm/battle/actions/psi_flash_immunity_test.asm) — the
+/* FLASH_IMMUNITY_TEST (asm/battle/actions/psi_flash_immunity_test.asm), the
  * standalone blocking form (PSI shield nullify + flash_resist test) was deleted
  * with pump_mode at cutover; its logic is inlined into the PSI Flash steppers
  * (btlact_psi_flash_*_step), which STEP_PUSH BC_PSI_SHIELD_NULLIFY. */
@@ -3254,8 +3254,8 @@ static StepResult btlact_fly_honey_step(BattleActionState *st) {
  */
 /*
  * Shared resumable form. Effect mapping by the 0-7 roll (the per-tier
- * thresholds): roll <= ko_max — KO; roll == para_idx — paralysis;
- * roll == strange_idx — feeling strange; otherwise crying. -1 disables a
+ * thresholds): roll <= ko_max, KO; roll == para_idx, paralysis;
+ * roll == strange_idx, feeling strange; otherwise crying. -1 disables a
  * branch (alpha has no KO/paralysis). flash_immunity_test()'s halves are
  * inlined: the BC_PSI_SHIELD_NULLIFY push, then the flash_resist roll with
  * its "didn't work" text. The crying infliction uses the group-equals-ID
@@ -3447,7 +3447,7 @@ uint16_t autolifeup(void) {
 }
 
 /* ======================================================================
- * Status effect battle actions — resist-checked
+ * Status effect battle actions, resist-checked
  * ====================================================================== */
 
 /*
@@ -3472,7 +3472,7 @@ static StepResult btlact_crying_step(BattleActionState *st) {
  * Fails on NPCs. Status group is same as status ID.
  */
 static StepResult btlact_crying2_step(BattleActionState *st) {
-    /* NOTE: passes STATUS_2_CRYING as the status GROUP — crying2.asm does
+    /* NOTE: passes STATUS_2_CRYING as the status GROUP, crying2.asm does
      * TYX ("Status group is identical to status ID"). */
     uint32_t msg = st->pc == 0
         ? inflict_decide(true, STATUS_2_CRYING, STATUS_2_CRYING,
@@ -3501,7 +3501,7 @@ static StepResult btlact_solidify_step(BattleActionState *st) {
  * Inflict solidified on target. Luck80 check. No NPC check.
  */
 static StepResult btlact_solidify_2_step(BattleActionState *st) {
-    /* No NPC check — faithful to the blocking form. */
+    /* No NPC check, faithful to the blocking form. */
     uint32_t msg = st->pc == 0
         ? inflict_roll_decide(false, INFLICT_ROLL_LUCK80,
                               STATUS_GROUP_TEMPORARY, STATUS_2_SOLIDIFIED,
@@ -3517,7 +3517,7 @@ static StepResult btlact_solidify_2_step(BattleActionState *st) {
  * Fails on NPCs. Status group is same as status ID.
  */
 static StepResult btlact_mushroomize_step(BattleActionState *st) {
-    /* NOTE: passes STATUS_1_MUSHROOMIZED as the status GROUP — the same
+    /* NOTE: passes STATUS_1_MUSHROOMIZED as the status GROUP, the same
      * group-equals-ID assembly idiom as crying2. */
     uint32_t msg = st->pc == 0
         ? inflict_decide(true, STATUS_1_MUSHROOMIZED, STATUS_1_MUSHROOMIZED,
@@ -4012,7 +4012,7 @@ static StepResult btlact_pray_rending_sound_step(BattleActionState *st) {
  *   9 = Defense Down (all, Defense Down α)
  *
  * Resumable: the prayer roll happens at pc 0 (then the text push); the
- * targeting setup — including golden/rockin's random-targeting rolls —
+ * targeting setup, including golden/rockin's random-targeting rolls, 
  * runs at the text's resume pc, exactly the blocking sequence points. The
  * per-target dispatch is a BATTLE_APPLY child push carrying the
  * sub-action's ROM address (the dispatch-table rows of the same functions
@@ -4080,13 +4080,13 @@ static StepResult btlact_pray_step(BattleActionState *st) {
                 battle_target_allies();
                 battle_remove_npc_targeting();
                 break;
-            case 3: /* golden — random single ally */
+            case 3: /* golden, random single ally */
                 battle_target_allies();
                 battle_remove_npc_targeting();
                 battle_remove_dead_targeting();
                 bt.battler_target_flags = battle_random_targeting(bt.battler_target_flags);
                 break;
-            case 4: /* rockin — random single enemy */
+            case 4: /* rockin, random single enemy */
                 battle_target_all_enemies();
                 battle_remove_npc_targeting();
                 battle_remove_dead_targeting();
@@ -4180,7 +4180,7 @@ static StepResult apply_neutralize_to_all_step(BattleActionState *st) {
  * Equipment switching in battle
  * ====================================================================== */
 
-/* CHECK_ITEM_USABLE_BY: now shared via inventory.h — see inventory.c. */
+/* CHECK_ITEM_USABLE_BY: now shared via inventory.h, see inventory.c. */
 
 /*
  * BTLACT_SWITCH_WEAPONS (asm/battle/actions/switch_weapon.asm)
@@ -4193,7 +4193,7 @@ static StepResult apply_neutralize_to_all_step(BattleActionState *st) {
  *
  * Resumable: the blocking form holds dt.blinking_triangle_flag = 1 across
  * ALL its texts (raw display_text_from_addr, no battle epilogue) and clears
- * it once at the end, so the resume pcs do NOT clear it — only the final pc
+ * it once at the end, so the resume pcs do NOT clear it, only the final pc
  * does. The equip mutations precede the success text (pc 0); the attack
  * dispatch is a BATTLE_ACTION child push (scratch16[0] = char_id,
  * scratch16[1] = the dispatched action 4/5).
@@ -4242,14 +4242,14 @@ static StepResult btlact_switch_weapons_step(BattleActionState *st) {
         case 1: {
             /* Dispatch: check if the (now-equipped) weapon is a projectile type */
             CharStruct *ch2 = &party_characters[st->scratch16[0] - 1];
-            uint16_t action = 4;  /* normal weapon — bash */
+            uint16_t action = 4;  /* normal weapon, bash */
             uint8_t weapon_slot = ch2->equipment[EQUIP_WEAPON];
             if (weapon_slot != 0) {
                 uint8_t weapon_item_id = ch2->items[weapon_slot - 1];
                 if (weapon_item_id != 0) {
                     const ItemConfig *entry = get_item_entry(weapon_item_id);
                     if (entry && (entry->type & 0x03) == 1)
-                        action = 5;  /* projectile weapon — shoot */
+                        action = 5;  /* projectile weapon, shoot */
                 }
             }
             st->scratch16[1] = action;
@@ -4567,7 +4567,7 @@ static StepResult push_battle_wait_frames(ModeState *child, uint16_t frames) {
     return STEP_RESULT_PUSH_INIT(GAME_MODE_BATTLE_WAIT, child);
 }
 
-/* STEP_PUSH the former blocking load_battle_scene() — now
+/* STEP_PUSH the former blocking load_battle_scene(), now
  * GAME_MODE_LOAD_BATTLE_SCENE (mode_step_load_battle_scene, battle_ui.c). */
 static StepResult push_load_battle_scene(ModeState *child, uint16_t group,
                                          uint16_t music) {
@@ -4601,7 +4601,7 @@ static bool cutscene_text_steps(BattleActionState *st, uint8_t base,
             *out = STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
             return true;
         }
-        /* FALLTHROUGH — unresolvable text: continue inline */
+        /* FALLTHROUGH: unresolvable text: continue inline */
     case 2:
         dt.blinking_triangle_flag = 0;
         fade_out(1, 2);
@@ -4659,7 +4659,7 @@ static bool weakened_seq_steps(BattleActionState *st, uint8_t base,
             *out = STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
             return true;
         }
-        /* FALLTHROUGH — unresolvable text: continue inline */
+        /* FALLTHROUGH: unresolvable text: continue inline */
     case 4:
         dt.blinking_triangle_flag = 0;
         bt.battle_mode_flag = 1;
@@ -5362,8 +5362,8 @@ static int btlact_find(uint32_t rom_addr) {
 }
 
 /*
- * JUMP_TEMP_FUNCTION_POINTER — Port of asm/overworld/jump_temp_function_pointer.asm.
- * Assembly: JML (TEMP_FUNCTION_POINTER) — indirect long jump through a
+ * JUMP_TEMP_FUNCTION_POINTER: Port of asm/overworld/jump_temp_function_pointer.asm.
+ * Assembly: JML (TEMP_FUNCTION_POINTER), indirect long jump through a
  * 24-bit ROM address stored in bt.temp_function_pointer. The C port
  * dispatches through btlact_dispatch_table instead; the ROM addresses come
  * from the battle_action_table asset (loaded from the donor ROM).
@@ -5381,7 +5381,7 @@ void jump_temp_function_pointer(void) {
         return;
     }
     if (!btlact_dispatch_table[idx].func) {
-        /* A stepper-bearing action reached the blocking path — should be
+        /* A stepper-bearing action reached the blocking path, should be
          * impossible (battle_action_dispatch routes those via STEP_PUSH). */
         LOG_WARN("WARN: battle action $%06X has no blocking form\n",
                  bt.temp_function_pointer);

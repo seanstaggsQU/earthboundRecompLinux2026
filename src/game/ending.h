@@ -4,7 +4,7 @@
 #include "core/types.h"
 
 /*
- * Ending sequence system — cast scene + staff credits.
+ * Ending sequence system, cast scene + staff credits.
  *
  * Ports of:
  *   PLAY_CAST_SCENE              (asm/ending/play_cast_scene.asm)
@@ -42,10 +42,10 @@
 typedef void (*frame_callback_fn)(void);
 extern frame_callback_fn frame_callback;
 
-/* WRAM 0xB4D1: CAST_TILE_OFFSET — tile base offset for cast name rendering. */
+/* WRAM 0xB4D1: CAST_TILE_OFFSET, tile base offset for cast name rendering. */
 extern uint16_t cast_tile_offset;
 
-/* CREDITS_SCROLL_FRAME — per-frame IRQ callback during credits. */
+/* CREDITS_SCROLL_FRAME: per-frame IRQ callback during credits. */
 void credits_scroll_frame(void);
 
 /* ---- Savestate snapshot ----
@@ -68,33 +68,33 @@ void frame_callback_savestate_unpack(const void *in);
  * true iff all were re-resolved. Used by the savestate self-test. */
 bool ending_asset_selfheal_test(void);
 
-/* HANDLE_CAST_SCROLLING — tick callback for entity scripts during cast scene. */
+/* HANDLE_CAST_SCROLLING: tick callback for entity scripts during cast scene. */
 void handle_cast_scrolling(uint16_t current_entity_slot);
 
-/* UPLOAD_SPECIAL_CAST_PALETTE — callroutine: load palette from decompressed data. */
+/* UPLOAD_SPECIAL_CAST_PALETTE: callroutine: load palette from decompressed data. */
 void upload_special_cast_palette(uint16_t palette_index);
 
-/* SET_CAST_SCROLL_THRESHOLD — callroutine: set var0 = param*8 + BG3_Y_POS. */
+/* SET_CAST_SCROLL_THRESHOLD: callroutine: set var0 = param*8 + BG3_Y_POS. */
 void set_cast_scroll_threshold(uint16_t param, uint16_t current_entity_slot);
 
-/* CHECK_CAST_SCROLL_THRESHOLD — callroutine: return 1 if BG3_Y >= var0. */
+/* CHECK_CAST_SCROLL_THRESHOLD: callroutine: return 1 if BG3_Y >= var0. */
 uint16_t check_cast_scroll_threshold(uint16_t current_entity_slot);
 
-/* IS_ENTITY_STILL_ON_CAST_SCREEN — callroutine: return 1 if entity Y > BG3_Y - 8. */
+/* IS_ENTITY_STILL_ON_CAST_SCREEN: callroutine: return 1 if entity Y > BG3_Y - 8. */
 uint16_t is_entity_still_on_cast_screen(uint16_t current_entity_slot);
 
-/* CREATE_ENTITY_AT_V01_PLUS_BG3Y — callroutine wrapper. */
+/* CREATE_ENTITY_AT_V01_PLUS_BG3Y: callroutine wrapper. */
 void create_entity_at_v01_plus_bg3y(uint16_t sprite_id, uint16_t script_id,
                                      uint16_t current_entity_slot);
 
-/* PRINT_CAST_NAME — movement command: render cast name on BG3. */
+/* PRINT_CAST_NAME: movement command: render cast name on BG3. */
 void print_cast_name(uint16_t cast_index, uint16_t x_col, uint16_t y_row);
 
-/* PRINT_CAST_NAME_ENTITY_VAR0 — movement command: render var0-based name. */
+/* PRINT_CAST_NAME_ENTITY_VAR0: movement command: render var0-based name. */
 void print_cast_name_entity_var0(uint16_t cast_index, uint16_t x_col,
                                   uint16_t y_row, uint16_t current_entity_slot);
 
-/* PRINT_CAST_NAME_PARTY — movement command: render party member name. */
+/* PRINT_CAST_NAME_PARTY: movement command: render party member name. */
 void print_cast_name_party(uint16_t char_id, uint16_t x_col, uint16_t y_row);
 
 #endif /* GAME_ENDING_H */

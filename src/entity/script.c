@@ -33,11 +33,11 @@ extern void call_screen_pos_callback(int16_t entity_offset);
 extern void build_entity_draw_list(void);
 
 /*
- * event_script_init — Initialize a script's PC from the event script pointer table.
+ * event_script_init, Initialize a script's PC from the event script pointer table.
  *
  * All script IDs are resolved through the global EVENT_SCRIPT_POINTERS table
  * and the registered script bank system. Title screen scripts (787-798) are
- * resolved the same way as any other script — via their registered bank.
+ * resolved the same way as any other script, via their registered bank.
  */
 void event_script_init(uint16_t script_id, int16_t entity_offset,
                        int16_t script_offset) {
@@ -53,7 +53,7 @@ void event_script_init(uint16_t script_id, int16_t entity_offset,
         return;
     }
 
-    /* Unknown script — halt immediately */
+    /* Unknown script, halt immediately */
     LOG_WARN("WARN: unknown script ID %u (ent=%d)\n", script_id, entity_offset);
     scripts.pc[script_offset] = 0;
     scripts.pc_bank[script_offset] = 0xFF;
@@ -74,7 +74,7 @@ static inline uint8_t read_script_byte(uint16_t bank, uint16_t offset) {
  * Transient request channel: a callroutine that needs a child modal context
  * records a request here; the interpreter loops abort and the frame position
  * is parked in GAME_MODE_ACTIONSCRIPT_FRAME. The request is set and consumed
- * within one frame's work — it never crosses a yield, so it is deliberately
+ * within one frame's work, it never crosses a yield, so it is deliberately
  * NOT serialized (the parked resume state on the mode stack is). */
 typedef struct {
     uint8_t  child_kind;       /* AsChildKind; AS_CHILD_NONE = no request */
@@ -252,7 +252,7 @@ static EmsResult run_entity_scripts_and_tick(int16_t entity_offset) {
      *
      * Bit 14 (OBJECT_MOVE_DISABLED) skips entity scripts only.
      * Bit 15 (OBJECT_TICK_DISABLED) skips the tick callback only.
-     * These are independent checks — bit 14 does NOT skip the tick callback. */
+     * These are independent checks, bit 14 does NOT skip the tick callback. */
 
     /* Execute entity scripts unless bit 14 is set */
     if (!(entities.tick_callback_hi[entity_offset] & 0x4000)) {
@@ -278,7 +278,7 @@ static EmsResult run_entity_scripts_and_tick(int16_t entity_offset) {
  * The tick callback runs every frame after all scripts for this entity.
  * Tick callbacks never request a child mode (dispatch_tick_callback's
  * handlers are yield-free, except update_overworld_frame's documented
- * one-frame sector-music wait, which stays inline-blocking — deferred
+ * one-frame sector-music wait, which stays inline-blocking, deferred
  * sequential-N-frame-helper class). */
 static void entity_tick(int16_t entity_offset) {
     if (!(entities.tick_callback_hi[entity_offset] & 0x8000)) {
@@ -292,7 +292,7 @@ static void entity_tick(int16_t entity_offset) {
 
 /* Phase 1 (scripts + ticks) from entity `ent` onward. The iteration cursor is
  * the serialized global ert.next_active_entity, deliberately re-read after each
- * entity exactly like the original — entity frees during a script (or during a
+ * entity exactly like the original, entity frees during a script (or during a
  * child mode) retarget it. */
 static EmsResult as_run_phase1_from(int16_t ent) {
     while (ent >= 0) {
@@ -332,7 +332,7 @@ static void as_frame_tail(void) {
 
 /* Continue the interrupted entity after a child mode popped: finish the
  * suspended script (from the parked pc), the rest of its script chain, then
- * its tick callback. The chain's bit-14 gate is NOT re-checked — the blocking
+ * its tick callback. The chain's bit-14 gate is NOT re-checked, the blocking
  * loop tested it once before the chain, and the suspended chain is past it. */
 static EmsResult as_continue_entity(const ActionscriptFrameState *st) {
     if (ems_run(st->script_offset, st->pc, true) == EMS_YIELD) {
@@ -443,30 +443,30 @@ StepResult mode_step_actionscript_frame(ModeState *ms) {
  * flyover, pp-recovery), the frame is parked and finished as
  * GAME_MODE_ACTIONSCRIPT_FRAME. There are two entry points:
  *
- *   - run_actionscript_frame_step() — the mode-step form. On a park it hands the
+ *   - run_actionscript_frame_step(), the mode-step form. On a park it hands the
  *     parked state to the calling mode step (via actionscript_frame_take_push())
  *     as a STEP_PUSH; the root loop then drives the child to completion and the
  *     caller resumes at its flush phase. This keeps the full state on the
  *     serializable mode stack (single yield = save-anywhere).
- *   - run_actionscript_frame() — the plain blocking form for the render-helper
+ *   - run_actionscript_frame(), the plain blocking form for the render-helper
  *     layer (render_frame_tick / render_frame_tick_work / window_tick /
  *     wait_frames_with_updates / dismount_bicycle / teleport-departure / ending /
  *     the naming-screen helpers), which yields via its own wait_for_vblank() and
- *     has no mode step to push onto. These DO run cutscene scripts that park — the
+ *     has no mode step to push onto. These DO run cutscene scripts that park, the
  *     Onett opening renders its meteorite dialogue and the "War Against Giygas!"
- *     flyover through this layer — so it still drives the child to completion via
+ *     flyover through this layer, so it still drives the child to completion via
  *     the pump_mode bridge (a local yield loop). Those contexts are already not
  *     savestate-able (C-local loop counters + wait_for_vblank), so the nested pump
  *     does not regress save-anywhere; this bridge dies when the render-helper layer
  *     itself is converted to mode steps alongside the display_text spine (Commit 3+).
  *
- * ert.disable_actionscript stays 1 across the child either way — script
+ * ert.disable_actionscript stays 1 across the child either way, script
  * execution stays frozen during a script-triggered modal context.
  */
 
 /* Parked-frame state staged between run_actionscript_frame_step() (fills it on a
  * park) and actionscript_frame_take_push() (moves it onto the pushed
- * GAME_MODE_ACTIONSCRIPT_FRAME state). Lives within one frame's work — it never
+ * GAME_MODE_ACTIONSCRIPT_FRAME state). Lives within one frame's work, it never
  * crosses a host yield, so it is deliberately NOT serialized. */
 static ActionscriptFrameState g_asf_pending;
 

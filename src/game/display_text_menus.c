@@ -1,7 +1,7 @@
 /*
  * Display text menu functions.
  *
- * Extracted from display_text.c — store/shop menus, telephone,
+ * Extracted from display_text.c, store/shop menus, telephone,
  * escargo express, teleport destination selection, name entry,
  * sound stone, and special event dispatch.
  */
@@ -66,7 +66,7 @@ static size_t phone_call_text_size;
 
 
 /*
- * GAME_MODE_ENTER_NAME — run-to-completion port of ENTER_YOUR_NAME_PLEASE
+ * GAME_MODE_ENTER_NAME: run-to-completion port of ENTER_YOUR_NAME_PLEASE
  * (asm/text/enter_your_name_please.asm, 117 lines).
  *
  * In-game name registration dialog.  Reached from CC_1F_41 cases 3/4 (via
@@ -191,7 +191,7 @@ StepResult mode_step_enter_name(ModeState *st) {
  *   - sound_stone.gfx.lzhal: compressed graphics (0x2C00 bytes decompressed)
  *   - sound_stone.pal: 192 bytes (6 ert.palettes for melody indicators)
  */
-/* ---- GAME_MODE_SOUND_STONE (run-to-completion port of use_sound_stone) ---- */
+/* GAME_MODE_SOUND_STONE (run-to-completion port of use_sound_stone) */
 
 /* Sound stone asset pointers/tables, re-derived each step (deterministic, so not
  * serialized in ModeState). ok=false if a required asset is missing. */
@@ -237,7 +237,7 @@ static SoundStoneAssets ss_load_assets(void) {
 }
 
 /*
- * USE_SOUND_STONE step — see the SoundStoneState comment in mode_stack.h. The
+ * USE_SOUND_STONE step, see the SoundStoneState comment in mode_stack.h. The
  * single host_process_frame() yield is owned by the pump, so this body never
  * calls wait_for_vblank(); each former blocking yield is a phase boundary.
  */
@@ -341,7 +341,7 @@ StepResult mode_step_sound_stone(ModeState *st) {
         uint16_t pressed = core.pad1_pressed;
         int16_t tc = s->timing_counter;
 
-        /* ---- Per-frame sequencing + animation (original lines 287-451) ---- */
+        /* Per-frame sequencing + animation (original lines 287-451) */
 
         /* Initial delay phase (assembly lines 127-138) */
         if (tc == 0) {
@@ -374,7 +374,7 @@ StepResult mode_step_sound_stone(ModeState *st) {
 
         if (tc != 0) goto update_timing;
 
-        /* Timing counter reached 0 — melody's timer expired */
+        /* Timing counter reached 0, melody's timer expired */
         {
             int16_t cm = s->current_melody;
 
@@ -425,7 +425,7 @@ update_timing:
         }
 
 render_sprites:
-        /* ---- Render melody sprites (assembly lines 251-472) ---- */
+        /* Render melody sprites (assembly lines 251-472) */
         oam_clear();
 
         for (int i = 0; i < 8; i++) {
@@ -501,12 +501,12 @@ render_sprites:
          * The Sound Stone draws its melody/center sprites DIRECTLY via
          * write_spritemap_to_oam (above), not through the priority queue. Calling
          * the full update_screen() here would invoke render_all_priority_sprites(),
-         * which parks all 128 OAM slots and rebuilds only from the (empty) queue —
+         * which parks all 128 OAM slots and rebuilds only from the (empty) queue, 
          * wiping the sprites we just drew. The assembly's UPDATE_SCREEN is a no-op
          * on OAM for a queue-less scene (its RENDER_ALL_PRIORITY_SPRITES relies on
          * the preceding OAM_CLEAR rather than re-parking), so its only effect here
-         * is the palette sync. Mirror that — and render_all_battle_sprites(), which
-         * is the other direct-write scene — by syncing palettes only. */
+         * is the palette sync. Mirror that, and render_all_battle_sprites(), which
+         * is the other direct-write scene, by syncing palettes only. */
         sync_palettes_to_cgram();
         generate_battlebg_frame(&loaded_bg_data_layer1, 0);
         generate_battlebg_frame(&loaded_bg_data_layer2, 1);
@@ -553,7 +553,7 @@ render_sprites:
 
 
 /*
- * GAME_MODE_SPECIAL_EVENT — run-to-completion port of DISPATCH_SPECIAL_EVENT
+ * GAME_MODE_SPECIAL_EVENT: run-to-completion port of DISPATCH_SPECIAL_EVENT
  * (asm/text/dispatch_special_event.asm), the dispatch table for special in-game
  * events triggered by CC 1F 41. Each event_id maps to a game sequence or state
  * change; most return 0, some return meaningful values.
@@ -601,7 +601,7 @@ StepResult mode_step_special_event(ModeState *st) {
     case 6:  /* SET_OVERWORLD_STATUS_SUPPRESSION(get_event_flag(WIN_GIEGU)) */
         ow.overworld_status_suppression = event_flag_get(EVENT_FLAG_WIN_GIEGU) ? 1 : 0;
         return STEP_RESULT_POP(0);
-    case 7: { /* DISPLAY_TOWN_MAP — port of display_town_map(). Returns the map_id
+    case 7: { /* DISPLAY_TOWN_MAP, port of display_town_map(). Returns the map_id
                * that was displayed (0 if none); the TOWN_MAP child's result is
                * unused, so we carry map_id precomputed. */
         uint16_t map_id = display_town_map_prepare(&child);
@@ -624,27 +624,27 @@ StepResult mode_step_special_event(ModeState *st) {
         s->result = 0;  /* use_sound_stone() always returned 0 */
         s->phase = SE_RESULT;
         return STEP_RESULT_PUSH_INIT(GAME_MODE_SOUND_STONE, &child);
-    case 10:  /* SHOW_TITLE_SCREEN(1) — the yield-free setup runs inline. */
+    case 10:  /* SHOW_TITLE_SCREEN(1), the yield-free setup runs inline. */
         title_screen_setup(1);
         child.title_screen.phase      = TS_WARMUP;
         child.title_screen.quick_mode = 1;
         s->result = 0;
         s->phase = SE_RESULT;
         return STEP_RESULT_PUSH_INIT(GAME_MODE_TITLE_SCREEN, &child);
-    case 11:  /* PLAY_CAST_SCENE — run-to-completion GAME_MODE_ENDING (cast scene). */
+    case 11:  /* PLAY_CAST_SCENE, run-to-completion GAME_MODE_ENDING (cast scene). */
         child.ending.phase = EN_CAST_SETUP;
         s->result = 0;
         s->phase = SE_RESULT;
         return STEP_RESULT_PUSH_INIT(GAME_MODE_ENDING, &child);
-    case 12:  /* PLAY_CREDITS — run-to-completion GAME_MODE_ENDING (staff credits). */
+    case 12:  /* PLAY_CREDITS, run-to-completion GAME_MODE_ENDING (staff credits). */
         child.ending.phase = EN_CR_SETUP;
         s->result = 0;
         s->phase = SE_RESULT;
         return STEP_RESULT_PUSH_INIT(GAME_MODE_ENDING, &child);
-    case 13:  /* TOGGLE_HPPP_FLIPOUT_MODE(1) — enable */
+    case 13:  /* TOGGLE_HPPP_FLIPOUT_MODE(1), enable */
         toggle_hppp_flipout_mode(1);
         return STEP_RESULT_POP(0);
-    case 14:  /* TOGGLE_HPPP_FLIPOUT_MODE(0) — disable */
+    case 14:  /* TOGGLE_HPPP_FLIPOUT_MODE(0), disable */
         toggle_hppp_flipout_mode(0);
         return STEP_RESULT_POP(0);
     case 15:  /* CLEAR_ALL_EVENT_FLAGS: memset event_flags to 0 */
@@ -665,7 +665,7 @@ StepResult mode_step_special_event(ModeState *st) {
 
 
 /*
- * SHOW_CHARACTER_INVENTORY — Port of CC_1A_05 (asm/text/ccs/show_character_inventory.asm)
+ * SHOW_CHARACTER_INVENTORY: Port of CC_1A_05 (asm/text/ccs/show_character_inventory.asm)
  * + INVENTORY_GET_ITEM_NAME (asm/misc/inventory_get_item_name.asm).
  *
  * Displays a character's inventory as a 2-column menu in the given window.
@@ -777,25 +777,25 @@ static void load_store_table(void) {
 
 
 /*
- * OPEN_STORE_MENU — Port of src/inventory/store/open_store_menu.asm.
+ * OPEN_STORE_MENU: Port of src/inventory/store/open_store_menu.asm.
  *
  * Displays a shop's item list with prices and runs selection_menu.
  * Returns the selected item ID, or 0 if cancelled.
  *
  * Flow:
- *   1. DISPLAY_MONEY_WINDOW — shows current wallet amount
- *   2. SET_INSTANT_PRINTING — force instant text rendering
- *   3. SAVE_WINDOW_TEXT_ATTRIBUTES — save text state
+ *   1. DISPLAY_MONEY_WINDOW, shows current wallet amount
+ *   2. SET_INSTANT_PRINTING, force instant text rendering
+ *   3. SAVE_WINDOW_TEXT_ATTRIBUTES, save text state
  *   4. CREATE_WINDOW(WINDOW::STORE_ITEM_LIST = 0x0C)
- *   5. SET_WINDOW_NUMBER_PADDING(5) — for price formatting
+ *   5. SET_WINDOW_NUMBER_PADDING(5), for price formatting
  *   6. Loop 7 items: read from STORE_TABLE[shop_id*7+i], get name from
  *      ITEM_CONFIGURATION_TABLE, add as menu option, print price via
  *      PRINT_MONEY_IN_WINDOW
- *   7. OPEN_WINDOW_AND_PRINT_MENU(1, 0) — single-column layout
- *   8. SET_CURSOR_MOVE_CALLBACK(SET_HPPP_WINDOW_MODE_ITEM) — shows equip info
+ *   7. OPEN_WINDOW_AND_PRINT_MENU(1, 0), single-column layout
+ *   8. SET_CURSOR_MOVE_CALLBACK(SET_HPPP_WINDOW_MODE_ITEM), shows equip info
  *   9. INITIALIZE_WINDOW_FLAVOUR_PALETTE
- *  10. SELECTION_MENU(1) — allow cancel
- *  11. RESET_HPPP_OPTIONS_AND_LOAD_PALETTE — cleanup
+ *  10. SELECTION_MENU(1), allow cancel
+ *  11. RESET_HPPP_OPTIONS_AND_LOAD_PALETTE, cleanup
  *  12. CLOSE_FOCUS_WINDOW, RESTORE_WINDOW_TEXT_ATTRIBUTES, CLEAR_INSTANT_PRINTING
  */
 StepResult mode_step_store_menu(ModeState *ms) {
@@ -855,9 +855,9 @@ StepResult mode_step_store_menu(ModeState *ms) {
         set_cursor_move_callback(set_hppp_window_mode_item, CURSOR_CB_HPPP_MODE_ITEM);
         initialize_window_flavour_palette();
 
-        /* Assembly line 94-95: selection_menu(1) — allow cancel. STEP_PUSH it;
+        /* Assembly line 94-95: selection_menu(1), allow cancel. STEP_PUSH it;
          * the cleanup runs in STM_RESULT after it pops. selection_menu() returns
-         * 0 without pumping for a null/empty menu — replicate that early-out. */
+         * 0 without pumping for a null/empty menu, replicate that early-out. */
         WindowInfo *w = get_window(win.current_focus_window);
         if (w && w->menu_count != 0) {
             static ModeState sel_init;
@@ -912,7 +912,7 @@ static void load_menu_title_assets(void) {
 
 
 /*
- * GAME_MODE_TELEPORT_MENU step — run-to-completion port of
+ * GAME_MODE_TELEPORT_MENU step, run-to-completion port of
  * open_teleport_destination_menu() (asm/text/menu/open_teleport_destination_menu.asm,
  * 95 lines). See TeleportMenuState in mode_stack.h.
  *
@@ -977,7 +977,7 @@ StepResult mode_step_teleport_menu(ModeState *ms) {
 
         if (menu_item_count > 0) {
             open_window_and_print_menu(1, 0);
-            /* SELECTION_MENU(1) — the window cleanup runs in TPM_RESULT
+            /* SELECTION_MENU(1): the window cleanup runs in TPM_RESULT
              * after it pops. Outlives this dispatch (the pump copies it). */
             static ModeState sel_init;
             sel_init = (ModeState){0};
@@ -1006,7 +1006,7 @@ StepResult mode_step_teleport_menu(ModeState *ms) {
 
 
 /*
- * SELECT_ESCARGO_EXPRESS_ITEM — Port of src/inventory/select_escargo_express_item.asm (94 lines).
+ * SELECT_ESCARGO_EXPRESS_ITEM: Port of src/inventory/select_escargo_express_item.asm (94 lines).
  *
  * Displays a menu of items stored in Escargo Express.
  * Returns the 1-based selection index, or 0 if cancelled/empty.
@@ -1019,8 +1019,8 @@ StepResult mode_step_teleport_menu(ModeState *ms) {
  *      decoration; the C port uses just the base text.
  *   4. Loop i=0..35 (36 escargo slots):
  *      - If escargo_express_items[i] != 0, look up item name, add to menu
- *   5. OPEN_WINDOW_AND_PRINT_MENU(2, 0) — 2 columns
- *   6. SELECTION_MENU(1) — allow cancel
+ *   5. OPEN_WINDOW_AND_PRINT_MENU(2, 0), 2 columns
+ *   6. SELECTION_MENU(1), allow cancel
  *   7. CLEAR_WINDOW_TILEMAP(ESCARGO_EXPRESS_ITEM)
  *   8. Clear FORCE_LEFT_TEXT_ALIGNMENT, restore text attributes
  */
@@ -1043,7 +1043,7 @@ StepResult mode_step_escargo_menu(ModeState *ms) {
         }
 
         /* Loop over 36 Escargo Express storage slots.
-         * Assembly uses ADD_MENU_OPTION (type=1, counted mode) — SELECTION_MENU
+         * Assembly uses ADD_MENU_OPTION (type=1, counted mode), SELECTION_MENU
          * returns the 1-based option index. C port's selection_menu returns userdata,
          * so we assign sequential 1-based indices as userdata. */
         int seq = 1;
@@ -1063,8 +1063,8 @@ StepResult mode_step_escargo_menu(ModeState *ms) {
 
         open_window_and_print_menu(2, 0);
 
-        /* selection_menu(1) — STEP_PUSH; cleanup runs in EEM_RESULT after it
-         * pops. selection_menu() returns 0 without pumping for an empty menu —
+        /* selection_menu(1), STEP_PUSH; cleanup runs in EEM_RESULT after it
+         * pops. selection_menu() returns 0 without pumping for an empty menu, 
          * replicate that early-out. */
         WindowInfo *w = get_window(win.current_focus_window);
         if (w && w->menu_count != 0) {
@@ -1095,12 +1095,12 @@ StepResult mode_step_escargo_menu(ModeState *ms) {
 
 /* GAME_MODE_KEY_ITEMS_MENU step now lives in text.c, alongside
  * mode_step_use_item() and the Goods menu's Use/Help action-menu code it's
- * modeled on (both needed by the Key Items browser -- see
+ * modeled on (both needed by the Key Items browser, see
  * mode_step_key_items_menu()'s doc comment there). */
 
 
 /*
- * OPEN_TELEPHONE_MENU — Port of asm/text/menu/open_telephone_menu.asm (85 lines).
+ * OPEN_TELEPHONE_MENU: Port of asm/text/menu/open_telephone_menu.asm (85 lines).
  *
  * Displays a menu of telephone contacts whose event flags are set.
  * Returns the 1-based selection index, or 0 if cancelled/empty.
@@ -1163,7 +1163,7 @@ StepResult mode_step_telephone_menu(ModeState *ms) {
 
         if (menu_item_count > 0) {
             open_window_and_print_menu(1, 0);
-            /* selection_menu(1) — STEP_PUSH; cleanup + optional call text run in
+            /* selection_menu(1), STEP_PUSH; cleanup + optional call text run in
              * TPH_AFTER_MENU after it pops. */
             static ModeState sel_init;
             sel_init = (ModeState){0};

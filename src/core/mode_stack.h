@@ -11,7 +11,7 @@
  *
  * Modal contexts (battle, menus, dialogue, fades, intro) historically ran as
  * blocking C loops that called wait_for_vblank() while holding live locals on
- * the native call stack — state that cannot be serialized to a savestate. The
+ * the native call stack, state that cannot be serialized to a savestate. The
  * mode stack replaces those loops with run-to-completion "step" functions whose
  * per-frame work is split from the single host_process_frame() yield, and whose
  * former stack locals are hoisted into a serializable ModeState.
@@ -124,7 +124,7 @@ typedef enum {
 
 /* Forward declaration: ModeState is defined further down (it references the
  * per-mode state structs). StepResult embeds one by value so a step that returns
- * STEP_PUSH can carry the child's initial state — a pointer to a step-local would
+ * STEP_PUSH can carry the child's initial state, a pointer to a step-local would
  * be dangling by the time the pump/root applies it. */
 typedef union ModeState ModeState;
 
@@ -141,7 +141,7 @@ typedef struct {
 #define STEP_RESULT_POP(r)      ((StepResult){ .kind = STEP_POP,  .pop_result = (int32_t)(r) })
 
 /* STEP_PUSH carrying an initial ModeState for the child. `init` must point at
- * storage that outlives the dispatch call — in practice a `static` ModeState in
+ * storage that outlives the dispatch call, in practice a `static` ModeState in
  * the step function, or a field hoisted into the parent's own ModeState (which
  * lives in the serializable g_mode_stack, not on the C stack). The pump/root
  * copies *init into the child's level immediately, so the pointer is only
@@ -154,8 +154,8 @@ typedef struct {
 typedef enum {
     FADE_TICK_OVERWORLD_RENDER = 0, /* oam_clear; run_actionscript_frame; update_screen; fade_update */
     FADE_TICK_BATTLE_EFFECTS,       /* update_battle_screen_effects() */
-    FADE_TICK_WINDOW,               /* window_tick_work() — battle/menu fades with live windows */
-    FADE_TICK_SCREEN_ONLY,          /* oam_clear; update_screen; fade_update — port of wait_for_fade_complete() */
+    FADE_TICK_WINDOW,               /* window_tick_work(), battle/menu fades with live windows */
+    FADE_TICK_SCREEN_ONLY,          /* oam_clear; update_screen; fade_update, port of wait_for_fade_complete() */
 } FadeTickKind;
 
 typedef struct {
@@ -183,7 +183,7 @@ typedef struct {
 /* GAME_MODE_PROCESS_INTERACTION phases. Port of process_queued_interactions():
  * dequeue one interaction and dispatch by type. Text types (0/8/9/10) STEP_PUSH
  * GAME_MODE_TEXT_WAIT_FADE; the door type (2) calls door_transition() inline
- * (still a blocking driver — deferred); the trailing pending/clear bookkeeping
+ * (still a blocking driver, deferred); the trailing pending/clear bookkeeping
  * runs in PI_RESUME (after the pushed text pops) or inline for the non-text
  * types (no extra yield, matching the original). */
 typedef enum {
@@ -251,7 +251,7 @@ typedef struct {
     uint8_t saved_suppression; /* ow.overworld_status_suppression to restore at the end */
 } TeleportToState;
 
-/* GAME_MODE_WAIT_FRAMES — run-to-completion form of wait_frames_with_updates()
+/* GAME_MODE_WAIT_FRAMES: run-to-completion form of wait_frames_with_updates()
  * (asm WAIT_FRAMES_WITH_UPDATES / C0DD2C): render `remaining` frames (each
  * oam_clear -> run_actionscript_frame -> update_screen -> yield), then POP. A parked
  * callroutine becomes a STEP_PUSH of GAME_MODE_ACTIONSCRIPT_FRAME (the WF_FLUSH
@@ -267,11 +267,11 @@ typedef struct {
     uint16_t remaining; /* frames left to render */
 } WaitFramesState;
 
-/* GAME_MODE_WINDOW_BORDER_ANIM — run-to-completion port of the blocking window
+/* GAME_MODE_WINDOW_BORDER_ANIM: run-to-completion port of the blocking window
  * border-flash effect (animate_window_border / animate_window_border_with_hppp,
  * window.c), reached only via CC_1C_08 (display_text_cc.c) inside DISPLAY_TEXT.
  * The original stepped through the border tiles one window_tick() frame each
- * (mode 1) — or 4 tile frames, 8 HP/PP-meter frames, then 5 tile frames
+ * (mode 1), or 4 tile frames, 8 HP/PP-meter frames, then 5 tile frames
  * (mode 2). Each frame is a yielding phase that renders via the park-propagating
  * window_tick_work_step() / update_hppp_meter_work_step() split, so a callroutine
  * parked during overworld dialogue becomes a STEP_PUSH of ACTIONSCRIPT_FRAME
@@ -291,7 +291,7 @@ typedef struct {
     uint8_t started;  /* 0 until the palette-3 prologue has run */
 } WindowBorderAnimState;
 
-/* GAME_MODE_ENDING — run-to-completion port of the two blocking end-of-game
+/* GAME_MODE_ENDING: run-to-completion port of the two blocking end-of-game
  * sequences play_cast_scene() and play_credits() (asm/ending/). Each of their
  * former blocking `render_frame_tick()` loops becomes a frame-yielding phase: the
  * frame is rendered via render_frame_tick_work_step() and, on a parked callroutine,
@@ -348,7 +348,7 @@ typedef struct {
 } QuickChecktalkState;
 
 /* GAME_MODE_PAUSE_MENU phases. Port of open_menu_button() (text.c,
- * asm/overworld/open_menu.asm): the full overworld pause menu — Talk to, Goods
+ * asm/overworld/open_menu.asm): the full overworld pause menu, Talk to, Goods
  * (with the Use/Give/Drop/Help cascade), PSI, Equip, Check, Status. The former
  * goto-heavy for(;;) becomes a phase machine in the file_menu idiom: each
  * sub-menu builds its window synchronously, STEP_PUSHes GAME_MODE_SELECTION_MENU
@@ -356,7 +356,7 @@ typedef struct {
  * via mode_child_result() in the matching *_RESULT phase. Phases chain inside an
  * internal for(;;) so no-yield transitions match the blocking original.
  *
- * All four former blocking sub-drivers — PSI, Equip, Status, and Goods→Use —
+ * All four former blocking sub-drivers, PSI, Equip, Status, and Goods→Use, 
  * are now their own modes (GAME_MODE_PSI_MENU / EQUIP_MENU / STATUS_MENU /
  * USE_ITEM), STEP_PUSHed from here with the tails in PM_*_RESUME phases. */
 typedef enum {
@@ -379,16 +379,16 @@ typedef enum {
     PM_PSI_RESUME,          /* after PSI_MENU pops: used->cleanup / single-PSI sfx tail */
     PM_QUIT_CONFIRM_RESULT, /* after the "Really quit?" Yes/No -- this port's own addition */
     PM_QUIT_METHOD_RESULT,  /* after "Really quit?"->Yes: Close Game/Return to Title
-                              * -- this port's own addition */
+                              *, this port's own addition */
     PM_CLEANUP,             /* @CLEANUP_AND_CLOSE; push ENTITY_FADE_WAIT */
     PM_DONE,                /* enable entities + POP */
 } PauseMenuPhase;
 
-/* GAME_MODE_PAUSE_MENU's pop-result values -- this port's own addition, not
+/* GAME_MODE_PAUSE_MENU's pop-result values, this port's own addition, not
  * a ROM concept. Documented as "Always pops 0" until PM_QUIT_METHOD_RESULT's
  * Return to Title option needed a way to tell the overworld root
  * (OWP_POST_TELEPORT, game_main.c) to reset back to the title screen
- * instead of just closing the pause menu normally -- verified before
+ * instead of just closing the pause menu normally, verified before
  * adding this that nothing reads GAME_MODE_PAUSE_MENU's pop result today,
  * so extending it is safe. Every other pop path still returns plain 0. */
 #define PAUSE_MENU_RESULT_NONE               0
@@ -411,7 +411,7 @@ typedef struct {
 /* GAME_MODE_EQUIP_MENU phases. Port of open_equipment_menu() +
  * equipment_change_menu() (src/inventory/equipment/open_equipment_menu.asm 66
  * lines + equipment_change_menu.asm 252 lines): the pause menu's whole Equip
- * cascade — character selection (multi-party CHAR_SELECT with the
+ * cascade, character selection (multi-party CHAR_SELECT with the
  * equipment-stats on_change, or single-party auto-select), then the
  * slot-selection ("Where?") and item-selection ("Which?") menus, both
  * SELECTION_MENU pushes (the stat-preview cursor callbacks live in the
@@ -438,7 +438,7 @@ typedef struct {
 
 /* GAME_MODE_STATUS_MENU phases. Port of open_status_menu()
  * (asm/text/menu/open_status_menu.asm, 118 lines): the pause menu's Status
- * cascade — character selection (CHAR_SELECT with the status-window on_change,
+ * cascade, character selection (CHAR_SELECT with the status-window on_change,
  * which is instant-printed and never yields), then the PSI category menu and
  * the PSI description browse loop (both SELECTION_MENU pushes; their cursor
  * callbacks live in the re-fetchable WindowInfo, exactly as when the blocking
@@ -464,7 +464,7 @@ typedef struct {
     uint16_t result;        /* inline early-exit selection result */
 } StatusMenuState;
 
-/* GAME_MODE_SETTINGS_MENU -- this port's own addition, not a port of any ROM
+/* GAME_MODE_SETTINGS_MENU, this port's own addition, not a port of any ROM
  * routine (there is no settings screen in the original game). Reached from
  * the command menu's "Config" item (build_command_menu(), text.c). A single
  * selectable row per engine preference; confirming a row cycles its value
@@ -484,17 +484,17 @@ typedef struct {
     uint16_t result;        /* inline early-exit selection result */
 } SettingsMenuState;
 
-/* GAME_MODE_UPDATE_CHECK -- this port's own addition, not a port of any ROM
+/* GAME_MODE_UPDATE_CHECK, this port's own addition, not a port of any ROM
  * routine (there is no update screen in the original game). Reached from
  * file-select's "Check for Updates" row (fm_file_select_build(), file_
  * select.c), which is itself only shown when platform_update_supported()
- * is true (a desktop build compiled with a release feed configured -- see
+ * is true (a desktop build compiled with a release feed configured, see
  * platform.h). Same build/dispatch/rebuild shape as SettingsMenuState
  * above, but the actual network check/download/verify/install work all
  * happens off-thread in the platform backend (platform_update_*, never
  * blocking); this phase machine just starts that work and polls it once a
  * frame via platform_update_poll(). UPD_DOWNLOADING covers verify+install
- * internally -- those aren't separate UI phases since they happen inside
+ * internally, those aren't separate UI phases since they happen inside
  * the same background thread the download itself runs on. */
 typedef enum {
     UPD_CHECK_START = 0,   /* build the window, call platform_update_check_start() once */
@@ -522,7 +522,7 @@ typedef struct {
  * (asm/text/open_hppp_display.asm): the B/Select overworld HP/PP + money
  * display. Shows the windows, then idles on window frames until A/L opens the
  * full pause menu (STEP_PUSH GAME_MODE_PAUSE_MENU, which owns ALL the cleanup
- * — the display just pops after it) or B/Select dismisses. `primed`
+ *, the display just pops after it) or B/Select dismisses. `primed`
  * reproduces the blocking loop's render-before-first-read order (the input
  * acted on at the top of a step is what the pump's previous yield latched). */
 typedef enum {
@@ -541,7 +541,7 @@ typedef struct {
 
 /* GAME_MODE_PSI_MENU phases. Port of overworld_psi_menu()
  * (asm/text/menu/overworld_psi_menu.asm, 571 lines): the pause menu's PSI
- * cascade — character select (CHAR_SELECT push with the PSI-list on_change +
+ * cascade, character select (CHAR_SELECT push with the PSI-list on_change +
  * PSI-availability check_valid), ability select (SELECTION_MENU push with the
  * target/cost cursor callback), PP-cost / teleport-blocked failure texts
  * (DISPLAY_TEXT pushes sharing the PS_FAIL_RESUME tail), then targeting and
@@ -602,7 +602,7 @@ typedef struct {
  * unconverted ones run inline-blocking.
  *
  * Pops 0 if targeting was cancelled (the pause menu re-enters the action
- * menu), else 1 (item used or message shown — the pause menu closes); the
+ * menu), else 1 (item used or message shown, the pause menu closes); the
  * parent branches in PM_USE_RESUME. */
 typedef enum {
     UI_ENTER = 0,      /* classify; usable items push DETERMINE_TARGETING */
@@ -630,8 +630,8 @@ typedef struct {
     uint32_t desc_text_addr; /* @LOCAL08: description/failure text (0 = fallback) */
     /* Key Items pool feature, not part of the original ROM/assembly: when
      * set (input, set by the parent), item_id is used as-is instead of
-     * being read via get_character_item(char_id, item_slot) -- a pool item
-     * has no character/slot of its own -- and the consume-on-use removal
+     * being read via get_character_item(char_id, item_slot), a pool item
+     * has no character/slot of its own, and the consume-on-use removal
      * in UI_TARGET_RESULT calls key_items_remove(item_id) instead of
      * remove_item_from_inventory(char_id, item_slot). char_id is still set
      * by the parent (the current leader) since the rest of this shared
@@ -692,19 +692,19 @@ typedef struct {
     uint8_t phase;  /* EscargoMenuPhase */
 } EscargoMenuState;
 
-/* GAME_MODE_KEY_ITEMS_MENU phases -- Key Items pool feature, not part of
+/* GAME_MODE_KEY_ITEMS_MENU phases, Key Items pool feature, not part of
  * the original ROM/assembly. Modeled on GAME_MODE_ESCARGO_MENU for the
  * list-building shape (KIM_ENTER builds a window over key_items_pool[]
  * (game_state.h) and STEP_PUSHes SELECTION_MENU; an empty pool skips the
  * push and pops 0 immediately) and on the Goods menu's item-action-menu
  * shape (PM_ACTION_MENU/PM_ACTION_RESULT, text.c) for what happens after
- * an item is picked -- initially shipped skipping straight to Use with no
+ * an item is picked, initially shipped skipping straight to Use with no
  * submenu at all, which both looked broken (no feedback of any kind for
  * items whose use-script has no visible effect from a distance, e.g. "Key
  * to the Cabin" needs to be used AT the door) and didn't match the Goods
  * menu's own UX, both reported live. KIM_ITEM_RESULT maps the 1-based
  * selection back to an item_id (stored in item_id below) and shows a
- * trimmed Use/Help action menu (no Give/Drop -- key items carry
+ * trimmed Use/Help action menu (no Give/Drop, key items carry
  * ITEM_FLAG_CANNOT_GIVE and were never meant to be given away or
  * discarded). KIM_ACTION_RESULT dispatches: Use STEP_PUSHes
  * GAME_MODE_USE_ITEM (from_key_items_pool=1, char_id = current leader);
@@ -751,7 +751,7 @@ typedef struct {
 /* GAME_MODE_DETERMINE_TARGETING phases. Port of determine_targetting()
  * (asm/battle/determine_targetting.asm): looks up the battle action's
  * direction and target type from battle_action_table, then either resolves
- * the target inline (auto/self/random/all — TGT_ENTER pops immediately) or
+ * the target inline (auto/self/random/all, TGT_ENTER pops immediately) or
  * runs a targeting UI as a child mode:
  *   enemy ONE  -> STEP_PUSH BATTLE_ENEMY_SELECT  -> TGT_PICK_RESULT
  *   enemy ROW  -> STEP_PUSH BATTLE_ROW_SELECT    -> TGT_PICK_RESULT
@@ -780,10 +780,10 @@ typedef struct {
 } TargetingState;
 
 /* GAME_MODE_BATTLE_PSI_MENU phases. Port of battle_psi_menu()
- * (asm/battle/battle_psi_menu.asm): the in-battle PSI selection cascade —
+ * (asm/battle/battle_psi_menu.asm): the in-battle PSI selection cascade, 
  * the category menu (Offense/Recover/Assist/Other) and the per-category
- * ability list (both SELECTION_MENU pushes; their cursor callbacks —
- * generate_battle_psi_list_callback / display_psi_target_and_cost — live in
+ * ability list (both SELECTION_MENU pushes; their cursor callbacks, 
+ * generate_battle_psi_list_callback / display_psi_target_and_cost, live in
  * the re-fetchable WindowInfo, exactly as when the blocking selection_menu()
  * pumped the same step), the not-enough-PP message (DISPLAY_TEXT push
  * resuming at BP_PP_RESUME), and targeting (DETERMINE_TARGETING push).
@@ -812,11 +812,11 @@ typedef struct {
 } BattlePsiMenuState;
 
 /* GAME_MODE_BATTLE_MENU phases. Port of battle_selection_menu()
- * (asm/battle/menu_handler.asm): the per-character battle command menu —
+ * (asm/battle/menu_handler.asm): the per-character battle command menu, 
  * Bash/Shoot, Goods, Auto Fight, PSI/Spy, Defend, Run Away, Pray/Mirror.
  * BM_ENTER runs the whole synchronous front half (attack palette, weapon-type
- * classification, the auto-fight AI — which resolves and pops inline without
- * ever yielding — and the manual menu construction). BM_MAIN is the
+ * classification, the auto-fight AI, which resolves and pops inline without
+ * ever yielding, and the manual menu construction). BM_MAIN is the
  * @MENU_SELECTION_LOOP head (focus + print-once + SELECTION_MENU push);
  * BM_MAIN_RESULT handles cancel/debug input and dispatches the chosen command.
  * Target selection for Bash/Shoot/Spy/Mirror is a BATTLE_ENEMY_SELECT push
@@ -852,14 +852,14 @@ typedef struct {
 } BattleMenuState;
 
 /* GAME_MODE_BATTLE phases. Port of battle_routine()
- * (asm/battle/main_battle_routine.asm): the main battle loop — init/reinit,
+ * (asm/battle/main_battle_routine.asm): the main battle loop, init/reinit,
  * encounter texts, the per-turn player menus (GAME_MODE_BATTLE_MENU pushes),
  * enemy AI, the run-away check, turn execution, battle-end checks, EXP
  * distribution (GAME_MODE_LEVEL_UP pushes via gain_exp_prepare) and the
  * battle ending. The former goto labels map onto the BTL_* phases; every
  * display_in_battle_text_addr / display_text_wait_addr /
  * display_text_with_prompt_addr site is a DISPLAY_TEXT push via
- * battle_push_text_ex() (battle.c — the battle text prologue runs inline
+ * battle_push_text_ex() (battle.c, the battle text prologue runs inline
  * before the push, the resume phase runs the epilogue prompt-flag clear),
  * and the former BATTLE_WAIT / FADE_WAIT pumps are STEP_PUSHes.
  *
@@ -948,7 +948,7 @@ typedef struct {
     uint16_t exp_i;             /* BTL_VICTORY_EXP loop index */
 } BattleRoutineState;
 
-/* GAME_MODE_INSTANT_WIN — run-to-completion port of instant_win_handler()
+/* GAME_MODE_INSTANT_WIN: run-to-completion port of instant_win_handler()
  * (battle.c, asm/battle/instant_win_handler.asm): the auto-victory sequence
  * when the party vastly outclasses the enemies. The former raw
  * wait_for_vblank loops become per-frame phases (the 7 one-frame palette
@@ -975,7 +975,7 @@ typedef struct {
     uint8_t battler_i;  /* IW_EXP battler loop index */
 } InstantWinState;
 
-/* GAME_MODE_BATTLE_ENTRY — run-to-completion port of init_battle_overworld()
+/* GAME_MODE_BATTLE_ENTRY: run-to-completion port of init_battle_overworld()
  * (battle.c, asm/battle/init_overworld.asm), the random/overworld encounter
  * entry/exit driver, with init_battle_common() (asm/battle/init_common.asm)
  * inlined around the GAME_MODE_BATTLE push. The debug exit-button busy-wait
@@ -988,7 +988,7 @@ typedef struct {
  * Kept inline-blocking (documented deferral): reload_map()'s
  * force_blank/blank_screen one-shot vblank helpers.
  *
- * Always pops 0 (the blocking original returns void — a defeat result is
+ * Always pops 0 (the blocking original returns void, a defeat result is
  * handled by the caller observing game state, not a return value). */
 typedef enum {
     BE_ENTER = 0,     /* battle_mode gate, debug checks, instant win / battle */
@@ -1002,7 +1002,7 @@ typedef struct {
     uint8_t phase;    /* BattleEntryPhase */
 } BattleEntryState;
 
-/* GAME_MODE_BATTLE_SCRIPTED — run-to-completion port of init_battle_scripted()
+/* GAME_MODE_BATTLE_SCRIPTED: run-to-completion port of init_battle_scripted()
  * (battle.c, asm/battle/init_scripted.asm), the scripted/event-triggered
  * battle entry/exit driver, with init_battle_common() inlined around the
  * GAME_MODE_BATTLE push (same shape as GAME_MODE_BATTLE_ENTRY). BS_ENTER
@@ -1035,11 +1035,11 @@ typedef struct {
     uint16_t battle_group;  /* input: BTL_ENTRY_PTR_TABLE index */
 } BattleScriptedState;
 
-/* GAME_MODE_BATTLE_ACTION — one battle-action function (the btlact_* /
+/* GAME_MODE_BATTLE_ACTION: one battle-action function (the btlact_* /
  * battle_actions.c long tail), run-to-completion. The mode is generic: the
  * step dispatches to the action's resumable stepper via the `step` column of
  * btlact_dispatch_table (battle_actions.c); each converted action is a small
- * pc-machine whose texts are DISPLAY_TEXT pushes (battle_push_text_ex idiom —
+ * pc-machine whose texts are DISPLAY_TEXT pushes (battle_push_text_ex idiom, 
  * the resume pc clears dt.blinking_triangle_flag, i.e. the blocking
  * epilogue). Actions without a stepper still run inline-blocking through
  * jump_temp_function_pointer(), which doubles as the pump bridge for
@@ -1049,7 +1049,7 @@ typedef struct {
  * Pushed by GAME_MODE_BATTLE's BTL_TARGET (resume BTL_TARGET_POST), the PSI
  * menu's PS_EXEC_* phases and the use-item UI_EXEC_* phases (both text.c),
  * via battle_action_dispatch(). Always pops 0 (action functions return
- * nothing — their results flow through `bt`). */
+ * nothing, their results flow through `bt`). */
 typedef struct {
     uint8_t  pc;            /* per-action resume point (0 = entry) */
     uint8_t  exec_i;        /* generic loop counter for actions that need one */
@@ -1058,7 +1058,7 @@ typedef struct {
     uint32_t scratch32;     /* per-action hoisted 32-bit local */
 } BattleActionState;
 
-/* GAME_MODE_BATTLE_CALC — the battle_calc.c text-displaying calculation
+/* GAME_MODE_BATTLE_CALC: the battle_calc.c text-displaying calculation
  * pipeline (miss/SMAAAASH/damage/shield/sleep-wake texts), run-to-completion
  * as a VALUE-RETURNING child mode: the pop result is the blocking function's
  * return value, read back via mode_child_result(). One mode, one kind per
@@ -1094,10 +1094,10 @@ typedef struct {
                              * reflected damage) */
 } BattleCalcState;
 
-/* GAME_MODE_BATTLE_REVIVE — run-to-completion port of battle_revive_target()
+/* GAME_MODE_BATTLE_REVIVE: run-to-completion port of battle_revive_target()
  * (battle.c, asm/battle/revive_target.asm): the revive text (DISPLAY_TEXT
- * push), the affliction/HP writeback at its resume pc, and — for enemy
- * revives only — the palette flash (zero bank 12, fade to white, restore
+ * push), the affliction/HP writeback at its resume pc, and, for enemy
+ * revives only, the palette flash (zero bank 12, fade to white, restore
  * from bank 8) whose two waits are BW_FRAMES pushes. Pushed by the
  * healing-γ/Ω and pray_rainbow action steppers (battle_actions.c) via
  * battle_revive_make_init() (battle_internal.h). Always pops 0. */
@@ -1107,16 +1107,16 @@ typedef struct {
     uint16_t hp;      /* HP to revive with */
 } BattleReviveState;
 
-/* GAME_MODE_BATTLE_APPLY — run-to-completion port of apply_action_to_targets()
+/* GAME_MODE_BATTLE_APPLY: run-to-completion port of apply_action_to_targets()
  * (battle.c, asm/battle/apply_action_to_targets.asm): wait for the PSI
- * animation (a BW_PSI_ANIM push), then iterate the targeted battlers —
- * enemies (8..31) first, then party (0..7) — running the action once per
+ * animation (a BW_PSI_ANIM push), then iterate the targeted battlers, 
+ * enemies (8..31) first, then party (0..7), running the action once per
  * target. Like the assembly, the action is a 24-bit ROM address written to
  * bt.temp_function_pointer per call (battle_action_dispatch): converted
  * actions run as BATTLE_ACTION child pushes, pure/unconverted ones inline.
  * action_addr 0 = iterate without calling (the assembly's NULL check).
  * bt.current_target walks the battler table exactly as in the blocking form
- * (set at each pass start, += sizeof(Battler) per advance — it is global
+ * (set at each pass start, += sizeof(Battler) per advance, it is global
  * serialized state, so it survives the per-target yields). Pushed by the
  * pray / apply_neutralize_to_all action steppers and pumped by the
  * battle_ko_target final-attack path, via battle_apply_make_init()
@@ -1128,7 +1128,7 @@ typedef struct {
     uint32_t action_addr; /* per-target action's ROM address (0 = none) */
 } BattleApplyState;
 
-/* GAME_MODE_BATTLE_KO — run-to-completion port of battle_ko_target()
+/* GAME_MODE_BATTLE_KO: run-to-completion port of battle_ko_target()
  * (battle.c, asm/battle/ko_target.asm): the battler death driver. Enemy
  * deaths run the final-attack bracket (description text push + a
  * BATTLE_APPLY child carrying the final action's ROM address; the saved
@@ -1147,7 +1147,7 @@ typedef struct {
     uint32_t saved_flags;     /* final-attack bracket: saved bt.battler_target_flags */
 } BattleKoState;
 
-/* GAME_MODE_CHECK_DEAD_PLAYERS — run-to-completion port of check_dead_players()
+/* GAME_MODE_CHECK_DEAD_PLAYERS: run-to-completion port of check_dead_players()
  * (battle.c, asm/battle/check_dead_players.asm): syncs each party battler's HP/PP
  * from its char_struct and, when one has just dropped to 0 HP, marks it unconscious
  * and pushes the "X collapsed!" KO text as a DISPLAY_TEXT child (the blocking form
@@ -1164,9 +1164,9 @@ typedef struct {
 /* GAME_MODE_LEVEL_UP phases. Port of the gain_exp() level-up loop +
  * LEVEL_UP_CHAR (asm/misc/gain_exp.asm lines 68-118 + asm/misc/
  * level_up_char.asm, 763 lines) for the text-displaying play_sound != 0 path:
- * per gained level — the level-up music, the "reached level X" text, the seven
+ * per gained level, the level-up music, the "reached level X" text, the seven
  * stat growths, the max HP/PP increases (each gain pushing its DISPLAY_TEXT
- * message), the PSI-learn scan — then the next-threshold re-check, looping
+ * message), the PSI-learn scan, then the next-threshold re-check, looping
  * while more levels are pending. Everything between two texts runs inside the
  * step's internal for(;;) with no extra yield. The silent play_sound == 0 path
  * (reset_char_level_one, silent gain_exp) never yields and stays the
@@ -1212,7 +1212,7 @@ typedef struct {
     int32_t  place_value;  /* multiplier for the selected digit (@LOCAL03) */
 } NumberSelectState;
 
-/* GAME_MODE_CHAR_SELECT — battle-style HP/PP character column selection
+/* GAME_MODE_CHAR_SELECT: battle-style HP/PP character column selection
  * (char_select_prompt, battle.c, mode 0/2; mode 1 keeps the blocking
  * selection_menu path). Its on_change/check_valid callbacks were function
  * pointers, which cannot live in a serializable ModeState, so they are stored as
@@ -1262,7 +1262,7 @@ typedef struct {
     uint32_t saved_argument_memory; /* restored on pop (focus window arg memory) */
 } CharSelectState;
 
-/* GAME_MODE_TEXT_DELAY — run update_hppp_meter_work() for a fixed number of
+/* GAME_MODE_TEXT_DELAY: run update_hppp_meter_work() for a fixed number of
  * frames, optionally breaking early on a text-advance press. Frame-faithful port
  * of the CC 0x1F 0x60 TEXT_SPEED_DELAY loop: the blocking loop checks the input
  * break AFTER each update_hppp_meter_and_render() (i.e. post-yield), so the check
@@ -1281,7 +1281,7 @@ typedef struct {
                             * window frame, 2=delay frame; 0=none */
 } TextDelayState;
 
-/* GAME_MODE_ACTIONSCRIPT_WAIT — port of CC 0x1F 0x61 WAIT_FOR_ACTIONSCRIPT. An
+/* GAME_MODE_ACTIONSCRIPT_WAIT: port of CC 0x1F 0x61 WAIT_FOR_ACTIONSCRIPT. An
  * initial window_tick_work() frame renders open windows, then render_frame_tick_
  * work() runs each frame until ert.actionscript_state becomes non-zero. The
  * completion check sits at the top of AS_RENDER (post-yield), so the frame that
@@ -1298,13 +1298,13 @@ typedef struct {
                       * window frame, 2=AS_RENDER frame; 0=none */
 } ActionscriptWaitState;
 
-/* GAME_MODE_TEXT_PROMPT — run-to-completion port of cc_halt (CC 0x03/0x13/0x14,
+/* GAME_MODE_TEXT_PROMPT: run-to-completion port of cc_halt (CC 0x03/0x13/0x14,
  * halt.asm): wait at a text prompt for a button press, with an optional blinking
  * triangle and an optional text-speed auto-advance shortcut.
  *
  * The blocking original was a sequence of distinct loops: (1) drain
  * dt.text_prompt_waiting_for_input via render_frame_tick; (2) one window_tick
- * frame; then one of three mutually-exclusive waits — the text-speed shortcut
+ * frame; then one of three mutually-exclusive waits, the text-speed shortcut
  * loop, the no-triangle button wait, or the blinking-triangle animation. Each
  * becomes a phase. `primed` reproduces the post-yield input check of the
  * for/do-while branches (suppress the check on their first frame); the triangle
@@ -1332,19 +1332,19 @@ typedef struct {
                               * 6=TP_TRIANGLE; 0=none */
 } TextPromptState;
 
-/* GAME_MODE_SELECTION_MENU — run-to-completion port of selection_menu()
+/* GAME_MODE_SELECTION_MENU: run-to-completion port of selection_menu()
  * (window.c), the keystone menu primitive (pause menu, shops, file select,
  * mode-1 char select, ...). The blocking two-level loop becomes a three-phase
  * machine. Almost all of the menu's live state already lives in the serializable
  * WindowInfo (current_option, selected_option, menu_page_number, text_x/y), so
  * little is hoisted here; `w` is re-fetched via get_window(win.current_focus_
  * window) at the top of each step (a pointer is not serializable, and the focus
- * window is stable for the menu's lifetime — restored after each callback).
+ * window is stable for the menu's lifetime, restored after each callback).
  *
  * The window's cursor_move_callback is invoked directly off the (live, re-
  * fetchable) WindowInfo; it is NOT hoisted. WindowInfo already stores it as a
  * raw function pointer (and content_tilemap as a heap pointer) and is serialized
- * by SECTION_WINDOW today — making those pointers savestate-safe is a pre-
+ * by SECTION_WINDOW today, making those pointers savestate-safe is a pre-
  * existing serialization-hardening task for the cutover, independent of this
  * control-flow conversion.
  *
@@ -1355,7 +1355,7 @@ typedef struct {
  * (primed=0) is the second; thereafter SM_MAIN reads input then renders (primed=1).
  * A cursor move adds one window_tick_work yield + one render-only frame before the
  * next input read; a page-flip adds two window_tick_work yields + one render-only
- * frame — each matching the blocking version's `continue` paths frame for frame. */
+ * frame, each matching the blocking version's `continue` paths frame for frame. */
 typedef enum {
     SM_SETUP = 0,  /* one-shot setup; ends with window_tick_work, then yields */
     SM_MAIN,       /* cursor blink + per-frame HP/PP render + input handling */
@@ -1389,7 +1389,7 @@ typedef struct {
                              * meter frame parked, so its tail runs after the push */
 } SelectionMenuState;
 
-/* GAME_MODE_TOWN_MAP — run-to-completion port of display_town_map() (overworld X
+/* GAME_MODE_TOWN_MAP: run-to-completion port of display_town_map() (overworld X
  * button) and run_town_map_menu() (items menu). Both share one mode via
  * `menu_mode`. The blocking helper load_town_map_data() embedded a bare
  * while(fade_active()) wait; it is split into load_town_map_begin() (fade_out +
@@ -1418,7 +1418,7 @@ typedef struct {
     uint16_t fadeout_count; /* display variant: fade-out render frames remaining */
 } TownMapState;
 
-/* GAME_MODE_SOUND_STONE — run-to-completion port of use_sound_stone()
+/* GAME_MODE_SOUND_STONE: run-to-completion port of use_sound_stone()
  * (display_text_menus.c), the Sound Stone melody-playback screen. The blocking
  * original had a one-shot setup with two embedded yields (force-blank, then
  * blank-screen + fade-in), a long per-frame animation/sequencing loop, and a
@@ -1461,10 +1461,10 @@ typedef struct {
     SoundStonePlayback ps[8];
 } SoundStoneState;
 
-/* GAME_MODE_DEBUG_YMENU — run-to-completion port of the two clean-leaf debug
+/* GAME_MODE_DEBUG_YMENU: run-to-completion port of the two clean-leaf debug
  * Y-button menus (debug_y_button_flag, debug_y_button_guide in game_main.c). Both
  * are an outer redraw + inner input wait; `kind` selects which. (debug_y_button_
- * goods is its own GAME_MODE_DEBUG_GOODS — its A action's char_select_prompt(mode
+ * goods is its own GAME_MODE_DEBUG_GOODS, its A action's char_select_prompt(mode
  * 1) is now a STEP_PUSH of SELECTION_MENU via char_select_overworld_prepare.) */
 typedef enum {
     DBG_YMENU_FLAG = 0,  /* event flag editor */
@@ -1483,10 +1483,10 @@ typedef struct {
     uint16_t index;  /* FLAG: current flag index (1-1999) */
 } DebugYMenuState;
 
-/* GAME_MODE_DEBUG_GOODS — run-to-completion port of debug_y_button_goods
+/* GAME_MODE_DEBUG_GOODS: run-to-completion port of debug_y_button_goods
  * (game_main.c), the debug Y-button "Goods" item browser/giver. The blocking
  * form was a raw for(;;){...wait_for_vblank();...} loop with an inline
- * char_select_prompt(mode 1) — the last non-mode debug driver. D-pad browses
+ * char_select_prompt(mode 1), the last non-mode debug driver. D-pad browses
  * item ids (±1 held up/down, ±10 left/right), A gives the item to a selected
  * party member (auto-equips weapons/armor), B exits. The A path STEP_PUSHes
  * SELECTION_MENU exactly as the determine-targetting ally pick does
@@ -1505,7 +1505,7 @@ typedef struct {
     uint32_t saved_argument_memory;  /* focus window argument_memory across the push */
 } DebugGoodsState;
 
-/* GAME_MODE_DEBUG_MENU — run-to-completion port of debug_y_button_menu
+/* GAME_MODE_DEBUG_MENU: run-to-completion port of debug_y_button_menu
  * (game_main.c), the debug Y-button parent menu (hold B/SELECT + R in the
  * overworld with ow.debug_flag set). The blocking form was a `display_menu:`-goto
  * loop: build a 23-item phone menu, selection_menu(1), a 23-case dispatch, an
@@ -1514,7 +1514,7 @@ typedef struct {
  * Commands that still block via wait_for_vblank but never pump (Warp/CAST/STAFF) or
  * are synchronous (Save/learn_special_psi/Meter) run inline within DM_DISPATCH;
  * the deep pump bridges they cannot yet avoid (enter_your_name_please naming,
- * debug_teleport after CAST/STAFF) stay inline this commit — D4b converts them. */
+ * debug_teleport after CAST/STAFF) stay inline this commit, D4b converts them. */
 typedef enum {
     DM_ENTER = 0,  /* one-shot: disable entities, SFX, show HP/PP windows */
     DM_BUILD,      /* (re)build the 23-item menu window, push SELECTION_MENU */
@@ -1530,7 +1530,7 @@ typedef struct {
     uint32_t message_addr;  /* @AFTER_COMMAND text addr (0 = none); DM_DISPATCH→DM_AFTER */
 } DebugMenuState;
 
-/* GAME_MODE_BATTLE_WAIT — run-to-completion port of the family of blocking
+/* GAME_MODE_BATTLE_WAIT: run-to-completion port of the family of blocking
  * "advance one frame until <condition>" loops scattered through the battle code.
  * Each former loop body funnelled through window_tick() (or, for the swirl-update
  * variant, wait_for_vblank()+update_swirl_effect()); the single yield now belongs
@@ -1570,7 +1570,7 @@ typedef struct {
     uint16_t remaining; /* BW_FRAMES: frames left to render */
 } BattleWaitState;
 
-/* GAME_MODE_LOAD_BATTLE_SCENE — run-to-completion port of load_battle_scene()
+/* GAME_MODE_LOAD_BATTLE_SCENE: run-to-completion port of load_battle_scene()
  * (battle_ui.c): (re)loads the battle scene during boss transitions. The three
  * blocking waits become STEP_PUSHes: the swirl-in / swirl-out are
  * GAME_MODE_BATTLE_WAIT (BW_SWIRL_WINDOW), the fade-in is GAME_MODE_FADE_WAIT
@@ -1591,7 +1591,7 @@ typedef struct {
     uint16_t music;       /* music track (0 = unchanged) */
 } LoadBattleSceneState;
 
-/* GAME_MODE_BATTLE_ROW_SELECT — run-to-completion port of select_battle_row()
+/* GAME_MODE_BATTLE_ROW_SELECT: run-to-completion port of select_battle_row()
  * (battle_targeting.c): UP/DOWN choose the front (1) or back (2) row, A confirms,
  * B cancels. Three-phase machine in the verified char-select idiom: a render frame
  * (set_battler_flashing + target text + the inline "WINDOW_TICK equivalent" battle
@@ -1613,7 +1613,7 @@ typedef struct {
     uint16_t current_row;  /* 0=front, 1=back */
 } BattleRowSelectState;
 
-/* GAME_MODE_BATTLE_ENEMY_SELECT — run-to-completion port of select_battle_target()
+/* GAME_MODE_BATTLE_ENEMY_SELECT: run-to-completion port of select_battle_target()
  * (battle_targeting.c): LEFT/RIGHT cycle battlers within a row, UP/DOWN switch
  * rows, A confirms, B cancels. The blocking goto-machine had three re-render entry
  * points; this maps to:
@@ -1652,7 +1652,7 @@ typedef struct {
     uint16_t target_shown;  /* 0 until the target text has been displayed once */
 } BattleEnemySelectState;
 
-/* GAME_MODE_NAMING_EVENTS — run-to-completion port of init_naming_screen_events
+/* GAME_MODE_NAMING_EVENTS: run-to-completion port of init_naming_screen_events
  * (file_select.c): after a character is named, wait for the pending naming
  * actionscript, reassign the walk-out animation scripts, then wait for every
  * walk-out entity script to finish before clearing sprite VRAM.
@@ -1682,7 +1682,7 @@ typedef struct {
     uint16_t naming_index; /* init_naming_screen_events() arg */
 } NamingEventsState;
 
-/* GAME_MODE_TEXT_INPUT — run-to-completion port of text_input_dialog()
+/* GAME_MODE_TEXT_INPUT: run-to-completion port of text_input_dialog()
  * (file_select.c), the on-screen keyboard used by the naming screens and the
  * Mother-2/EarthBound player-name registry. The blocking loop was a single
  * render -> wait_for_vblank -> read-input -> handle cycle; the step renders the
@@ -1693,13 +1693,13 @@ typedef struct {
  *
  * The output buffer was a uint8_t* parameter, which cannot live in a POD
  * ModeState. It is replaced by a NameTargetId (file_select.h) resolved to the
- * (stable global) buffer on confirm — the same serializable-by-ID pattern as the
+ * (stable global) buffer on confirm, the same serializable-by-ID pattern as the
  * char-select callbacks. The eb_name work buffer is hoisted here; any
  * existing-name pre-fill is done by the wrapper into the initial state, so the
  * existing_name pointer never enters ModeState. */
 typedef struct {
     uint8_t  primed;                 /* 0 = first frame: render without reading input */
-    uint8_t  name_target;            /* NameTargetId — resolved to a buffer on confirm */
+    uint8_t  name_target;            /* NameTargetId, resolved to a buffer on confirm */
     uint8_t  has_dont_care;          /* naming_index >= 0 */
     uint8_t  is_lowercase;           /* keyboard case toggle */
     int16_t  naming_index;           /* -1 (player names) or 0..6 (Don't Care group) */
@@ -1715,7 +1715,7 @@ typedef struct {
     uint8_t  eb_name[32];            /* the name being built (EB-encoded) */
 } TextInputState;
 
-/* GAME_MODE_NAMING_PROMPT — run-to-completion port of the name_a_character()
+/* GAME_MODE_NAMING_PROMPT: run-to-completion port of the name_a_character()
  * prompt-wait loop: render the name box (with its bullet+dashes display) and the
  * prompt message each frame until any button is pressed, then pop so the caller
  * proceeds to the keyboard (GAME_MODE_TEXT_INPUT). The one-shot setup (create
@@ -1728,7 +1728,7 @@ typedef struct {
     int16_t  name_tile_cols; /* columns of the pre-rendered name display */
 } NamingPromptState;
 
-/* GAME_MODE_SCREEN_TRANSITION — run-to-completion port of the two frame loops in
+/* GAME_MODE_SCREEN_TRANSITION: run-to-completion port of the two frame loops in
  * screen_transition() (door.c, asm/overworld/screen_transition.asm), the door
  * fade-out (mode==1, "exit") and fade-in (mode==0, "enter") animations. The
  * one-shot setup (resolve config, init scroll velocity, the leading 2-frame
@@ -1738,7 +1738,7 @@ typedef struct {
  *
  * Both loops carry an OPTIONAL pre-yield: `if (palette_upload_mode) wait_for_
  * vblank();` flushes a pending palette DMA before the frame's palette animation
- * update — at most one extra yield per iteration. `pal_waited` tracks whether
+ * update, at most one extra yield per iteration. `pal_waited` tracks whether
  * that pre-yield has been taken this iteration (reset after the frame's main
  * yield), reproducing the conditional double-yield exactly.
  *
@@ -1767,7 +1767,7 @@ typedef struct {
     uint16_t duration;   /* eff_duration (exit) / secondary_duration (enter) */
 } ScreenTransitionState;
 
-/* GAME_MODE_PALETTE_FADE — run-to-completion port of the family of fixed-length
+/* GAME_MODE_PALETTE_FADE: run-to-completion port of the family of fixed-length
  * "run a palette fade for N frames" loops in overworld_palette.c. The one-shot
  * setup (load_palette_to_fade_buffer / prepare_palette_fade_slopes /
  * load_map_palette_animation_frame + initialize_map_palette_fade) stays in each
@@ -1791,7 +1791,7 @@ typedef struct {
  *
  * Each kind follows the blocking loop's ordering: test "done" (remaining==0)
  * first, then (skippable kinds) the pad, else run the body, decrement, and yield.
- * The body runs before the yield in every case — frame-identical to the originals. */
+ * The body runs before the yield in every case, frame-identical to the originals. */
 typedef enum {
     PF_SKIPPABLE_PAUSE = 0,
     PF_MAP_CHANGE,
@@ -1805,7 +1805,7 @@ typedef struct {
     uint16_t remaining; /* frames left to run */
 } PaletteFadeState;
 
-/* GAME_MODE_MAP_PALETTE_FADE — run-to-completion port of load_map_palette()'s
+/* GAME_MODE_MAP_PALETTE_FADE: run-to-completion port of load_map_palette()'s
  * fade path (map_loader.c). The one-shot setup (parse target palette + compute
  * the per-channel 8.8 accumulators/slopes into ert.buffer scratch) stays in the
  * wrapper; only the per-frame UPDATE_MAP_PALETTE_FADE loop and the post-fade
@@ -1826,7 +1826,7 @@ typedef struct {
     uint16_t remaining; /* accumulate frames left */
 } MapPaletteFadeState;
 
-/* GAME_MODE_MOSAIC_FADE — run-to-completion port of the brightness-ramp mosaic
+/* GAME_MODE_MOSAIC_FADE: run-to-completion port of the brightness-ramp mosaic
  * fades: FADE_OUT_WITH_MOSAIC (callroutine.c) and flyover.c's fade_in/out. The
  * INIDISP brightness nibble is ramped by `step` each brightness step, optionally
  * driving the MOSAIC register (size inversely proportional to brightness) when
@@ -1842,7 +1842,7 @@ typedef struct {
  *            (phase 1) before popping.
  *
  * delay == 0 means the whole ramp completes in a single step with no yields
- * (the original's inner for-loop ran zero times) — the step's internal loop
+ * (the original's inner for-loop ran zero times), the step's internal loop
  * advances brightness steps back-to-back until a yield (delay > 0) or completion. */
 typedef enum { MF_IN = 0, MF_OUT } MosaicFadeKind;
 
@@ -1856,21 +1856,21 @@ typedef struct {
     uint16_t delay_left;  /* remaining delay yields before the next brightness step */
 } MosaicFadeState;
 
-/* GAME_MODE_FLYOVER — run-to-completion port of the two flyover/cutscene
+/* GAME_MODE_FLYOVER: run-to-completion port of the two flyover/cutscene
  * bytecode interpreters in flyover.c: play_flyover_script() (FO_SCRIPT, the map
  * intro "fly over" text) and coffeetea_scene() (FO_COFFEETEA, the coffee/tea
  * break). Both walk a script of EB-character/control opcodes, then fade in,
  * display, and fade back out with the usual force-blank/undraw cleanup.
  *
  * The flyover module's render state (flyover_screen_offset, flyover_vwf_x/y, …)
- * stays in file-static .bss (set by the wrappers / the static helpers) — it is
+ * stays in file-static .bss (set by the wrappers / the static helpers), it is
  * run-to-completion-safe; serializing it is deferred (same policy as town_map's
  * anim counters). Only the former C-stack locals are hoisted here. The script
  * pointer is re-derived from `id` each step (FO_SCRIPT: flyover_script_ids[id];
  * FO_COFFEETEA: ASSET_COFFEE/TEA_BIN by `id` = type), so no pointer is stored.
  *
  * The flyover brightness ramps have no mosaic, so they are inlined (not pushed as
- * GAME_MODE_MOSAIC_FADE — STEP_PUSH cannot yet carry init state). `sub` drives
+ * GAME_MODE_MOSAIC_FADE: STEP_PUSH cannot yet carry init state). `sub` drives
  * the multi-yield opcode 0x09 (FO_SCRIPT: upload→wait→scroll; FO_COFFEETEA: the
  * smooth-scroll inner loop). load_background_animation()'s body is replicated in
  * the CT setup phases because the public blocking version is still used by
@@ -1917,12 +1917,12 @@ typedef struct {
     uint32_t script_size;         /* script byte length */
 } FlyoverState;
 
-/* GAME_MODE_INTRO_LOGO — run-to-completion port of logo_screen() (logo_screen.c):
+/* GAME_MODE_INTRO_LOGO: run-to-completion port of logo_screen() (logo_screen.c):
  * the Nintendo -> APE -> HAL logo sequence shown at boot. Each logo is loaded
  * (no yield), faded in, held, and faded out. The brightness ramps are exactly
  * GAME_MODE_MOSAIC_FADE (MF_IN / MF_OUT with no mosaic), so this mode PUSHes a
  * MOSAIC_FADE child for each fade via STEP_PUSH-with-init rather than re-inlining
- * the ramp — the first real use of that mechanism.
+ * the ramp, the first real use of that mechanism.
  *
  *   LG_LOAD  - load logo[idx] gfx, prime INIDISP=0x00 / MOSAIC=0, set the hold
  *              length, then PUSH MF_IN; resume at LG_HOLD.
@@ -1951,7 +1951,7 @@ typedef struct {
     uint16_t hold_remaining; /* frames left to hold the current logo */
 } IntroLogoState;
 
-/* GAME_MODE_GAS_STATION — run-to-completion port of gas_station() /
+/* GAME_MODE_GAS_STATION: run-to-completion port of gas_station() /
  * RUN_GAS_STATION_CREDITS (gas_station.c), the "red Giygas static" prologue. The
  * one-shot setup (entity_system_init + gas_station_load, both yield-free) stays
  * in the blocking wrapper; the six former blocking loops become phases sharing
@@ -1972,7 +1972,7 @@ typedef struct {
  * matching the blocking WAIT_FRAMES_OR_UNTIL_PRESSED / pad checks. Pops 0 on a
  * full run, 1 on a button skip. Each phase does its frame's work then decrements
  * `remaining`, performing the (yield-free) transition to the next phase on the
- * frame that reaches 0 — so the frame counts match the originals. */
+ * frame that reaches 0, so the frame counts match the originals. */
 typedef enum {
     GS_PH1 = 0,
     GS_PH2,
@@ -1991,10 +1991,10 @@ typedef struct {
     uint16_t remaining;         /* frames left in the current countdown phase */
 } GasStationState;
 
-/* GAME_MODE_TITLE_SCREEN — run-to-completion port of show_title_screen()
+/* GAME_MODE_TITLE_SCREEN: run-to-completion port of show_title_screen()
  * (title_screen.c). The one-shot setup (force-blank, entity init, BG/OAM/graphics
  * load, entity_init_wipe(TITLE_SCREEN_1), and the quick/non-quick pre-loop setup
- * — sprite-palette decomp + fade-target/slopes, or fade_in(4,1)) all stay in the
+ *, sprite-palette decomp + fade-target/slopes, or fade_in(4,1)) all stay in the
  * blocking wrapper. The three former blocking loops become phases:
  *
  *   TS_WARMUP  - 60-frame warm-up. quick_mode selects the body: quick =
@@ -2033,13 +2033,13 @@ typedef struct {
     uint16_t frame;           /* TS_WARMUP: warm-up frame counter */
 } TitleScreenState;
 
-/* GAME_MODE_ATTRACT — run-to-completion port of run_attract_mode() (attract_mode.c),
+/* GAME_MODE_ATTRACT: run-to-completion port of run_attract_mode() (attract_mode.c),
  * an idle title-screen demo scene. The one-shot setup runs inline in
  * run_attract_mode_prepare() (called by the init_intro parent before the push);
  * the scene-driving DISPLAY_TEXT and the three post-script loops live here:
  *
  *   AT_SCRIPT     - STEP_PUSH GAME_MODE_DISPLAY_TEXT with the scene's attract-mode
- *                   bytecode (attract_mode_text_addrs[scene_index]) — the script
+ *                   bytecode (attract_mode_text_addrs[scene_index]), the script
  *                   sets flags, teleports, spawns entities, and pauses for the scene
  *                   duration. On its POP -> AT_MAIN. (Replaces the former blocking
  *                   display_text_from_addr() in run_attract_mode().)
@@ -2056,7 +2056,7 @@ typedef struct {
  *
  * Pops the button-pressed flag (1 if a button ended the scene, else 0), matching
  * the blocking return. The swirl update in AT_OVAL_CLOSE runs one render-frame
- * earlier than the blocking loop (which yielded before it) — an accepted
+ * earlier than the blocking loop (which yielded before it), an accepted
  * imperceptible shift on this brief cosmetic close animation. */
 typedef enum {
     AT_SCRIPT = 0,
@@ -2074,7 +2074,7 @@ typedef struct {
     uint16_t scene_index;    /* AT_SCRIPT: which attract scene script to run */
 } AttractState;
 
-/* GAME_MODE_FILE_MENU — run-to-completion port of file_menu_loop() (file_select.c),
+/* GAME_MODE_FILE_MENU: run-to-completion port of file_menu_loop() (file_select.c),
  * the file-select cascade reached from the intro. Each former blocking sub-menu
  * (file_select_menu / show_file_select_submenu / text_speed / sound_mode / flavour
  * / delete-confirm) was a thin wrapper around selection_menu(); the cascade now
@@ -2082,7 +2082,7 @@ typedef struct {
  * and reads the choice back via mode_child_result() in the matching *_RESULT phase.
  *
  * Two things deliberately stay blocking, called inline from the step (the C-stack
- * during them is acceptable — they are terminal, input-driven, and depend on
+ * during them is acceptable, they are terminal, input-driven, and depend on
  * subsystems not yet converted): new_game_naming() (its own multi-character driver
  * over the already-converted naming modes) and the synchronous load/save/erase
  * helpers (no yield). The leading fade-in wait is phase FM_FADEIN_WAIT.
@@ -2124,11 +2124,11 @@ typedef struct {
     uint16_t result;        /* inline early-exit result for the *_RESULT phase */
 } FileMenuState;
 
-/* GAME_MODE_NEW_GAME_NAMING — run-to-completion port of new_game_naming()
+/* GAME_MODE_NEW_GAME_NAMING: run-to-completion port of new_game_naming()
  * (file_select.c), the new-game character/pet/food/thing naming flow reached from
  * the file-select new-game cascade (FM_NG_NAMING). Folds in the former blocking
  * helpers name_a_character() and init_naming_screen_events(): each character is a
- * three-push sequence — NAMING_PROMPT (render name box, wait for a button) ->
+ * three-push sequence, NAMING_PROMPT (render name box, wait for a button) ->
  * TEXT_INPUT (the on-screen keyboard) -> NAMING_EVENTS (walk-out animation wait).
  * The naming loop advances/retreats on the keyboard result; the confirmation
  * screen pushes SELECTION_MENU and, on Yep, counts a 180-frame settle before the
@@ -2157,14 +2157,14 @@ typedef struct {
     uint16_t wait_frames;  /* NGN_CONFIRM_WAIT countdown */
 } NewGameNamingState;
 
-/* GAME_MODE_SPECIAL_EVENT — run-to-completion port of dispatch_special_event()
+/* GAME_MODE_SPECIAL_EVENT: run-to-completion port of dispatch_special_event()
  * (display_text_menus.c), the 18-case dispatcher behind CC_1F_41. Most cases run
  * inline with no yield (status suppression, flag clears, homesickness, bicycle
  * dismount) or block only via host_process_frame (the cast/credits cutscenes);
  * those compute their result and POP in SE_ENTER. The five modal cases STEP_PUSH
- * an existing child — coffeetea (FLYOVER), the M2/EB name prompt (ENTER_NAME),
+ * an existing child, coffeetea (FLYOVER), the M2/EB name prompt (ENTER_NAME),
  * the town map (TOWN_MAP), the sound stone (SOUND_STONE) and the title screen
- * (TITLE_SCREEN) — and resume in SE_RESULT (POP the precomputed return value) or
+ * (TITLE_SCREEN), and resume in SE_RESULT (POP the precomputed return value) or
  * SE_RESULT_CHILD (POP the child's result, for the name prompt). The CC_1F_41
  * channel stores the popped value to working memory in DT_RESUME_CC1F_SPECIAL_EVENT. */
 typedef enum {
@@ -2179,7 +2179,7 @@ typedef struct {
     uint16_t result;    /* precomputed return value carried across a child push */
 } SpecialEventState;
 
-/* GAME_MODE_ENTER_NAME — run-to-completion port of enter_your_name_please()
+/* GAME_MODE_ENTER_NAME: run-to-completion port of enter_your_name_please()
  * (display_text_menus.c), the M2/EB player-name registry prompt (CC_1F_41 cases
  * 3/4, also the debug menu's Player 0/1). EN_ENTER sets the text flags, creates
  * WINDOW_NAMING_PROMPT, prints the prompt / existing name, then text_input_prepare()
@@ -2197,7 +2197,7 @@ typedef struct {
     uint16_t result;    /* keyboard result, captured on resume */
 } EnterNameState;
 
-/* GAME_MODE_INIT_INTRO — run-to-completion port of init_intro()'s state machine
+/* GAME_MODE_INIT_INTRO: run-to-completion port of init_intro()'s state machine
  * (init_intro.c). STEP_PUSHes the converted intro leaves (INTRO_LOGO, GAS_STATION,
  * TITLE_SCREEN), ATTRACT, and FILE_MENU as children, branching on
  * mode_child_result(). The yield-free transitions (change_music,
@@ -2227,7 +2227,7 @@ typedef struct {
     uint8_t  attract_index;    /* which attract scene table entry is next */
 } InitIntroState;
 
-/* GAME_MODE_DISPLAY_TEXT — run-to-completion port of the text bytecode
+/* GAME_MODE_DISPLAY_TEXT: run-to-completion port of the text bytecode
  * interpreter display_text() (display_text.c, asm/text/display_text.asm). The
  * blocking while-loop body is the DT_RUN phase, run inside an internal for(;;)
  * that processes control codes back-to-back and only returns (yields) at a real
@@ -2246,7 +2246,7 @@ typedef struct {
  * recursion are run-to-completion here. The remaining yielding control codes
  * (cc_halt/cc_pause/CC_11 selection_menu/the cc_1f sub-ops) still call their
  * blocking forms inline, which internally pump_mode their already-converted
- * children — C-stack state for now, converted to STEP_PUSH in later commits. */
+ * children, C-stack state for now, converted to STEP_PUSH in later commits. */
 typedef enum {
     DT_ENTER = 0, /* per-call prologue, then fall through to DT_RUN (no yield) */
     DT_RUN,       /* interpret control codes until a yield point */
@@ -2288,12 +2288,12 @@ typedef struct {
     ScriptReader reader;           /* offset-based script cursor (serializable) */
 } DisplayTextModeState;  /* note: DisplayTextState (display_text.h) is the `dt` global type */
 
-/* GAME_MODE_ACTIONSCRIPT_FRAME — finish an interrupted run_actionscript_frame()
+/* GAME_MODE_ACTIONSCRIPT_FRAME: finish an interrupted run_actionscript_frame()
  * (script.c). The entity-script interpreter is already run-to-completion per
  * frame; its only yields were callroutines that ran a child modal context
  * inline-blocking: MOVEMENT_DISPLAY_TEXT (DISPLAY_TEXT), the two
  * FADE_OUT_WITH_MOSAIC wrappers (MOSAIC_FADE) and PLAY_FLYOVER_SCRIPT (FLYOVER).
- * Those callroutines now record a yield REQUEST (transient — set and consumed
+ * Those callroutines now record a yield REQUEST (transient, set and consumed
  * within one frame's work, never crossing a yield) and abort the interpreter
  * loops; run_actionscript_frame() parks the frame position here and the step
  * pushes the requested child, then on POP runs the callroutine's post-child
@@ -2301,13 +2301,13 @@ typedef struct {
  * the suspended script (from `pc`), the rest of that entity's script chain +
  * tick callback, the remaining phase-1 entities, then the movement/draw phases.
  * A resumed script can immediately request another child (two texts back to
- * back) — the step refills from the new request and pushes it in the same step.
+ * back), the step refills from the new request and pushes it in the same step.
  *
  * The iteration cursors live in the already-serialized globals exactly as the
  * blocking loops used them (ert.next_active_entity / ert.actionscript_current_
  * script are deliberately re-read after each script so child-side entity/script
  * frees retarget the iteration). Only the former C locals are hoisted here; in
- * particular `pc` mirrors the blocking form's local pc — scripts.pc[] is NOT
+ * particular `pc` mirrors the blocking form's local pc, scripts.pc[] is NOT
  * written at the interrupt point, and the loop-exit writeback overwrites any
  * child-side rewrite, exactly like the blocking original.
  * ert.disable_actionscript stays 1 across the child (the blocking pump ran
@@ -2327,10 +2327,10 @@ typedef enum {
 
 typedef enum {
     AS_EPI_NONE = 0,
-    AS_EPI_TEXT_FLAG,  /* event_flag_set(2) — text-done flag, after the text pops */
+    AS_EPI_TEXT_FLAG,  /* event_flag_set(2), text-done flag, after the text pops */
 } AsEpilogue;
 
-/* GAME_MODE_PP_RECOVERY_FLASH — run-to-completion port of
+/* GAME_MODE_PP_RECOVERY_FLASH: run-to-completion port of
  * INSTANT_WIN_PP_RECOVERY (battle.c, asm/battle/instant_win_pp_recovery.asm),
  * the event-script callroutine run after an instant-win battle: two purple
  * screen flashes (fill palettes purple, 12-frame fade back to the saved
@@ -2338,7 +2338,7 @@ typedef enum {
  * GAME_MODE_ACTIONSCRIPT_FRAME (AS_CHILD_PP_RECOVERY); the recovery SFX plays
  * at the callroutine's request point. Each step: when a 12-frame fade has
  * completed, finalize it (and on the second flash, apply the PP recovery and
- * POP — blocking bundled the finalize with the NEXT frame's work, so the
+ * POP: blocking bundled the finalize with the NEXT frame's work, so the
  * finalize runs at the top of the following step, not with the 12th update);
  * a fresh flash saves the palettes / fills purple / preps the slopes, then
  * every step runs one update_map_palette_animation(). Always pops 0. */
@@ -2363,7 +2363,7 @@ typedef struct {
     uint32_t fo_script_size;   /* AS_CHILD_FLYOVER: script byte length */
 } ActionscriptFrameState;
 
-/* GAME_MODE_TELEPORT — run-to-completion port of teleport_mainloop()
+/* GAME_MODE_TELEPORT: run-to-completion port of teleport_mainloop()
  * (overworld_teleport.c, asm/misc/teleport_mainloop.asm): the PSI-teleport
  * driver. Stops music + one wait (TP_BEGIN), then the synchronous style setup
  * (freeze entities, tick-callback assignment, teleport music) in TP_SETUP, then
@@ -2371,7 +2371,7 @@ typedef struct {
  * teleport_freeze_entities_conditional + update_screen, one yield) until
  * ow.psi_teleport_state leaves 0. State 1 (arrived) runs the arrival load across
  * TP_ARRIVE/TP_ARRIVE_DEST/TP_ARRIVE_DONE, STEP_PUSHing GAME_MODE_FADE_WAIT for the
- * single fade-wait (formerly run_frames_until_fade_done — arrival's for non-INSTANT,
+ * single fade-wait (formerly run_frames_until_fade_done, arrival's for non-INSTANT,
  * INSTANT departure's). The non-INSTANT departure animation (init_teleport_departure.asm)
  * is now run-to-completion across TP_DEPART_SETUP/_WAIT/_ANIM (formerly the blocking
  * init_teleport_departure_run): synchronous party/speed/callback/music setup, a 30-frame
@@ -2417,7 +2417,7 @@ typedef struct {
     uint16_t frame_i;   /* TP_FAIL_WAIT / TP_FAIL_SETTLE frame counter */
 } TeleportState;
 
-/* GAME_MODE_BICYCLE_DISMOUNT — run-to-completion port of
+/* GAME_MODE_BICYCLE_DISMOUNT: run-to-completion port of
  * get_off_bicycle_with_message() (overworld_teleport.c,
  * asm/overworld/get_off_bicycle.asm): show the "got off the bicycle" message,
  * then dismount. BD_TEXT creates the standard text window and STEP_PUSHes the
@@ -2439,7 +2439,7 @@ typedef struct {
     uint8_t phase;  /* BicycleDismountPhase */
 } BicycleDismountState;
 
-/* GAME_MODE_HP_ALERT — run-to-completion port of SHOW_HP_ALERT
+/* GAME_MODE_HP_ALERT: run-to-completion port of SHOW_HP_ALERT
  * (asm/overworld/show_hp_alert.asm), the "[name]'s HP is very low!" overworld
  * warning shown by check_low_hp_alert() (overworld_palette.c) when a party
  * member drops below 20% HP. HA_TEXT disables entities, opens the text window,
@@ -2447,7 +2447,7 @@ typedef struct {
  * closes the window + one window_tick frame; HA_DONE re-enables entities and
  * POPs. party_index selects whose name/HP triggered it (re-derived at HA_TEXT).
  * Pumped by check_low_hp_alert() (still called inline-blocking mid-loop from
- * update_overworld_damage, a per-frame root function — it STEP_PUSHes at
+ * update_overworld_damage, a per-frame root function, it STEP_PUSHes at
  * Phase D). Always pops 0. */
 typedef enum {
     HA_TEXT = 0,   /* disable entities, window + battler name, push the warning */
@@ -2461,7 +2461,7 @@ typedef struct {
     uint8_t party_index;  /* 0-based party slot whose name + HP triggered the alert */
 } HpAlertState;
 
-/* GAME_MODE_GAME_OVER — run-to-completion port of spawn() (asm/overworld/spawn.asm)
+/* GAME_MODE_GAME_OVER: run-to-completion port of spawn() (asm/overworld/spawn.asm)
  * with initialize_game_over_screen() and play_comeback_sequence() inlined as
  * phases. Shown when the whole party is KO'd in the overworld. The former blocking
  * yields become child pushes / CONTINUEs:
@@ -2511,7 +2511,7 @@ typedef struct {
     uint16_t saved_y;   /* ow.respawn_y captured at GO_ENTER */
 } GameOverState;
 
-/* GAME_MODE_OVERWORLD — the permanent root mode (g_mode_stack[0]), pushed once at
+/* GAME_MODE_OVERWORLD: the permanent root mode (g_mode_stack[0]), pushed once at
  * game_init() and never popped. It folds in the BOOT machine (D3): its OWP_BOOT_*
  * phases run boot_begin() (which pushes INIT_INTRO as a child, or does the
  * skip-intro init) and then overworld_boot() + the first render, with no yield
@@ -2534,7 +2534,7 @@ typedef struct {
  *   update_overworld_damage loop-> HP_ALERT mid-loop   (-> OWP_LOOP_END resume)
  *   spawn                       -> GAME_OVER           (OWP_GAMEOVER_RESULT)
  * debug_y_button_menu() stays inline-blocking (debug-only; its Goods sub-front
- * cannot be a mode yet — documented deferral, like battle.c's debug loops).
+ * cannot be a mode yet, documented deferral, like battle.c's debug loops).
  *
  * The first frame after boot renders without running POST (the assembly's first
  * loop iteration): OWP_BOOT_AWAIT advances to OWP_RENDER, which renders then
@@ -2563,7 +2563,7 @@ typedef enum {
                              * -> OWP_RENDER in the same step (no yield = no Ness-flash). */
     OWP_RENDER_FLUSH,       /* resume after a parked actionscript frame's child popped:
                              * update_screen + update_swirl_effect -> OWP_POST_TOP. */
-    OWP_BOOT_FLUSH,         /* resume after the boot actionscript frame parked (rare —
+    OWP_BOOT_FLUSH,         /* resume after the boot actionscript frame parked (rare, 
                              * EVENT_001/002 run no modal): overworld_boot_flush() ->
                              * OWP_RENDER in the same step. */
 } OverworldPhase;
@@ -2670,7 +2670,7 @@ union ModeState {
  * DISPLAY_TEXT levels and the Phase-D flip adds the BOOT/OVERWORLD root.
  * 24 leaves headroom
  * (mode_push logs + drops on overflow rather than corrupting the stack).
- * Raising this changes the on-disk SECTION_MODE_STACK size — harmless
+ * Raising this changes the on-disk SECTION_MODE_STACK size, harmless
  * pre-cutover (savestates are not cross-build compatible). */
 #define MODE_STACK_MAX 24
 
@@ -2709,7 +2709,7 @@ StepResult mode_dispatch_step(GameMode mode, ModeState *st);
  * The blocking helper layer (render_frame_tick / window_tick / wait_frames_with_
  * updates / dismount_bicycle / teleport-departure / ending) keeps calling the
  * plain void run_actionscript_frame() (entity.h), which warns-and-drops a stray
- * park — those contexts do not run cutscene callroutines (battle is guarded by
+ * park, those contexts do not run cutscene callroutines (battle is guarded by
  * battle_mode_flag; transitions/teleport freeze entities; menus/credits run no
  * action scripts), so a park there is not expected. */
 bool       run_actionscript_frame_step(void);
@@ -2766,7 +2766,7 @@ StepResult mode_step_debug_menu(ModeState *st);
  * BW_FRAMES) before STEP_PUSH GAME_MODE_BATTLE_WAIT. Always pops 0. */
 StepResult mode_step_battle_wait(ModeState *st);
 
-/* GAME_MODE_LOAD_BATTLE_SCENE — see LoadBattleSceneState above. Init via
+/* GAME_MODE_LOAD_BATTLE_SCENE: see LoadBattleSceneState above. Init via
  * ModeState.load_battle_scene (group, music; phase = LBS_ENTER) before the
  * STEP_PUSH from the Giygas cutscene battle-action steppers. Always pops 0.
  * Defined in battle_ui.c. */
@@ -2856,7 +2856,7 @@ StepResult mode_step_gas_station(ModeState *st);
 StepResult mode_step_title_screen(ModeState *st);
 
 /* GAME_MODE_ATTRACT step (defined in attract_mode.c). Init via ModeState.attract
- * (phase = AT_MAIN) before STEP_PUSH GAME_MODE_ATTRACT — the wrapper runs the
+ * (phase = AT_MAIN) before STEP_PUSH GAME_MODE_ATTRACT, the wrapper runs the
  * one-shot setup + the blocking scene script first. Pops the button-pressed
  * flag (1 if a button ended the scene, else 0). */
 StepResult mode_step_attract_mode(ModeState *st);
@@ -2936,7 +2936,7 @@ StepResult mode_step_equip_menu(ModeState *st);
  * via STEP_PUSH from the pause menu. Always pops 0. */
 StepResult mode_step_status_menu(ModeState *st);
 
-/* GAME_MODE_SETTINGS_MENU step (defined in text.c) -- this port's own
+/* GAME_MODE_SETTINGS_MENU step (defined in text.c), this port's own
  * addition, not a ROM routine. Init with ModeState.settings_menu
  * (phase = SET_BUILD); entered via STEP_PUSH from the pause menu. Always
  * pops 0. */

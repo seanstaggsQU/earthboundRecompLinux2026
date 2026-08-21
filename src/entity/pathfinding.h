@@ -1,5 +1,5 @@
 /*
- * Pathfinding system — A*-style path computation for enemy entities.
+ * Pathfinding system, A*-style path computation for enemy entities.
  *
  * Ports of:
  *   FIND_PATH_TO_PARTY               (asm/misc/find_path_to_party.asm)
@@ -8,7 +8,7 @@
  *   INITIALIZE_PATHFINDER             (asm/overworld/pathfinding/initialize_pathfinder.asm)
  *   PATH_BFS_SEARCH                   (asm/overworld/pathfinding/path_bfs_search.asm)
  *   TRACE_PATH_ROUTE                  (asm/misc/trace_path_route.asm)
- *   COMPRESS_PATH_WAYPOINTS           (asm/misc/compress_path_waypoints.asm — misnamed file)
+ *   COMPRESS_PATH_WAYPOINTS           (asm/misc/compress_path_waypoints.asm, misnamed file)
  *   POPULATE_PATH_MATRIX              (asm/misc/populate_path_matrix.asm)
  *   INIT_PATH_MATRIX_BORDERS          (asm/misc/init_path_matrix_borders.asm)
  *   SORT_PATH_NODES                   (asm/misc/sort_path_nodes.asm)
@@ -20,7 +20,7 @@
 
 #include "core/types.h"
 
-/* ---- Structs matching assembly (include/structs.asm) ---- */
+/* Structs matching assembly (include/structs.asm) */
 
 /* pathfinder_coords: 4 bytes */
 typedef struct {
@@ -51,7 +51,7 @@ typedef struct {
     Pathfinder pathfinders[MAX_PATHFINDERS]; /* offset 160 */
 } PathfindingState;
 
-/* ---- Collision width/height tables (17 entries each) ---- */
+/* Collision width/height tables (17 entries each) */
 
 /* ENTITY_COLLISION_WIDTH_TABLE (asm/data/unknown/C42AA7.asm) */
 static const int16_t entity_collision_width_table[17] = {
@@ -63,7 +63,7 @@ static const int16_t entity_collision_height_table[17] = {
     1, 0, 1, 1, 1, 1, 1, 1, 2, 2, 0, 1, 2, 2, 2, 0, 2
 };
 
-/* ---- Public API ---- */
+/* Public API */
 
 /* Compute paths from enemy entities to the party.
  * Called by initiate_enemy_encounter() after marking battle participants.

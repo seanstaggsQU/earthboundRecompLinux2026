@@ -15,7 +15,7 @@
  *     the older slot if the newest is torn. It validates BEFORE touching any live
  *     state, so a corrupt slot never partially overwrites the running game.
  *
- * Both MUST be called at a root-loop boundary (host_root_boundary) — never mid-pump —
+ * Both MUST be called at a root-loop boundary (host_root_boundary), never mid-pump, 
  * since load replaces the mode stack wholesale. load_slots() returns false only when
  * NEITHER slot is valid. */
 bool state_dump_save_slots(void);
@@ -31,7 +31,7 @@ bool state_dump_roundtrip_test(void);
  * every directly-serialized section's live global with a sentinel between the save
  * and the load. A load that fully reconstructs state from the file (rather than
  * silently leaning on a global it never overwrites) must still re-save byte-identical.
- * Catches a section that is written but not restored on load — the failure the plain
+ * Catches a section that is written but not restored on load, the failure the plain
  * round-trip masks, since there the unchanged globals reproduce the reference anyway.
  * Approximates a cross-process (cold-boot) load in one process. Desktop-only; always
  * false on embedded. */

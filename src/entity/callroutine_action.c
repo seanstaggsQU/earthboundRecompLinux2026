@@ -1,5 +1,5 @@
 /*
- * Callroutine action script functions — entity preparation, fades, teleport.
+ * Callroutine action script functions, entity preparation, fades, teleport.
  * Extracted from callroutine.c.
  */
 #include "entity/callroutine_internal.h"
@@ -17,7 +17,7 @@
 #include "game_main.h"
 #include <string.h>
 
-/* ---- Inline switch case wrappers ---- */
+/* Inline switch case wrappers */
 
 int16_t cr_actionscript_prepare_entity(int16_t entity_offset, int16_t script_offset,
                                        uint16_t pc, uint16_t *out_pc) {
@@ -53,7 +53,7 @@ int16_t cr_actionscript_fade_out(int16_t entity_offset, int16_t script_offset,
      * Reads 2 bytes: low byte = step, high byte = delay.
      * Assembly: XBA/TAX/XBA decodes A_lo=step, X_lo=delay.
      * FADE_OUT negates step and stores into FADE_PARAMETERS.
-     * Non-blocking — NMI handler applies per-frame brightness changes. */
+     * Non-blocking, NMI handler applies per-frame brightness changes. */
     uint16_t param = sw(pc);
     *out_pc = pc + 2;
     uint8_t step = param & 0xFF;
@@ -68,7 +68,7 @@ int16_t cr_actionscript_fade_in(int16_t entity_offset, int16_t script_offset,
      * Reads 2 bytes: low byte = step, high byte = delay.
      * Assembly: XBA/TAX/XBA decodes A_lo=step, X_lo=delay.
      * FADE_IN stores step (positive) into FADE_PARAMETERS.
-     * Non-blocking — NMI handler applies per-frame brightness changes. */
+     * Non-blocking, NMI handler applies per-frame brightness changes. */
     uint16_t param = sw(pc);
     *out_pc = pc + 2;
     uint8_t step = param & 0xFF;
@@ -124,7 +124,7 @@ int16_t cr_actionscript_fade_out_with_mosaic(int16_t entity_offset, int16_t scri
      * Reads 6 bytes: three 16-bit params (step, delay, mosaic_enable).
      * Assembly: MOVEMENT_DATA_READ16 x3, then JSL FADE_OUT_WITH_MOSAIC.
      * Identical behavior to ROM_ADDR_FADE_OUT_WITH_MOSAIC (same C08814
-     * target, different wrapper address) — so it takes the same
+     * target, different wrapper address), so it takes the same
      * GAME_MODE_MOSAIC_FADE child (MF_OUT + final_hdma, which also disables
      * the HDMA window like the assembly's tail; the previously-called raw
      * fade_out_with_mosaic() loop did not). */

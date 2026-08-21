@@ -19,7 +19,7 @@
 #define FONT_CHAR_COUNT   96
 
 /* Special EB text character codes (from CHAR enum in include/macros.asm) */
-#define EB_CHAR_EQUIPPED  0x22  /* CHAR::EQUIPPED — purple oval with "E" */
+#define EB_CHAR_EQUIPPED  0x22  /* CHAR::EQUIPPED, purple oval with "E" */
 
 /* Initialize the text rendering system.
    Loads fonts from extracted assets and sets up VRAM for text display. */
@@ -119,7 +119,7 @@ typedef struct {
 void text_menus_savestate_pack(void *out);   /* out: TextMenuSaveState* */
 void text_menus_savestate_unpack(const void *in);
 
-/* --- VWF internal state (public for ending/cast name rendering + savestates) --- */
+/* VWF internal state (public for ending/cast name rendering + savestates) */
 extern uint8_t vwf_buffer[VWF_BUFFER_SIZE];
 extern uint16_t vwf_x;
 extern uint16_t vwf_tile;
@@ -131,7 +131,7 @@ extern TextRenderState text_render_state;
  * glyph_data: 1bpp glyph, height: pixel rows, width: pixel advance. */
 void blit_vwf_glyph(const uint8_t *glyph_data, uint8_t height, uint8_t width);
 
-/* --- VWF (Variable Width Font) API --- */
+/* VWF (Variable Width Font) API */
 
 /* Initialize VWF state (clear buffer, reset position) */
 void vwf_init(void);
@@ -182,7 +182,7 @@ void vwf_render_eb_string_at(const uint8_t *eb_str, int len, uint16_t x_tile,
    VWF tiles at VRAM::TEXT_LAYER_TILES + $1700 (tile index 0x2E0).
    Returns the number of VWF tile columns used (each column = 2 VRAM
    tiles for 16px fonts, 1 tile for 8px fonts).
-   Does NOT write tilemap entries — caller must do that separately. */
+   Does NOT write tilemap entries, caller must do that separately. */
 int vwf_render_to_fixed_tiles(const uint8_t *eb_str, int len, uint8_t font_id,
                                uint16_t vram_tile_base);
 
@@ -195,7 +195,7 @@ int render_title_to_vram(const char *title, uint8_t title_slot);
 /* Set VWF cursor position (in pixels) */
 void vwf_set_position(uint16_t pixel_x);
 
-/* VWF word-wrap indent flag — set when wrapping inserts an auto-newline.
+/* VWF word-wrap indent flag, set when wrapping inserts an auto-newline.
  * Port of VWF_INDENT_NEW_LINE BSS variable. */
 extern uint8_t vwf_indent_new_line;
 

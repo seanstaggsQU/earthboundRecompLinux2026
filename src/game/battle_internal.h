@@ -2,7 +2,7 @@
  * Battle system internal header.
  *
  * Shared declarations for battle sub-files (battle.c, battle_actions.c).
- * NOT for external consumers — use battle.h instead.
+ * NOT for external consumers, use battle.h instead.
  */
 #ifndef GAME_BATTLE_INTERNAL_H
 #define GAME_BATTLE_INTERNAL_H
@@ -11,7 +11,7 @@
 #include "core/math.h"
 #include "core/mode_stack.h"
 
-/* ---- RNG helpers ---- */
+/* RNG helpers */
 static inline uint8_t rand_byte(void) {
     return rng_next_byte();
 }
@@ -21,28 +21,28 @@ static inline uint16_t rand_limit(uint16_t limit) {
     return (uint16_t)(((uint32_t)rand_byte() * limit) >> 8);
 }
 
-/* ---- Targeting mode constants ---- */
+/* Targeting mode constants */
 #define TARGETTED_ALLIES  0
 #define TARGETTED_SINGLE  1
 #define TARGETTED_ROW     2
 #define TARGETTED_ALL     4
 #define TARGETTED_ENEMIES 16
 
-/* ---- EB character encoding constants ---- */
+/* EB character encoding constants */
 #define EB_CHAR_SPACE     0x50
 #define EB_CHAR_A_MINUS_1 0x70  /* CHAR::A_ - 1 = 0x71 - 1 */
 
-/* ---- Shared data tables ---- */
+/* Shared data tables */
 extern const uint16_t dead_targettable_actions[];
 extern const uint8_t *npc_ai_table;
 
-/* ---- Sound effect IDs used across battle sub-files ---- */
+/* Sound effect IDs used across battle sub-files */
 #define SFX_RECOVER_HP         36
 
-/* ---- Functions defined in battle.c, called by battle_actions.c ---- */
+/* Functions defined in battle.c, called by battle_actions.c */
 
 /* Battle scene/setup. load_battle_scene() is now GAME_MODE_LOAD_BATTLE_SCENE
- * (mode_step_load_battle_scene, battle_ui.c) — STEP_PUSHed by the Giygas
+ * (mode_step_load_battle_scene, battle_ui.c), STEP_PUSHed by the Giygas
  * cutscene battle-action steppers; the blocking form is gone. */
 void load_battle_sprite(uint16_t sprite_id);
 void setup_battle_enemy_sprites(void);
@@ -77,7 +77,7 @@ uint16_t enemy_select_mode(uint16_t current_group);
 void close_all_windows_and_hide_hppp(void);
 
 
-/* ---- Dispatch table type ---- */
+/* Dispatch table type */
 typedef struct {
     uint32_t rom_addr;
     /* Blocking inline form, used ONLY for the pure (non-yielding) actions that
@@ -93,7 +93,7 @@ typedef struct {
 /* The battle text prologue (display_in_battle_text_addr /
  * display_text_wait_addr / display_text_with_prompt_addr's front half) + a
  * DISPLAY_TEXT child init for `addr` (defined in battle.c). Returns false
- * (warn) when the address is unresolvable — the caller falls through to its
+ * (warn) when the address is unresolvable, the caller falls through to its
  * resume point inline, which runs the epilogue (dt.blinking_triangle_flag
  * clear). */
 bool battle_push_text_ex(ModeState *child, uint32_t addr, bool prompt,
@@ -135,7 +135,7 @@ void battle_recover_hp_prepare(Battler *target, uint16_t heal_amount,
 void battle_recover_pp_prepare(Battler *target, uint16_t amount,
                                BattleTailText *out);
 
-/* ---- Functions defined in battle_calc.c ---- */
+/* Functions defined in battle_calc.c */
 
 /* Build a GAME_MODE_BATTLE_CALC child init (see BattleCalcKind in
  * core/mode_stack.h for each kind's arg0/arg1 and pop value). Action steppers
@@ -166,22 +166,22 @@ void battle_increase_defense(Battler *target);
 void battle_decrease_defense(Battler *target);
 
 /* Shield handling (battle_psi_shield_nullify / battle_weaken_shield blocking
- * forms were deleted with pump_mode — STEP_PUSH BC_PSI_SHIELD_NULLIFY /
+ * forms were deleted with pump_mode, STEP_PUSH BC_PSI_SHIELD_NULLIFY /
  * BC_WEAKEN_SHIELD instead). */
 uint16_t battle_shields_common(Battler *target, uint16_t shield_type);
 uint16_t battle_get_shield_targeting(uint16_t action);
 
 /* Dodge (battle_miss_calc / battle_smaaaash blocking forms deleted with
- * pump_mode — STEP_PUSH BC_MISS_CALC / BC_SMAAAASH instead). */
+ * pump_mode, STEP_PUSH BC_MISS_CALC / BC_SMAAAASH instead). */
 uint16_t battle_determine_dodge(void);
 
 /* Damage calculation pipeline (battle_calc_damage / battle_calc_resist_damage /
- * battle_level_[1-4]_attack blocking forms deleted with pump_mode — STEP_PUSH
+ * battle_level_[1-4]_attack blocking forms deleted with pump_mode, STEP_PUSH
  * BC_CALC_DAMAGE / BC_RESIST_DAMAGE / the btlact_level_N_attack steppers). */
 uint16_t battle_get_action_type(uint16_t action_id);
 
 /* Status/HP helpers (battle_heal_strangeness / battle_fail_attack_on_npcs
- * blocking forms deleted with pump_mode — STEP_PUSH BC_HEAL_STRANGENESS /
+ * blocking forms deleted with pump_mode, STEP_PUSH BC_HEAL_STRANGENESS /
  * BC_FAIL_ON_NPCS instead). */
 void battle_lose_hp_status(Battler *target, uint16_t amount);
 void recalc_character_miss_rate(uint16_t character_id);
@@ -194,7 +194,7 @@ void recalc_character_miss_rate(uint16_t character_id);
 uint16_t char_select_overworld_prepare(void (*on_change)(uint16_t));
 void char_select_overworld_finish(uint16_t window_id, bool had_on_change);
 
-/* ---- Functions defined in battle_targeting.c ---- */
+/* Functions defined in battle_targeting.c */
 
 /* Target selection UI */
 void choose_target(uint16_t attacker_offset);
@@ -225,7 +225,7 @@ void battle_target_allies(void);
 void battle_remove_npc_targeting(void);
 void battle_feeling_strange_retargeting(void);
 
-/* ---- Functions defined in battle_psi.c ---- */
+/* Functions defined in battle_psi.c */
 
 bool ensure_battle_psi_table(void);
 uint16_t check_character_has_psi_ability(uint16_t char_id,
@@ -240,7 +240,7 @@ void show_psi_animation(uint16_t anim_id);
 void update_psi_animation(void);
 void apply_psi_battle_effect(uint16_t effect_id);
 
-/* ---- Functions defined in battle_ui.c ---- */
+/* Functions defined in battle_ui.c */
 
 /* Sprite palette effects */
 void setup_battle_sprite_palette_effect(uint16_t palette_index,
@@ -279,7 +279,7 @@ void initialize_battle_ui_state(void);
 void update_battle_screen_effects(void);
 void wait_and_update_battle_effects(void);
 
-/* ---- Functions defined in battle_actions.c, called by battle.c ---- */
+/* Functions defined in battle_actions.c, called by battle.c */
 
 /* Action dispatch: jump_temp_function_pointer / battle_action_dispatch are
  * declared in battle.h (text.c needs them too). */

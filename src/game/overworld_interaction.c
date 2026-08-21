@@ -2,17 +2,17 @@
  * Overworld interaction and dialogue functions.
  *
  * Ported from:
- *   DISPLAY_TEXT_AND_WAIT_FOR_FADE       — asm/overworld/display_text_and_wait_for_fade.asm
- *   PROCESS_QUEUED_INTERACTIONS          — asm/overworld/process_queued_interactions.asm
- *   RELOAD_HOTSPOTS                      — asm/overworld/reload_hotspots.asm
- *   ACTIVATE_HOTSPOT                     — asm/overworld/activate_hotspot.asm
- *   CREATE_PREPARED_ENTITY_NPC           — asm/overworld/create_prepared_entity_npc.asm
- *   SET_ENTITY_DIRECTION_FROM_LEADER     — C042C2
- *   FIND_ADJACENT_NPC_INTERACTION        — C041E3
- *   FIND_NEARBY_TALKABLE_TPT_ENTRY       — find_nearby_talkable_tpt_entry.asm
- *   FIND_NEARBY_CHECKABLE_TPT_ENTRY      — find_nearby_checkable_tpt_entry.asm
- *   TALK_TO                              — asm/overworld/talk_to.asm
- *   CHECK                                — asm/overworld/check.asm
+ *   DISPLAY_TEXT_AND_WAIT_FOR_FADE: asm/overworld/display_text_and_wait_for_fade.asm
+ *   PROCESS_QUEUED_INTERACTIONS: asm/overworld/process_queued_interactions.asm
+ *   RELOAD_HOTSPOTS: asm/overworld/reload_hotspots.asm
+ *   ACTIVATE_HOTSPOT: asm/overworld/activate_hotspot.asm
+ *   CREATE_PREPARED_ENTITY_NPC: asm/overworld/create_prepared_entity_npc.asm
+ *   SET_ENTITY_DIRECTION_FROM_LEADER: C042C2
+ *   FIND_ADJACENT_NPC_INTERACTION: C041E3
+ *   FIND_NEARBY_TALKABLE_TPT_ENTRY: find_nearby_talkable_tpt_entry.asm
+ *   FIND_NEARBY_CHECKABLE_TPT_ENTRY: find_nearby_checkable_tpt_entry.asm
+ *   TALK_TO: asm/overworld/talk_to.asm
+ *   CHECK: asm/overworld/check.asm
  */
 
 #include "game/overworld_internal.h"
@@ -45,7 +45,7 @@
 #define NPC_TYPE_ITEM_BOX 2
 #define NPC_TYPE_OBJECT   3
 
-/* GAME_MODE_TEXT_WAIT_FADE step — the run-to-completion form of
+/* GAME_MODE_TEXT_WAIT_FADE step, the run-to-completion form of
  * display_text_and_wait_for_fade(). Each phase STEP_PUSHes the next child so the
  * whole interaction (dialogue + entity fade-out wait) lives on the mode stack
  * instead of the C stack, keeping a savestate taken mid-dialogue serializable.
@@ -106,7 +106,7 @@ static void process_interaction_finish(ProcessInteractionState *s) {
     ow.current_queued_interaction_type = 0xFFFF;
 }
 
-/* GAME_MODE_PROCESS_INTERACTION step — run-to-completion form of
+/* GAME_MODE_PROCESS_INTERACTION step, run-to-completion form of
  * process_queued_interactions(). The text-interaction dispatch (types 0/8/9/10)
  * STEP_PUSHes GAME_MODE_TEXT_WAIT_FADE and the door type (2) STEP_PUSHes
  * GAME_MODE_DOOR_TRANSITION, so the dialogue / door transition lives on the mode
@@ -163,7 +163,7 @@ StepResult mode_step_process_interaction(ModeState *st) {
             break;
         }
 
-        /* Non-text / unknown types: no pushed child — finish inline with no extra
+        /* Non-text / unknown types: no pushed child, finish inline with no extra
          * yield, exactly as the blocking original did. */
         process_interaction_finish(s);
         return STEP_RESULT_POP(0);
@@ -432,7 +432,7 @@ uint32_t talk_to(void) {
         return 0;
 
     if (ow.interacting_npc_id == 0xFFFE) {
-        /* Door — use MAP_OBJECT_TEXT */
+        /* Door, use MAP_OBJECT_TEXT */
         return ow.map_object_text;
     }
 
@@ -470,7 +470,7 @@ uint32_t check_action(void) {
         return 0;
 
     if (ow.interacting_npc_id == 0xFFFE) {
-        /* Door — use MAP_OBJECT_TEXT */
+        /* Door, use MAP_OBJECT_TEXT */
         return ow.map_object_text;
     }
 
@@ -479,7 +479,7 @@ uint32_t check_action(void) {
 
     switch (npc_type) {
     case NPC_TYPE_PERSON:
-        /* Can't CHECK a person — assembly returns NULL */
+        /* Can't CHECK a person, assembly returns NULL */
         break;
 
     case NPC_TYPE_ITEM_BOX: {

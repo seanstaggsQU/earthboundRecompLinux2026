@@ -1,5 +1,5 @@
 /*
- * Pathfinding system — A*-style path computation for enemy entities.
+ * Pathfinding system, A*-style path computation for enemy entities.
  * See pathfinding.h for the list of ported assembly routines.
  */
 
@@ -17,7 +17,7 @@
 #define READ_PARTY_SLOT(i) \
     read_u16_le(&game_state.party_entity_slots[(i)*2])
 
-/* ---- Pathfinding heap (bump allocator in PATHFINDING_BUFFER, 0xC00 bytes) ---- */
+/* Pathfinding heap (bump allocator in PATHFINDING_BUFFER, 0xC00 bytes) */
 
 #define PF_HEAP_SIZE 0xC00
 
@@ -38,7 +38,7 @@ static uint16_t pf_heap_alloc(uint16_t size_words) {
     return result;
 }
 
-/* ---- Path matrix (collision grid, stored in ert.buffer[0x3000]) ---- */
+/* Path matrix (collision grid, stored in ert.buffer[0x3000]) */
 
 /* The collision matrix is a byte array: each cell is one byte.
  * Values: 0xFD(-3)=wall, 0xFE(-2)=unvisited, 0xFF(-1)=target,
@@ -78,7 +78,7 @@ static uint16_t search_queue_end;
 static uint16_t search_queue_read;
 static uint16_t search_queue_write;
 
-/* ---- INIT_PATH_MATRIX_BORDERS (C4B7A5) ---- */
+/* INIT_PATH_MATRIX_BORDERS (C4B7A5) */
 
 static void init_path_matrix_borders(void) {
     /* Mark first and last column of each row as walls */
@@ -104,7 +104,7 @@ static void init_path_matrix_borders(void) {
     }
 }
 
-/* ---- SORT_PATH_NODES (C4B859) — selection sort by (hitbox.y, hitbox.x) ---- */
+/* SORT_PATH_NODES (C4B859), selection sort by (hitbox.y, hitbox.x) */
 
 /* Sorts an array of pathfinder indices by their hitbox.y (primary, ascending)
  * then hitbox.x (secondary, ascending). Uses selection sort.
@@ -152,7 +152,7 @@ static void sort_path_nodes(PathfindingState *state, uint16_t *sorted_indices,
     }
 }
 
-/* ---- POPULATE_PATH_MATRIX (C4B923) ---- */
+/* POPULATE_PATH_MATRIX (C4B923) */
 
 /* For each pathfinder entity, marks its area in the collision grid.
  * If from_offscreen == 0, marks just the origin cell.
@@ -215,7 +215,7 @@ static void populate_path_matrix(PathfindingState *state, uint16_t *sorted_indic
     }
 }
 
-/* ---- PATH_BFS_SEARCH (C4BAF6) ---- */
+/* PATH_BFS_SEARCH (C4BAF6) */
 
 /* BFS flood-fill from target positions. Expands wavefront through the grid,
  * marking each cell with its distance from the nearest target.
@@ -283,7 +283,7 @@ static void path_bfs_search(PathfindingState *state, int16_t pathfinder_idx,
         }
 
         if (!passable) {
-            /* Wall in hitbox — mark as VISITED and skip */
+            /* Wall in hitbox, mark as VISITED and skip */
             path_matrix[node_idx] = PATH_CELL_VISITED;
             continue;
         }
@@ -310,7 +310,7 @@ static void path_bfs_search(PathfindingState *state, int16_t pathfinder_idx,
             uint8_t nval = path_matrix[neighbor];
 
             if (nval >= PATH_CELL_UNVISITED) {
-                /* Unvisited or target — enqueue if queue not full */
+                /* Unvisited or target, enqueue if queue not full */
                 int queue_full;
                 if (search_queue_read == search_queue_start) {
                     queue_full = (search_queue_write == search_queue_end) ? 1 : 0;
@@ -326,8 +326,8 @@ static void path_bfs_search(PathfindingState *state, int16_t pathfinder_idx,
                         search_queue_write++;
                 }
             } else {
-                /* Already visited — track minimum cost neighbor.
-                 * Assembly: BLTEQ @NEXT_NEIGHBOR — skips if min_neighbor <= nval */
+                /* Already visited, track minimum cost neighbor.
+                 * Assembly: BLTEQ @NEXT_NEIGHBOR, skips if min_neighbor <= nval */
                 if (nval < min_neighbor)
                     min_neighbor = nval;
             }
@@ -335,7 +335,7 @@ static void path_bfs_search(PathfindingState *state, int16_t pathfinder_idx,
 
         /* Set this cell's cost */
         if (min_neighbor == PATH_CELL_VISITED) {
-            /* No lower-cost neighbor found — this is a start cell (cost 0) */
+            /* No lower-cost neighbor found, this is a start cell (cost 0) */
             path_matrix[node_idx] = PATH_CELL_EMPTY;
         } else {
             uint8_t cost = (uint8_t)(min_neighbor + 1);
@@ -363,7 +363,7 @@ static void path_bfs_search(PathfindingState *state, int16_t pathfinder_idx,
     }
 }
 
-/* ---- TRACE_PATH_ROUTE (C4BD9A) ---- */
+/* TRACE_PATH_ROUTE (C4BD9A) */
 
 /* Traces a path from a cell backward through the BFS cost gradient.
  * Returns the number of waypoints stored. */
@@ -411,7 +411,7 @@ static int16_t trace_path_route(int16_t start_y, int16_t start_x,
             uint8_t nval = path_matrix[ncell];
 
             if (nval != cost) {
-                /* Not a matching cardinal — update dir and continue */
+                /* Not a matching cardinal, update dir and continue */
                 dir = next_dir;
                 last_dir++;
                 continue;
@@ -466,7 +466,7 @@ static int16_t trace_path_route(int16_t start_y, int16_t start_x,
             cur_x = best_cardinal_x;
             last_dir = best_cardinal_dir;
         } else {
-            /* No valid move — path ends */
+            /* No valid move, path ends */
             break;
         }
 
@@ -483,7 +483,7 @@ static int16_t trace_path_route(int16_t start_y, int16_t start_x,
     return waypoint_count;
 }
 
-/* ---- COMPRESS_PATH_WAYPOINTS (C4BF7F) ---- */
+/* COMPRESS_PATH_WAYPOINTS (C4BF7F) */
 
 /* Removes collinear intermediate waypoints from a path.
  * Returns the compressed waypoint count. */
@@ -509,11 +509,11 @@ static int16_t compress_path_waypoints(PathfinderCoords *waypoints, int16_t coun
         int16_t new_dy = cur_y - prev_y;
 
         if (new_dx == dx && new_dy == dy) {
-            /* Same direction — update the last kept waypoint in-place */
+            /* Same direction, update the last kept waypoint in-place */
             waypoints[out_count].x = cur_x;
             waypoints[out_count].y = cur_y;
         } else {
-            /* Direction changed — emit a new waypoint */
+            /* Direction changed, emit a new waypoint */
             out_count++;
             waypoints[out_count].x = cur_x;
             waypoints[out_count].y = cur_y;
@@ -528,7 +528,7 @@ static int16_t compress_path_waypoints(PathfinderCoords *waypoints, int16_t coun
     return out_count + 1;
 }
 
-/* ---- INITIALIZE_PATHFINDER (C4B59F) ---- */
+/* INITIALIZE_PATHFINDER (C4B59F) */
 
 /* Main pathfinding orchestrator. Sets up the grid, runs BFS for each group
  * of pathfinders, traces routes, and stores compressed waypoints.
@@ -544,7 +544,7 @@ static int16_t initialize_pathfinder(PathfindingState *state,
                                      int16_t max_steps,
                                      int16_t bfs_max_iterations,
                                      int16_t queue_alloc_size) {
-    /* Initialize heap — overlay onto ert.buffer[BUF_PF_HEAP] to save static RAM */
+    /* Initialize heap, overlay onto ert.buffer[BUF_PF_HEAP] to save static RAM */
     pf_heap = (uint16_t *)&ert.buffer[BUF_PF_HEAP];
     pf_heap_start = 0;
     pf_heap_current = 0;
@@ -677,7 +677,7 @@ static int16_t initialize_pathfinder(PathfindingState *state,
     return success_count;
 }
 
-/* ---- CALCULATE_PATHFINDING_TARGETS (C0B9BC) ---- */
+/* CALCULATE_PATHFINDING_TARGETS (C0B9BC) */
 
 /* Compute grid-relative coordinates for each party member.
  * origin_x: grid origin X in tile coords (subtracted from absolute tile X).
@@ -707,7 +707,7 @@ static void calculate_pathfinding_targets(PathfindingState *state,
     }
 }
 
-/* ---- INITIALIZE_PATHFINDING_FOR_ENTITIES (C0BA35) ---- */
+/* INITIALIZE_PATHFINDING_FOR_ENTITIES (C0BA35) */
 
 /* Build collision grid, set up pathfinder entries for each entity with
  * pathfinding_state == -1, then run the pathfinder.
@@ -802,7 +802,7 @@ static int16_t initialize_pathfinding_for_entities(
     /* In the C port this is synchronous, so no waiting needed */
 
     if (result == 0) {
-        /* Pathfinding failed — set all entities to state 1 (request reset) */
+        /* Pathfinding failed, set all entities to state 1 (request reset) */
         for (int16_t slot = 0; slot < MAX_ENTITIES; slot++) {
             int16_t ent = ENT(slot);
             if (entities.script_table[ent] != -1)
@@ -823,7 +823,7 @@ static int16_t initialize_pathfinding_for_entities(
         int16_t ent = ENT(slot);
 
         if (pf->path_point_count == 0) {
-            /* No path found — set pathfinding state to 1 */
+            /* No path found, set pathfinding state to 1 */
             entities.pathfinding_states[ent] = 1;
         } else {
             /* Copy waypoints from pf_heap to ert.delivery_paths */
@@ -848,7 +848,7 @@ static int16_t initialize_pathfinding_for_entities(
     return 0;
 }
 
-/* ---- FIND_PATH_TO_PARTY (asm/misc/find_path_to_party.asm) ---- */
+/* FIND_PATH_TO_PARTY (asm/misc/find_path_to_party.asm) */
 
 PathfindingState *find_path_to_party(int16_t party_count, int16_t radius_x,
                                      int16_t radius_y) {
@@ -893,7 +893,7 @@ PathfindingState *find_path_to_party(int16_t party_count, int16_t radius_x,
     return &state;
 }
 
-/* ---- PATHFIND_TO_CURRENT_ENTITY (asm/overworld/pathfinding/pathfind_to_current_entity.asm) ---- */
+/* PATHFIND_TO_CURRENT_ENTITY (asm/overworld/pathfinding/pathfind_to_current_entity.asm) */
 
 /* Runs pathfinding from offscreen TO the current entity's position.
  * Sets up a 56×56 tile grid centred on the current entity.
@@ -913,7 +913,7 @@ int16_t pathfind_to_current_entity(void) {
     ert.pathfinding_target_width  = half_w;
     ert.pathfinding_target_height = half_h;
 
-    /* Get current entity (the delivery man — the pathfinding destination) */
+    /* Get current entity (the delivery man, the pathfinding destination) */
     int16_t cur_slot = ert.current_entity_slot;
     int16_t cur_ent  = ENT(cur_slot);
     int16_t cur_size = entities.sizes[cur_ent];
@@ -929,7 +929,7 @@ int16_t pathfind_to_current_entity(void) {
     int16_t origin_x = tile_x - half_w;
     int16_t origin_y = tile_y - half_h;
 
-    /* The target is the current entity — grid centre (half_w, half_h).
+    /* The target is the current entity, grid centre (half_w, half_h).
      * Assembly stores: targets[0].x = half_w & 0x3F, targets[0].y = half_h & 0x3F */
     state.targets[0].x = half_w & 0x3F;
     state.targets[0].y = half_h & 0x3F;
@@ -943,7 +943,7 @@ int16_t pathfind_to_current_entity(void) {
     );
 }
 
-/* ---- PATHFIND_TO_PARTY_LEADER (asm/overworld/pathfinding/pathfind_to_party_leader.asm) ---- */
+/* PATHFIND_TO_PARTY_LEADER (asm/overworld/pathfinding/pathfind_to_party_leader.asm) */
 
 /* Runs pathfinding from offscreen TO the party leader (and all party members).
  * Sets up a 56×56 tile grid centred on the leader.
@@ -981,7 +981,7 @@ int16_t pathfind_to_party_leader(void) {
     int16_t origin_y = tile_y - half_h;
 
     /* Calculate grid-relative positions for all party members as targets.
-     * party_count = 1 (only the leader — index 0 in party_entity_slots). */
+     * party_count = 1 (only the leader, index 0 in party_entity_slots). */
     calculate_pathfinding_targets(&state, 1, origin_x, origin_y);
 
     /* Run pathfinding: 1 target, from_offscreen=1, max_steps=252, queue_alloc=50 */

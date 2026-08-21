@@ -126,7 +126,7 @@ static void load_town_map_finish(uint16_t map_index) {
     /* Load icon palette to palette groups 8+.
      * Assembly copies BPP4PALETTE_SIZE*8=256 bytes, but the actual palette file
      * is only 64 bytes (2 sub-ert.palettes). The remaining bytes would read into
-     * adjacent ROM data — harmless since palette groups 10-15 are unused. */
+     * adjacent ROM data, harmless since palette groups 10-15 are unused. */
     size_t pal_size = ASSET_SIZE(ASSET_TOWN_MAPS_ICON_PAL);
     const uint8_t *icon_pal = ASSET_DATA(ASSET_TOWN_MAPS_ICON_PAL);
     if (icon_pal) {
@@ -362,7 +362,7 @@ static void render_town_map_icons(uint16_t map_index) {
 }
 
 /*
- * GAME_MODE_TOWN_MAP step — run-to-completion driver shared by display_town_map()
+ * GAME_MODE_TOWN_MAP step, run-to-completion driver shared by display_town_map()
  * and run_town_map_menu(). See the TownMapState comment in mode_stack.h. The
  * single host_process_frame() yield is owned by the pump, so this body never
  * calls wait_for_vblank().
@@ -378,7 +378,7 @@ StepResult mode_step_town_map(ModeState *st) {
         return STEP_RESULT_CONTINUE();
 
     case TM_LOAD_WAIT:
-        /* Former bare while(fade_active()) wait_for_vblank() — each CONTINUE
+        /* Former bare while(fade_active()) wait_for_vblank(), each CONTINUE
          * yields, advancing the fade via host_process_frame(). */
         if (fade_active())
             return STEP_RESULT_CONTINUE();
@@ -469,7 +469,7 @@ StepResult mode_step_town_map(ModeState *st) {
  * (static to this TU) and returns the map_id to display (0 = none). When non-zero,
  * fills *init with the TOWN_MAP display push; the caller STEP_PUSHes
  * GAME_MODE_TOWN_MAP and returns map_id as the event result. (Unlike
- * show_town_map_prepare, there is no Town Map item check or entity disable here —
+ * show_town_map_prepare, there is no Town Map item check or entity disable here, 
  * the event version is unconditional, matching the assembly.)
  */
 uint16_t display_town_map_prepare(ModeState *init) {

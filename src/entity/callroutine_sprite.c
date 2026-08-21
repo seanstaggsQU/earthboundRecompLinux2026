@@ -1,5 +1,5 @@
 /*
- * Callroutine entity sprite functions — direction, frame, animation, collision.
+ * Callroutine entity sprite functions, direction, frame, animation, collision.
  * Extracted from callroutine.c.
  */
 #include "entity/callroutine_internal.h"
@@ -21,7 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ---- Static cr_* functions moved from callroutine.c ---- */
+/* Static cr_* functions moved from callroutine.c */
 
 /*
  * CR_SET_ENTITY_DIRECTION_AND_FRAME (C0AA6E)
@@ -54,8 +54,8 @@ int16_t cr_set_entity_direction_and_frame(int16_t ent, int16_t scr,
  * CR_DEALLOCATE_ENTITY_SPRITE (C020F1)
  *
  * Faithful port of DEALLOCATE_ENTITY_SPRITE:
- *   1. CLEAR_SPRITEMAP_SLOTS — free overworld spritemap ert.buffer entries
- *   2. ALLOC_SPRITE_MEM(0) — free sprite VRAM allocation
+ *   1. CLEAR_SPRITEMAP_SLOTS, free overworld spritemap ert.buffer entries
+ *   2. ALLOC_SPRITE_MEM(0), free sprite VRAM allocation
  *   3. Set ENTITY_SPRITE_IDS = -1  (prevents stale sprite_id matches)
  *   4. Set ENTITY_NPC_IDS = -1
  *
@@ -78,11 +78,11 @@ int16_t cr_deallocate_entity_sprite(int16_t ent, int16_t scr,
         }
     }
 
-    /* ASM line 14-16: ALLOC_SPRITE_MEM(ert.current_entity_slot, 0) — free VRAM slots
+    /* ASM line 14-16: ALLOC_SPRITE_MEM(ert.current_entity_slot, 0), free VRAM slots
      * by searching for entries tagged with this entity's ID. */
     alloc_sprite_mem((uint16_t)ert.current_entity_slot, 0);
 
-    /* Assembly lines 17-22: if NPC ID upper bits == 0x8000, it's an enemy —
+    /* Assembly lines 17-22: if NPC ID upper bits == 0x8000, it's an enemy, 
      * decrement ow.overworld_enemy_count. */
     if ((entities.npc_ids[offset] & 0xF000) == 0x8000) {
         ow.overworld_enemy_count--;
@@ -134,7 +134,7 @@ int16_t cr_is_y_less_than_entity(int16_t ent, int16_t scr,
 }
 
 /*
- * CR_CLEAR_LOOP_COUNTER (C0AAFD) — MOVEMENT_CMD_CLEAR_LOOP_COUNTER
+ * CR_CLEAR_LOOP_COUNTER (C0AAFD), MOVEMENT_CMD_CLEAR_LOOP_COUNTER
  *
  * Stores 0 at script data offset $0C (the loop counter used by var[6]).
  * Assembly: LDA #$0000 / LDY #$000C / STA ($84),Y / RTL
@@ -144,14 +144,14 @@ int16_t cr_clear_loop_counter(int16_t ent, int16_t scr,
     *out_pc = pc;
     /* Assembly: LDA #$0000 / LDY #$000C / STA ($84),Y
      * Clears the loop counter at script stack offset $0C.
-     * (NOT entities.var[6] — that's the movement target X coordinate.) */
+     * (NOT entities.var[6], that's the movement target X coordinate.) */
     scripts.stack[scr][12] = 0;
     scripts.stack[scr][13] = 0;
     return 0;
 }
 
 /*
- * CR_MOVEMENT_LOOP (C0AAD5) — MOVEMENT_CMD_LOOP
+ * CR_MOVEMENT_LOOP (C0AAD5), MOVEMENT_CMD_LOOP
  *
  * Reads 3 parameter bytes: 1-byte loop count + 2-byte target address.
  * Uses entity var[6] as the loop counter.
@@ -230,12 +230,12 @@ int16_t cr_render_entity_sprite_me1(int16_t ent, int16_t scr,
  * then checks if entity is on screen relative to leader position.
  *
  * ROM flow:
- *   1. STZ ENTITY_ANIMATION_FRAME,X — reset animation frame
- *   2. JSL RENDER_ENTITY_SPRITE_ENTRY3 — render with frame 0
- *   3. JSL IS_ENTITY_NEAR_LEADER — check if entity is near leader (on screen)
- *   4. RTL — return on-screen result
+ *   1. STZ ENTITY_ANIMATION_FRAME,X, reset animation frame
+ *   2. JSL RENDER_ENTITY_SPRITE_ENTRY3, render with frame 0
+ *   3. JSL IS_ENTITY_NEAR_LEADER, check if entity is near leader (on screen)
+ *   4. RTL, return on-screen result
  *
- * Return value is CRITICAL — feeds into tempvar for EVENT_SHORTCALL_CONDITIONAL_NOT
+ * Return value is CRITICAL, feeds into tempvar for EVENT_SHORTCALL_CONDITIONAL_NOT
  * loop. Returns -1 if entity is on screen, 0 if off screen.
  *
  * IS_ENTITY_NEAR_LEADER checks:
@@ -247,7 +247,7 @@ int16_t cr_reset_entity_animation(int16_t ent, int16_t scr,
                                   uint16_t pc, uint16_t *out_pc) {
     *out_pc = pc;
 
-    /* ASM line 4: STZ ENTITY_ANIMATION_FRAME,X — reset animation frame to 0 */
+    /* ASM line 4: STZ ENTITY_ANIMATION_FRAME,X, reset animation frame to 0 */
     entities.animation_frame[ent] = 0;
 
     /* ASM line 5: JSL RENDER_ENTITY_SPRITE_ENTRY3
@@ -255,7 +255,7 @@ int16_t cr_reset_entity_animation(int16_t ent, int16_t scr,
      * if on screen → uploads tiles to VRAM via SETUP_AND_RENDER. */
     render_entity_sprite(ent);
 
-    /* ASM line 6: JSL IS_ENTITY_NEAR_LEADER — return on-screen result */
+    /* ASM line 6: JSL IS_ENTITY_NEAR_LEADER, return on-screen result */
     /* During fast teleportation, always treat entities as on-screen */
     if (ow.psi_teleport_speed_int >= 4)
         return -1;
@@ -271,7 +271,7 @@ int16_t cr_reset_entity_animation(int16_t ent, int16_t scr,
     return 0;  /* off screen */
 }
 
-/* ---- Inline switch case wrappers ---- */
+/* Inline switch case wrappers */
 
 int16_t cr_initialize_party_member_entity(int16_t entity_offset, int16_t script_offset,
                                           uint16_t pc, uint16_t *out_pc) {
@@ -290,7 +290,7 @@ int16_t cr_initialize_party_member_entity(int16_t entity_offset, int16_t script_
     /* Force animation re-render on next UPDATE_ENTITY_ANIMATION call */
     entities.animation_fingerprints[offset] = -1;
 
-    /* var3 = 8 (animation period — frames between walk frame toggles) */
+    /* var3 = 8 (animation period, frames between walk frame toggles) */
     entities.var[3][offset] = 8;
 
     /* var2 = random 0-15 (staggered start so party members don't
@@ -300,7 +300,7 @@ int16_t cr_initialize_party_member_entity(int16_t entity_offset, int16_t script_
     /* In ROM, calls UPDATE_ENTITY_SPRITE (JSL C0A780) which renders
      * the sprite for the current direction, sets use_8dir_sprites = 1,
      * and uploads initial sprite tiles to VRAM. This does NOT modify
-     * ENTITY_ANIMATION_FRAME — the entity stays hidden (animation_frame=-1)
+     * ENTITY_ANIMATION_FRAME: the entity stays hidden (animation_frame=-1)
      * until a SET_ANIMATION opcode in the event script makes it visible. */
     update_entity_sprite(offset);
 
@@ -334,7 +334,7 @@ int16_t cr_update_follower_visuals(int16_t entity_offset, int16_t script_offset,
     /* Port of C04EF0 UPDATE_FOLLOWER_VISUALS.
      * Called once during EVENT_002 (party follower) init to set follower entity direction,
      * surface_flags, graphics pointers, walking_style, and var7 flags
-     * from the position ert.buffer. Not per-frame — update_follower_state
+     * from the position ert.buffer. Not per-frame, update_follower_state
      * (tick callback) handles the per-frame updates. */
     update_follower_visuals(entity_offset);
     *out_pc = pc;
@@ -343,7 +343,7 @@ int16_t cr_update_follower_visuals(int16_t entity_offset, int16_t script_offset,
 
 int16_t cr_sram_check_routine_checksum(int16_t entity_offset, int16_t script_offset,
                                        uint16_t pc, uint16_t *out_pc) {
-    /* No-op in C port — SRAM checksum verification (C1FFD3).
+    /* No-op in C port, SRAM checksum verification (C1FFD3).
      * The ROM verifies save data integrity on each frame. The C port
      * uses its own save system, making this permanently unnecessary. */
     *out_pc = pc;

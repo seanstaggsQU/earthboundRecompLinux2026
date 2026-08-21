@@ -1,5 +1,5 @@
 /*
- * gen_struct_info.c — Build-time tool that emits JSON struct metadata.
+ * gen_struct_info.c, Build-time tool that emits JSON struct metadata.
  *
  * Compiled and run by CMake to produce struct_info.json, which the
  * ebtools analyze-dump command uses to decode state dump files.
@@ -51,7 +51,7 @@
            #fname, offsetof(stype, fname), sizeof(((stype *)0)->fname), sizeof(((stype *)0)->fname))
 
 /*
- * LAST_FIELD — compile-time assertion that fname is near the end of stype.
+ * LAST_FIELD: compile-time assertion that fname is near the end of stype.
  * Catches missing fields when a struct grows.
  */
 #define LAST_FIELD_TOLERANCE 7
@@ -59,19 +59,19 @@
 #define LAST_FIELD(stype, fname, tstr) \
     _Static_assert(offsetof(stype, fname) + sizeof(((stype *)0)->fname) + \
         LAST_FIELD_TOLERANCE >= sizeof(stype), \
-        #stype "." #fname " is not the last field — update gen_struct_info.c"); \
+        #stype "." #fname " is not the last field, update gen_struct_info.c"); \
     FIELD(stype, fname, tstr)
 
 #define LAST_AFIELD(stype, fname, tstr, decoder) \
     _Static_assert(offsetof(stype, fname) + sizeof(((stype *)0)->fname) + \
         LAST_FIELD_TOLERANCE >= sizeof(stype), \
-        #stype "." #fname " is not the last field — update gen_struct_info.c"); \
+        #stype "." #fname " is not the last field, update gen_struct_info.c"); \
     AFIELD(stype, fname, tstr, decoder)
 
 #define LAST_BLOB_FIELD(stype, fname) \
     _Static_assert(offsetof(stype, fname) + sizeof(((stype *)0)->fname) + \
         LAST_FIELD_TOLERANCE >= sizeof(stype), \
-        #stype "." #fname " is not the last field — update gen_struct_info.c"); \
+        #stype "." #fname " is not the last field, update gen_struct_info.c"); \
     BLOB_FIELD(stype, fname)
 
 /* Macro for emitting enum entries in the "enums" JSON section */
@@ -90,7 +90,7 @@ int main(void) {
     printf("{\n  \"version\": 1,\n  \"sections\": {\n");
 
     /* ================================================================
-     * SECTION_CORE (0x0001) — CoreState
+     * SECTION_CORE (0x0001), CoreState
      * ================================================================ */
     BEGIN_SECTION("CORE", 1, CoreState);
     FIELD(CoreState, pad1_raw, "u16"); SEP();
@@ -112,7 +112,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_GAME_STATE (0x0002) — GameState (packed)
+     * SECTION_GAME_STATE (0x0002), GameState (packed)
      * ================================================================ */
     BEGIN_SECTION("GAME_STATE", 2, GameState);
     AFIELD(GameState, mother2_playername, "u8[12]", "eb_text"); SEP();
@@ -174,7 +174,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_PARTY_CHARACTERS (0x0003) — CharStruct[6] (packed)
+     * SECTION_PARTY_CHARACTERS (0x0003), CharStruct[6] (packed)
      * Emit fields for a single CharStruct; the section contains 6.
      * ================================================================ */
     {
@@ -242,7 +242,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_EVENT_FLAGS (0x0004) — uint8_t[128]
+     * SECTION_EVENT_FLAGS (0x0004), uint8_t[128]
      * ================================================================ */
     {
         printf("    \"EVENT_FLAGS\": {\n");
@@ -256,7 +256,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_OVERWORLD (0x0005) — OverworldState
+     * SECTION_OVERWORLD (0x0005), OverworldState
      * ================================================================ */
     BEGIN_SECTION("OVERWORLD", 5, OverworldState);
     FIELD(OverworldState, npc_spawns_enabled, "u8"); SEP();
@@ -373,7 +373,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_BATTLE (0x0006) — BattleState
+     * SECTION_BATTLE (0x0006), BattleState
      * ================================================================ */
     BEGIN_SECTION("BATTLE", 6, BattleState);
     BLOB_FIELD(BattleState, battlers_table); SEP();
@@ -476,7 +476,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_DISPLAY_TEXT (0x0007) — DisplayTextState
+     * SECTION_DISPLAY_TEXT (0x0007), DisplayTextState
      * ================================================================ */
     BEGIN_SECTION("DISPLAY_TEXT", 7, DisplayTextState);
     FIELD(DisplayTextState, text_speed_based_wait, "u16"); SEP();
@@ -515,7 +515,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_WINDOW (0x0008) — WindowSystemState
+     * SECTION_WINDOW (0x0008), WindowSystemState
      * ================================================================ */
     BEGIN_SECTION("WINDOW", 8, WindowSystemState);
     FIELD(WindowSystemState, current_focus_window, "u16"); SEP();
@@ -537,7 +537,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_MAP_LOADER (0x0009) — MapLoaderState
+     * SECTION_MAP_LOADER (0x0009), MapLoaderState
      * ================================================================ */
     BEGIN_SECTION("MAP_LOADER", 9, MapLoaderState);
     FIELD(MapLoaderState, current_sector_attributes, "u16"); SEP();
@@ -571,7 +571,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_PPU (0x000A) — PPUState
+     * SECTION_PPU (0x000A), PPUState
      * ================================================================ */
     BEGIN_SECTION("PPU", 10, PPUState);
     BLOB_FIELD(PPUState, vram); SEP();
@@ -616,7 +616,7 @@ int main(void) {
     FIELD(PPUState, sprite_x_offset, "i16"); SEP();
     FIELD(PPUState, sprite_y_offset, "i16"); SEP();
     /* Per-scanline HDMA scratch (EB_VIEWPORT_HEIGHT-sized, viewport-dependent). Kept
-     * last in PPUState and excluded from the savestate — see snes/ppu.h. */
+     * last in PPUState and excluded from the savestate, see snes/ppu.h. */
     BLOB_FIELD(PPUState, wh0_table); SEP();
     BLOB_FIELD(PPUState, wh1_table); SEP();
     BLOB_FIELD(PPUState, wh2_table); SEP();
@@ -628,7 +628,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_POSITION_BUFFER (0x000B) — PositionBufferState
+     * SECTION_POSITION_BUFFER (0x000B), PositionBufferState
      * ================================================================ */
     BEGIN_SECTION("POSITION_BUFFER", 11, PositionBufferState);
     BLOB_FIELD(PositionBufferState, player_position_buffer); SEP();
@@ -642,7 +642,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_DOOR (0x000C) — DoorState
+     * SECTION_DOOR (0x000C), DoorState
      * ================================================================ */
     BEGIN_SECTION("DOOR", 12, DoorState);
     FIELD(DoorState, door_found, "u16"); SEP();
@@ -659,7 +659,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_ENTITY_RUNTIME (0x000D) — EntityRuntimeState
+     * SECTION_ENTITY_RUNTIME (0x000D), EntityRuntimeState
      * ================================================================ */
     BEGIN_SECTION("ENTITY_RUNTIME", 13, EntityRuntimeState);
     FIELD(EntityRuntimeState, current_entity_offset, "i16"); SEP();
@@ -710,7 +710,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_ENTITY_SYSTEM (0x000E) — EntitySystem
+     * SECTION_ENTITY_SYSTEM (0x000E), EntitySystem
      * ================================================================ */
     BEGIN_SECTION("ENTITY_SYSTEM", 14, EntitySystem);
     FIELD(EntitySystem, first_entity, "i16"); SEP();
@@ -794,7 +794,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_SCRIPTS (0x000F) — ScriptSystem
+     * SECTION_SCRIPTS (0x000F), ScriptSystem
      * ================================================================ */
     BEGIN_SECTION("SCRIPTS", 15, ScriptSystem);
     FIELD(ScriptSystem, next_script, "i8[70]"); SEP();
@@ -809,7 +809,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_SPRITE_PRIORITY (0x0010) — SpritePriorityQueue[4]
+     * SECTION_SPRITE_PRIORITY (0x0010), SpritePriorityQueue[4]
      * ================================================================ */
     {
         printf("    \"SPRITE_PRIORITY\": {\n");
@@ -829,7 +829,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_FADE (0x0011) — FadeState
+     * SECTION_FADE (0x0011), FadeState
      * ================================================================ */
     BEGIN_SECTION("FADE", 17, FadeState);
     FIELD(FadeState, target, "u8"); SEP();
@@ -843,7 +843,7 @@ int main(void) {
     SEP();
 
     /* ================================================================
-     * SECTION_RNG (0x0012) — RNGState
+     * SECTION_RNG (0x0012), RNGState
      * ================================================================ */
     BEGIN_SECTION("RNG", 18, RNGState);
     FIELD(RNGState, a, "u16"); SEP();
@@ -854,7 +854,7 @@ int main(void) {
 
 #ifdef EB_ENABLE_AUDIO
     /* ================================================================
-     * SECTION_AUDIO (0x0013) — AudioState
+     * SECTION_AUDIO (0x0013), AudioState
      * ================================================================ */
     BEGIN_SECTION("AUDIO", 19, AudioState);
     AFIELD(AudioState, current_music_track, "u16", "music_track"); SEP();
@@ -868,7 +868,7 @@ int main(void) {
 #endif
 
     /* ================================================================
-     * SECTION_PSI_ANIMATION (0x0014) — PsiAnimationState
+     * SECTION_PSI_ANIMATION (0x0014), PsiAnimationState
      * ================================================================ */
     BEGIN_SECTION("PSI_ANIMATION", 20, PsiAnimationState);
     FIELD(PsiAnimationState, time_until_next_frame, "u8"); SEP();
@@ -891,7 +891,7 @@ int main(void) {
     END_SECTION();
 
     /* ================================================================
-     * Enums section — emitted from C constants so they stay in sync
+     * Enums section, emitted from C constants so they stay in sync
      * ================================================================ */
     printf("\n  },\n  \"enums\": {\n");
 
@@ -983,7 +983,7 @@ int main(void) {
     ENUM_ENTRY_NAMED(STATUS_GROUP_SHIELD, "Shield");
     printf("\n    },\n");
 
-    /* status_0 — persistent easy heal */
+    /* status_0, persistent easy heal */
     printf("    \"status_0\": {\n");
     ENUM_ENTRY_NAMED(0, "OK"); SEP();
     ENUM_ENTRY_NAMED(STATUS_0_UNCONSCIOUS, "Unconscious"); SEP();
@@ -995,14 +995,14 @@ int main(void) {
     ENUM_ENTRY_NAMED(STATUS_0_COLD, "Cold");
     printf("\n    },\n");
 
-    /* status_1 — persistent hard heal */
+    /* status_1, persistent hard heal */
     printf("    \"status_1\": {\n");
     ENUM_ENTRY_NAMED(0, "OK"); SEP();
     ENUM_ENTRY_NAMED(STATUS_1_MUSHROOMIZED, "Mushroomized"); SEP();
     ENUM_ENTRY_NAMED(STATUS_1_POSSESSED, "Possessed");
     printf("\n    },\n");
 
-    /* status_2 — temporary */
+    /* status_2, temporary */
     printf("    \"status_2\": {\n");
     ENUM_ENTRY_NAMED(0, "OK"); SEP();
     ENUM_ENTRY_NAMED(STATUS_2_ASLEEP, "Asleep"); SEP();
@@ -1011,25 +1011,25 @@ int main(void) {
     ENUM_ENTRY_NAMED(STATUS_2_SOLIDIFIED, "Solidified");
     printf("\n    },\n");
 
-    /* status_3 — strangeness */
+    /* status_3, strangeness */
     printf("    \"status_3\": {\n");
     ENUM_ENTRY_NAMED(0, "OK"); SEP();
     ENUM_ENTRY_NAMED(STATUS_3_STRANGE, "Strange");
     printf("\n    },\n");
 
-    /* status_4 — concentration */
+    /* status_4, concentration */
     printf("    \"status_4\": {\n");
     ENUM_ENTRY_NAMED(0, "OK"); SEP();
     ENUM_ENTRY_NAMED(STATUS_4_CANT_CONCENTRATE, "CantConcentrate");
     printf("\n    },\n");
 
-    /* status_5 — homesickness */
+    /* status_5, homesickness */
     printf("    \"status_5\": {\n");
     ENUM_ENTRY_NAMED(0, "OK"); SEP();
     ENUM_ENTRY_NAMED(STATUS_5_HOMESICK, "Homesick");
     printf("\n    },\n");
 
-    /* status_6 — shield */
+    /* status_6, shield */
     printf("    \"status_6\": {\n");
     ENUM_ENTRY_NAMED(0, "None"); SEP();
     ENUM_ENTRY_NAMED(STATUS_6_PSI_SHIELD_POWER, "PSI Shield Power"); SEP();
@@ -1038,7 +1038,7 @@ int main(void) {
     ENUM_ENTRY_NAMED(STATUS_6_SHIELD, "Shield");
     printf("\n    },\n");
 
-    /* item_id — generated from items.json */
+    /* item_id, generated from items.json */
     printf("    \"item_id\": {\n");
     {
         int first = 1;
@@ -1052,7 +1052,7 @@ int main(void) {
     }
     printf("\n    },\n");
 
-    /* music_track — generated from music_tracks.json */
+    /* music_track, generated from music_tracks.json */
     printf("    \"music_track\": {\n");
     {
         int first = 1;

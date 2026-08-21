@@ -29,7 +29,7 @@
 #include <stdio.h>
 
 /*
- * Read helpers — use the generalized script bank system.
+ * Read helpers, use the generalized script bank system.
  * The current bank index is stored in scripts.pc_bank[script_offset].
  */
 static int current_bank_idx;
@@ -200,7 +200,7 @@ static inline void wram_write(WramField f, int16_t val) {
 }
 
 /*
- * Table macros — sizeof(field[0]) auto-detects the C-side element width,
+ * Table macros, sizeof(field[0]) auto-detects the C-side element width,
  * so 8-bit fields stay packed at 1 byte while 16-bit fields use 2.
  */
 #define WRAM_ENT_TABLE(base, field) \
@@ -355,7 +355,7 @@ static WramField resolve_wram(uint16_t addr) {
 #undef WRAM_GLOBAL
 
 /*
- * Opcode dispatch — maps opcode number to handler.
+ * Opcode dispatch, maps opcode number to handler.
  * Returns updated PC.
  */
 uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
@@ -368,7 +368,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
 
     switch (opcode) {
 
-    /* ---- 0x00: EVENT_END — deactivate entity ---- */
+    /* 0x00: EVENT_END, deactivate entity */
     case OP_END: {
         deactivate_entity(entity_offset);
         scripts.sleep_frames[script_offset] = -1;
@@ -376,7 +376,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x01: EVENT_LOOP — push loop count + return address to stack ---- */
+    /* 0x01: EVENT_LOOP, push loop count + return address to stack */
     case OP_LOOP: {
         uint8_t count = sb(pc);
         pc++;
@@ -391,7 +391,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x02: EVENT_LOOP_END — decrement loop counter, jump back if > 0 ---- */
+    /* 0x02: EVENT_LOOP_END, decrement loop counter, jump back if > 0 */
     case OP_LOOP_END: {
         uint16_t stack_off = scripts.stack_offset[script_offset];
         if (stack_off < 3)
@@ -408,7 +408,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x06: EVENT_PAUSE — set sleep frames ---- */
+    /* 0x06: EVENT_PAUSE, set sleep frames */
     case OP_PAUSE: {
         uint8_t frames = sb(pc);
         pc++;
@@ -416,7 +416,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x07: EVENT_START_TASK — allocate new script, link to entity ---- */
+    /* 0x07: EVENT_START_TASK, allocate new script, link to entity */
     case OP_START_TASK: {
         uint16_t target_rom = sw(pc);
         pc += 2;
@@ -443,7 +443,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x08: SET_TICK_CALLBACK — set tick callback address ---- */
+    /* 0x08: SET_TICK_CALLBACK, set tick callback address */
     case OP_SET_TICK_CALLBACK: {
         uint16_t lo = sw(pc);
         pc += 2;
@@ -456,14 +456,14 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x09: EVENT_HALT — infinite sleep ---- */
+    /* 0x09: EVENT_HALT, infinite sleep */
     case OP_HALT: {
         pc--;
         scripts.sleep_frames[script_offset] = -1;
         return pc;
     }
 
-    /* ---- 0x0A: SHORTCALL_COND — if tempvar == 0, jump to target ---- */
+    /* 0x0A: SHORTCALL_COND, if tempvar == 0, jump to target */
     case OP_SHORTCALL_COND: {
         uint16_t target_rom = sw(pc);
         pc += 2;
@@ -473,7 +473,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x0B: SHORTCALL_COND_NOT — if tempvar != 0, jump to target ---- */
+    /* 0x0B: SHORTCALL_COND_NOT, if tempvar != 0, jump to target */
     case OP_SHORTCALL_COND_NOT: {
         uint16_t target_rom = sw(pc);
         pc += 2;
@@ -483,7 +483,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x0C: EVENT_END_TASK — terminate current script task ---- */
+    /* 0x0C: EVENT_END_TASK, terminate current script task */
     case OP_END_TASK: {
         free_action_script(entity_offset, script_offset);
         scripts.sleep_frames[script_offset] = -1;
@@ -495,7 +495,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x0F: CLEAR_TICK_CALLBACK — set tick callback to NOP ---- */
+    /* 0x0F: CLEAR_TICK_CALLBACK, set tick callback to NOP */
     case OP_CLEAR_TICK_CALLBACK: {
         /* Assembly: sets callback to MOVEMENT_NOP (a no-op).
          * The 16-bit STA to tick_callback_hi clears bits 14-15 (frozen/disabled).
@@ -505,7 +505,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x27: TV_CB_DISPATCH — apply callback op to script tempvar ---- */
+    /* 0x27: TV_CB_DISPATCH, apply callback op to script tempvar */
     /* Assembly: ENTITY_SCRIPT_TEMPVARS + script_offset → $8C, then
      * reads [callback_idx(1), param(2)] and dispatches AND/OR/ADD/XOR. */
     case 0x27: {
@@ -524,7 +524,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x14: VAR_CB_DISP — apply callback op to entity variable ---- */
+    /* 0x14: VAR_CB_DISP, apply callback op to entity variable */
     /* Assembly: VAR_TABLE[var_idx] + entity_offset → $8C, then reads
      * [callback_idx(1), param(2)] and dispatches AND/OR/ADD/XOR. */
     case 0x14: {
@@ -547,7 +547,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x0D: CALLBACK_DISP — 16-bit callback op on WRAM address ---- */
+    /* 0x0D: CALLBACK_DISP, 16-bit callback op on WRAM address */
     /* Assembly: reads [base_addr(2), callback_idx(1), param(2)] from script.
      * Dispatches AND/OR/ADD/XOR via ENTITY_VAR_OP_TABLE. The WRAM address
      * is resolved to a C port field via resolve_wram(). */
@@ -577,7 +577,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x18: CALLBACK_DISP2 — 8-bit callback op on WRAM address ---- */
+    /* 0x18: CALLBACK_DISP2, 8-bit callback op on WRAM address */
     /* Assembly: reads [base_addr(2), callback_idx(1), param(1)] from script.
      * Uses 8-bit accumulator mode (SEP before callback dispatch).
      * The WRAM address targets a single byte. If the address is even, it
@@ -619,7 +619,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x03: LONGJUMP — far jump (offset + bank) ---- */
+    /* 0x03: LONGJUMP, far jump (offset + bank) */
     case 0x03: {
         uint16_t target_addr = sw(pc);
         pc += 2;
@@ -635,7 +635,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x04: LONGCALL — far call (offset + bank), push return ---- */
+    /* 0x04: LONGCALL, far call (offset + bank), push return */
     case 0x04: {
         uint16_t target_addr = sw(pc);
         pc += 2;
@@ -660,11 +660,11 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x05: LONGRETURN — pop far return address from stack ---- */
+    /* 0x05: LONGRETURN, pop far return address from stack */
     case 0x05: {
         uint16_t stack_off = scripts.stack_offset[script_offset];
         if (stack_off == 0) {
-            /* Empty stack — terminate script (same as END_TASK) */
+            /* Empty stack, terminate script (same as END_TASK) */
             free_action_script(entity_offset, script_offset);
             scripts.sleep_frames[script_offset] = -1;
             if (entities.script_index[entity_offset] < 0) {
@@ -683,7 +683,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x10: SWITCH — jump table indexed by tempvar ---- */
+    /* 0x10: SWITCH, jump table indexed by tempvar */
     case 0x10: {
         int16_t tv = scripts.tempvar[script_offset];
         uint8_t count = sb(pc);
@@ -697,7 +697,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc + count * 2;
     }
 
-    /* ---- 0x11: SWITCH_CALL — call through jump table indexed by tempvar ---- */
+    /* 0x11: SWITCH_CALL, call through jump table indexed by tempvar */
     case 0x11: {
         int16_t tv = scripts.tempvar[script_offset];
         uint8_t count = sb(pc);
@@ -719,7 +719,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc + count * 2;
     }
 
-    /* ---- 0x12: WRITE_BYTE_WRAM — write 8-bit value to WRAM address ---- */
+    /* 0x12: WRITE_BYTE_WRAM, write 8-bit value to WRAM address */
     case 0x12: {
         uint16_t addr = sw(pc);
         pc += 2;
@@ -764,7 +764,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x13: CHECK_NEXT — if next script exists, free it ---- */
+    /* 0x13: CHECK_NEXT, if next script exists, free it */
     case 0x13: {
         /* Assembly (13.asm): checks ENTITY_SCRIPT_NEXT_SCRIPTS[script_offset].
          * If >= 0 (a next script is linked after the current one), frees that
@@ -784,7 +784,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x16: COND_JUMP_POP — if tempvar == 0, jump and pop 3 from stack ---- */
+    /* 0x16: COND_JUMP_POP, if tempvar == 0, jump and pop 3 from stack */
     case 0x16: {
         uint16_t target_rom = sw(pc);
         pc += 2;
@@ -798,7 +798,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x17: COND_JUMP_POP_NOT — if tempvar != 0, jump and pop 3 ---- */
+    /* 0x17: COND_JUMP_POP_NOT, if tempvar != 0, jump and pop 3 */
     case 0x17: {
         uint16_t target_rom = sw(pc);
         pc += 2;
@@ -812,7 +812,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x0E: SET_VAR — write word to entity variable table ---- */
+    /* 0x0E: SET_VAR, write word to entity variable table */
     case OP_SET_VAR: {
         uint8_t var_idx = sb(pc);
         pc++;
@@ -824,7 +824,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x15: WRITE_WORD_WRAM — write 16-bit value to WRAM address ---- */
+    /* 0x15: WRITE_WORD_WRAM, write 16-bit value to WRAM address */
     case OP_WRITE_WORD_WRAM: {
         uint16_t addr = sw(pc);
         pc += 2;
@@ -861,13 +861,13 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x19: SHORTJUMP — unconditional jump within bank ---- */
+    /* 0x19: SHORTJUMP, unconditional jump within bank */
     case OP_SHORTJUMP: {
         uint16_t target_rom = sw(pc);
         return rom_to_offset(target_rom);
     }
 
-    /* ---- 0x1A: SHORTCALL — push return address, jump to target ---- */
+    /* 0x1A: SHORTCALL, push return address, jump to target */
     case OP_SHORTCALL: {
         uint16_t target_rom = sw(pc);
         pc += 2;
@@ -881,7 +881,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return rom_to_offset(target_rom);
     }
 
-    /* ---- 0x1B: SHORT_RETURN — pop return address from stack ---- */
+    /* 0x1B: SHORT_RETURN, pop return address from stack */
     case OP_SHORT_RETURN: {
         uint16_t stack_off = scripts.stack_offset[script_offset];
         if (stack_off == 0) {
@@ -900,7 +900,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x1C: SET_ANIM_PTR — set animation table pointer ---- */
+    /* 0x1C: SET_ANIM_PTR, set animation table pointer */
     case OP_SET_ANIM_PTR: {
         entities.spritemap_ptr_lo[entity_offset] = sw(pc);
         pc += 2;
@@ -913,7 +913,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x1D: WRITE_WORD_TEMPVAR — tempvar = literal word ---- */
+    /* 0x1D: WRITE_WORD_TEMPVAR, tempvar = literal word */
     case OP_WRITE_WORD_TEMPVAR: {
         int16_t value = (int16_t)sw(pc);
         pc += 2;
@@ -921,12 +921,12 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x1E: WRITE_WRAM_TEMPVAR — tempvar = mem[addr] ---- */
+    /* 0x1E: WRITE_WRAM_TEMPVAR, tempvar = mem[addr] */
     case OP_WRITE_WRAM_TEMPVAR: {
         uint16_t addr = sw(pc);
         pc += 2;
         if (addr == WRAM_FADE_STEP) {
-            /* FADE_PARAMETERS::step ($7E0028) — non-zero while a palette fade is in
+            /* FADE_PARAMETERS::step ($7E0028), non-zero while a palette fade is in
              * progress, 0 when idle.  WAIT_UNTIL_ENTITY_STOPPED (C3ABE0) polls this
              * to hold event scripts until the fade finishes. */
             scripts.tempvar[script_offset] = (int16_t)fade_state.step;
@@ -947,7 +947,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x1F: SET_VAR_FROM_TEMPVAR — var[idx] = tempvar ---- */
+    /* 0x1F: SET_VAR_FROM_TEMPVAR, var[idx] = tempvar */
     case 0x1F: {
         uint8_t var_idx = sb(pc);
         pc++;
@@ -957,7 +957,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x20: LOAD_VAR_TO_TEMPVAR — tempvar = var[idx] ---- */
+    /* 0x20: LOAD_VAR_TO_TEMPVAR, tempvar = var[idx] */
     case 0x20: {
         uint8_t var_idx = sb(pc);
         pc++;
@@ -967,7 +967,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x21: LOAD_VAR_SLEEP — sleep_frames = var[idx] ---- */
+    /* 0x21: LOAD_VAR_SLEEP, sleep_frames = var[idx] */
     case 0x21: {
         uint8_t var_idx = sb(pc);
         pc++;
@@ -977,7 +977,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x22: SET_DRAW_CALLBACK ---- */
+    /* 0x22: SET_DRAW_CALLBACK */
     case OP_SET_DRAW_CALLBACK: {
         uint16_t rom_addr = sw(pc);
         pc += 2;
@@ -989,7 +989,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x23: SET_POS_CALLBACK ---- */
+    /* 0x23: SET_POS_CALLBACK */
     case OP_SET_POS_CALLBACK: {
         uint16_t rom_addr = sw(pc);
         pc += 2;
@@ -1011,7 +1011,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x25: SET_MOVE_CALLBACK ---- */
+    /* 0x25: SET_MOVE_CALLBACK */
     case OP_SET_MOVE_CALLBACK: {
         uint16_t rom_addr = sw(pc);
         pc += 2;
@@ -1033,7 +1033,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x24: LOOP_FROM_TV — loop with count from tempvar ---- */
+    /* 0x24: LOOP_FROM_TV, loop with count from tempvar */
     case 0x24: {
         uint8_t count = (uint8_t)scripts.tempvar[script_offset];
         uint16_t stack_off = scripts.stack_offset[script_offset];
@@ -1047,7 +1047,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x26: SET_ANIM_VAR — animation_frame = var[idx] ---- */
+    /* 0x26: SET_ANIM_VAR, animation_frame = var[idx] */
     case 0x26: {
         uint8_t var_idx = sb(pc);
         pc++;
@@ -1057,7 +1057,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x28: SET_X — set absolute X position ---- */
+    /* 0x28: SET_X, set absolute X position */
     case OP_SET_X: {
         int16_t x = (int16_t)sw(pc);
         pc += 2;
@@ -1066,7 +1066,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x29: SET_Y — set absolute Y position ---- */
+    /* 0x29: SET_Y, set absolute Y position */
     case OP_SET_Y: {
         int16_t y = (int16_t)sw(pc);
         pc += 2;
@@ -1075,7 +1075,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x2A: SET_Z — set absolute Z position ---- */
+    /* 0x2A: SET_Z, set absolute Z position */
     case OP_SET_Z: {
         int16_t z = (int16_t)sw(pc);
         pc += 2;
@@ -1084,7 +1084,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x2B: ADD_X — add signed 16-bit offset to abs_x ---- */
+    /* 0x2B: ADD_X, add signed 16-bit offset to abs_x */
     case 0x2B: {
         int16_t val = (int16_t)sw(pc);
         pc += 2;
@@ -1092,7 +1092,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x2C: ADD_Y — add signed 16-bit offset to abs_y ---- */
+    /* 0x2C: ADD_Y, add signed 16-bit offset to abs_y */
     case 0x2C: {
         int16_t val = (int16_t)sw(pc);
         pc += 2;
@@ -1100,7 +1100,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x2D: ADD_Z — add signed 16-bit offset to abs_z ---- */
+    /* 0x2D: ADD_Z, add signed 16-bit offset to abs_z */
     case 0x2D: {
         int16_t val = (int16_t)sw(pc);
         pc += 2;
@@ -1108,7 +1108,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x2E: ADD_DX — add fixed-point velocity to delta_x ---- */
+    /* 0x2E: ADD_DX, add fixed-point velocity to delta_x */
     case 0x2E: {
         uint16_t raw = sw(pc);
         pc += 2;
@@ -1121,7 +1121,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x2F: ADD_DY — add fixed-point velocity to delta_y ---- */
+    /* 0x2F: ADD_DY, add fixed-point velocity to delta_y */
     case 0x2F: {
         uint16_t raw = sw(pc);
         pc += 2;
@@ -1134,7 +1134,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x30: ADD_DZ — add fixed-point velocity to delta_z ---- */
+    /* 0x30: ADD_DZ, add fixed-point velocity to delta_z */
     case 0x30: {
         uint16_t raw = sw(pc);
         pc += 2;
@@ -1147,7 +1147,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x39: SET_VEL_ZERO — zero all velocity components ---- */
+    /* 0x39: SET_VEL_ZERO, zero all velocity components */
     case OP_SET_VEL_ZERO: {
         entities.delta_frac_x[entity_offset] = 0;
         entities.delta_x[entity_offset] = 0;
@@ -1158,7 +1158,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x31: BG_SET_H_OFFSET — set BG horizontal scroll offset ---- */
+    /* 0x31: BG_SET_H_OFFSET, set BG horizontal scroll offset */
     case 0x31: {
         uint8_t bg_idx = sb(pc);
         pc++;
@@ -1172,7 +1172,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x32: BG_SET_V_OFFSET — set BG vertical scroll offset ---- */
+    /* 0x32: BG_SET_V_OFFSET, set BG vertical scroll offset */
     case 0x32: {
         uint8_t bg_idx = sb(pc);
         pc++;
@@ -1186,7 +1186,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x33: BG_SET_H_VEL — set BG horizontal scroll velocity ---- */
+    /* 0x33: BG_SET_H_VEL, set BG horizontal scroll velocity */
     case 0x33: {
         uint8_t bg_idx = sb(pc);
         pc++;
@@ -1202,7 +1202,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x34: BG_SET_V_VEL — set BG vertical scroll velocity ---- */
+    /* 0x34: BG_SET_V_VEL, set BG vertical scroll velocity */
     case 0x34: {
         uint8_t bg_idx = sb(pc);
         pc++;
@@ -1217,7 +1217,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x35: BG_ADD_H_VEL — add to BG horizontal scroll velocity ---- */
+    /* 0x35: BG_ADD_H_VEL, add to BG horizontal scroll velocity */
     case 0x35: {
         uint8_t bg_idx = sb(pc);
         pc++;
@@ -1234,7 +1234,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x36: BG_ADD_V_VEL — add to BG vertical scroll velocity ---- */
+    /* 0x36: BG_ADD_V_VEL, add to BG vertical scroll velocity */
     case 0x36: {
         uint8_t bg_idx = sb(pc);
         pc++;
@@ -1251,7 +1251,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x37: BG_ADD_H_OFF — add to BG horizontal scroll offset ---- */
+    /* 0x37: BG_ADD_H_OFF, add to BG horizontal scroll offset */
     case 0x37: {
         uint8_t bg_idx = sb(pc);
         pc++;
@@ -1264,7 +1264,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x38: BG_ADD_V_OFF — add to BG vertical scroll offset ---- */
+    /* 0x38: BG_ADD_V_OFF, add to BG vertical scroll offset */
     case 0x38: {
         uint8_t bg_idx = sb(pc);
         pc++;
@@ -1277,7 +1277,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x3A: CLEAR_BG_VEL — zero BG layer scroll velocity ---- */
+    /* 0x3A: CLEAR_BG_VEL, zero BG layer scroll velocity */
     case 0x3A: {
         uint8_t bg_idx = sb(pc);
         pc++;
@@ -1291,7 +1291,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x3B: SET_ANIMATION — set animation frame ---- */
+    /* 0x3B: SET_ANIMATION, set animation frame */
     case OP_SET_ANIMATION: {
         uint8_t frame = sb(pc);
         pc++;
@@ -1305,19 +1305,19 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x3C: NEXT_ANIM_FRAME — increment animation frame ---- */
+    /* 0x3C: NEXT_ANIM_FRAME, increment animation frame */
     case OP_NEXT_ANIM_FRAME: {
         entities.animation_frame[entity_offset]++;
         return pc;
     }
 
-    /* ---- 0x3D: PREV_ANIM_FRAME — decrement animation frame ---- */
+    /* 0x3D: PREV_ANIM_FRAME, decrement animation frame */
     case OP_PREV_ANIM_FRAME: {
         entities.animation_frame[entity_offset]--;
         return pc;
     }
 
-    /* ---- 0x3E: SKIP_ANIM_FRAMES — add N to animation frame ---- */
+    /* 0x3E: SKIP_ANIM_FRAMES, add N to animation frame */
     case OP_SKIP_ANIM_FRAMES: {
         int8_t delta = (int8_t)sb(pc);
         pc++;
@@ -1325,7 +1325,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x3F: SET_X_VELOCITY ---- */
+    /* 0x3F: SET_X_VELOCITY */
     case OP_SET_X_VELOCITY: {
         uint16_t raw = sw(pc);
         pc += 2;
@@ -1336,7 +1336,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x40: SET_Y_VELOCITY ---- */
+    /* 0x40: SET_Y_VELOCITY */
     case OP_SET_Y_VELOCITY: {
         uint16_t raw = sw(pc);
         pc += 2;
@@ -1347,7 +1347,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x41: SET_Z_VELOCITY ---- */
+    /* 0x41: SET_Z_VELOCITY */
     case OP_SET_Z_VELOCITY: {
         uint16_t raw = sw(pc);
         pc += 2;
@@ -1358,7 +1358,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x42: CALLROUTINE — call C function via ROM address dispatch ---- */
+    /* 0x42: CALLROUTINE, call C function via ROM address dispatch */
     case OP_CALLROUTINE: {
         uint32_t rom_addr = s24(pc);
         pc += 3;
@@ -1372,7 +1372,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return new_pc;
     }
 
-    /* ---- 0x43: SET_PRIORITY ---- */
+    /* 0x43: SET_PRIORITY */
     case OP_SET_PRIORITY: {
         uint8_t prio = sb(pc);
         pc++;
@@ -1380,7 +1380,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         return pc;
     }
 
-    /* ---- 0x44: SLEEP_FROM_TEMPVAR — if tempvar != 0, sleep that many frames ---- */
+    /* 0x44: SLEEP_FROM_TEMPVAR, if tempvar != 0, sleep that many frames */
     case OP_SLEEP_FROM_TEMPVAR: {
         int16_t tv = scripts.tempvar[script_offset];
         if (tv != 0) {
@@ -1393,13 +1393,13 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
         if (opcode < 0x45) {
             uint8_t arg_size = opcode_arg_sizes[opcode];
             if (arg_size == 0xFF) {
-                /* Variable-length opcode — cannot safely skip */
+                /* Variable-length opcode, cannot safely skip */
                 FATAL("unimplemented variable-length opcode 0x%02X "
                       "(ent=%d scr=%d)\n",
                       opcode, entity_offset, script_offset);
             }
             LOG_WARN("WARN: unimplemented opcode 0x%02X (%u arg bytes) "
-                  "(ent=%d scr=%d) — skipping\n",
+                  "(ent=%d scr=%d), skipping\n",
                   opcode, arg_size, entity_offset, script_offset);
             return pc + arg_size;  /* skip argument bytes */
         }
@@ -1410,7 +1410,7 @@ uint16_t opcode_dispatch(uint8_t opcode, int16_t script_offset,
 }
 
 /*
- * FREE_ACTION_SCRIPT — remove a script from its entity's script chain
+ * FREE_ACTION_SCRIPT: remove a script from its entity's script chain
  * and return it to the free list.
  */
 static void free_action_script(int16_t entity_offset, int16_t script_offset) {

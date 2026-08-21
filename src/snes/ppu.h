@@ -34,7 +34,7 @@ END_PACKED_STRUCT
  * above (real SNES hardware register width, 0-255). The actual visibility/
  * position math (ppu_render.c) exclusively reads the wider oam_full_y[]
  * (int16_t) instead, which can safely hold EB_VIEWPORT_HEIGHT directly even
- * once that exceeds 255 (it does today: 256) -- so PPU_OAM_Y_HIDDEN only
+ * once that exceeds 255 (it does today: 256), so PPU_OAM_Y_HIDDEN only
  * needs to be "as far off-screen as this narrow field can represent" for
  * whatever still reads it (debug/VRAM dumps, savestate contents), not a
  * literal EB_VIEWPORT_HEIGHT. Using EB_VIEWPORT_HEIGHT here directly would
@@ -125,7 +125,7 @@ typedef struct {
      * deliberately separate from sprite_y_offset above). ppu_render.c
      * computes snes_scanline = scanline - bg_win_y_offset to pick which
      * "native" row a non-filling BG layer (e.g. the text/window layer) reads
-     * for a given canvas scanline -- the vertical counterpart of how
+     * for a given canvas scanline, the vertical counterpart of how
      * EB_VIEWPORT_PAD_LEFT unconditionally shifts non-filling layers
      * horizontally during the wide-mode merge (ppu_render.c). Most scenes
      * (title screen, file select, gas station, logo screen, battle) use OAM
@@ -136,14 +136,14 @@ typedef struct {
      * The overworld is the one scene where this must diverge: entity/OAM
      * screen positions are already computed camera-relative (already
      * correct across the full canvas, via EB_VIEWPORT_CENTER_Y math in
-     * map_loader.c/callroutine*.c) -- adding a nonzero sprite_y_offset there
+     * map_loader.c/callroutine*.c), adding a nonzero sprite_y_offset there
      * would double-shift every entity AND incorrectly cull entities in the
      * overworld wide-FOV zoom's extra revealed area (render_obj_scanline's
      * "hide sprites outside [0, SNES_HEIGHT)" cull, gated on
      * sprite_y_offset != 0). So the overworld keeps sprite_y_offset at 0 (no
      * change to entities) but sets bg_win_y_offset to EB_VIEWPORT_PAD_TOP,
      * which only affects the non-filling text/window BG layer's row
-     * selection -- fixing dialogue/window boxes rendering with their top
+     * selection, fixing dialogue/window boxes rendering with their top
      * rows cut off in the default (non-zoomed) crop without touching
      * entity positions or the zoom's extra-area sprite visibility. */
     int16_t bg_win_y_offset;

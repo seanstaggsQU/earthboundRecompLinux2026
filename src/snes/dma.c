@@ -3,12 +3,12 @@
 
 void dma_queue_add(uint8_t mode, const uint8_t *src, uint16_t dest_vram_addr, uint16_t size) {
     (void)mode;
-    /* In the C port, transfers happen immediately — no queue needed */
+    /* In the C port, transfers happen immediately, no queue needed */
     ppu_vram_dma(src, dest_vram_addr, size);
 }
 
 void dma_queue_flush(void) {
-    /* In the C port, transfers happen immediately in dma_queue_add — nothing to flush */
+    /* In the C port, transfers happen immediately in dma_queue_add, nothing to flush */
 }
 
 void dma_vram_transfer(const uint8_t *src, uint16_t vram_word_addr, uint16_t byte_count) {

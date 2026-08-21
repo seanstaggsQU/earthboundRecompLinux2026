@@ -1,5 +1,5 @@
 /*
- * Entity system core — init, allocation, linked list management.
+ * Entity system core, init, allocation, linked list management.
  *
  * Ports of:
  *   INIT_ENTITY_SYSTEM      (asm/overworld/init_entity_system.asm)
@@ -27,7 +27,7 @@
 #include <math.h>
 #include <string.h>
 
-/* Global entity system state (large SoA structs — kept separate) */
+/* Global entity system state (large SoA structs, kept separate) */
 EntitySystem entities;
 ScriptSystem scripts;
 SpritePriorityQueue sprite_priority[4];
@@ -63,7 +63,7 @@ static bool allocate_entity_slot(int16_t *out_offset) {
 
     while (cur >= 0) {
         if (cur >= min_slot && cur < max_slot) {
-            /* Found a usable slot — unlink it from the free list */
+            /* Found a usable slot, unlink it from the free list */
             if (prev < 0) {
                 /* Removing from head of free list */
                 entities.last_entity = entities.next_entity[cur];
@@ -117,7 +117,7 @@ static void free_entity_scripts(int16_t entity_offset) {
 /*
  * CLEAR_SPRITE_TICK_CALLBACK (clear_sprite_tick_callback.asm)
  *
- * Sets the tick callback to MOVEMENT_NOP — a harmless RTL.
+ * Sets the tick callback to MOVEMENT_NOP, a harmless RTL.
  * Port of clear_sprite_tick_callback.asm:
  *   LDA #.LOWORD(MOVEMENT_NOP) / STA ENTITY_TICK_CALLBACK_LOW,X
  *   LDA #.HIWORD(MOVEMENT_NOP) / STA ENTITY_TICK_CALLBACK_HIGH,X
@@ -135,7 +135,7 @@ static void clear_sprite_tick_callback(int16_t entity_offset) {
 }
 
 /*
- * FIND_ENTITY_PREDECESSOR — find the entity before 'target' in the active list.
+ * FIND_ENTITY_PREDECESSOR: find the entity before 'target' in the active list.
  * Returns ENTITY_NONE if target is first.
  */
 static int16_t find_entity_predecessor(int16_t target) {
@@ -352,12 +352,12 @@ int16_t entity_init(uint16_t script_id, int16_t x, int16_t y) {
     /* Store script ID */
     entities.script_table[ent_offset] = (int16_t)script_id;
 
-    /* animation_frame = -1 means HIDDEN — call_entity_draw() skips
+    /* animation_frame = -1 means HIDDEN, call_entity_draw() skips
      * entities with animation_frame < 0. The entity's script or a
      * callroutine (RENDER_ENTITY_SPRITE_ME1/ME2, INITIALIZE_PARTY_MEMBER_ENTITY,
      * etc.) must set animation_frame >= 0 to make the entity visible.
      * IMPORTANT: cr_update_entity_animation() XORs frame with 2, so
-     * -1 ^ 2 = -3 and -3 ^ 2 = -1 — the entity stays invisible forever
+     * -1 ^ 2 = -3 and -3 ^ 2 = -1, the entity stays invisible forever
      * unless explicitly set to >= 0 first. */
     entities.animation_frame[ent_offset] = -1;
     entities.delta_frac_x[ent_offset] = 0;
@@ -420,7 +420,7 @@ int16_t create_entity(uint16_t sprite, uint16_t script, int16_t index,
      * Third param = hint (Y register) = entity slot index, or -1 for auto-allocate. */
     uint16_t vram_slot = upload_sprite_to_vram(
         new_sprite_tile_width, new_sprite_tile_height, (uint16_t)index);
-    /* ASM lines 62-65: wait loop — in C, just check result */
+    /* ASM lines 62-65: wait loop, in C, just check result */
     if (vram_slot >= 0x7FFF) {
         return -1;
     }
@@ -740,7 +740,7 @@ int16_t find_entity_for_character(uint8_t char_id) {
 }
 
 /*
- * remove_associated_entities — Remove floating sprites for a parent entity.
+ * remove_associated_entities, Remove floating sprites for a parent entity.
  *
  * Port of REMOVE_ASSOCIATED_ENTITIES (asm/misc/remove_associated_entities.asm).
  * Floating sprites are marked with draw_priority = parent_slot | 0xC000.
@@ -761,7 +761,7 @@ void remove_associated_entities(int16_t parent_slot) {
 }
 
 /*
- * calculate_direction_fine — Compute fine 16-bit direction between two positions.
+ * calculate_direction_fine, Compute fine 16-bit direction between two positions.
  *
  * Port of CALCULATE_DIRECTION_FROM_POSITIONS (C41EFF).
  * Returns a 16-bit fine direction:
@@ -786,7 +786,7 @@ uint16_t calculate_direction_fine(int16_t from_x, int16_t from_y,
 }
 
 /*
- * calculate_direction_8 — Compute 8-way direction between two positions.
+ * calculate_direction_8, Compute 8-way direction between two positions.
  *
  * Port of CALCULATE_DIRECTION_FROM_POSITIONS (C41EFF) + quantization step.
  * Returns SNES direction: 0=UP, 1=UP_RIGHT, 2=RIGHT, 3=DOWN_RIGHT,
@@ -844,7 +844,7 @@ int16_t get_direction_between_entities(int16_t source_type, int16_t source_id,
 }
 
 /* ===================================================================
- * Floating sprites — SPAWN_FLOATING_SPRITE + UPDATE_FLOATING_SPRITE_OFFSET
+ * Floating sprites, SPAWN_FLOATING_SPRITE + UPDATE_FLOATING_SPRITE_OFFSET
  *
  * Port of asm/text/spawn_floating_sprite.asm (bank C4) and
  * asm/overworld/entity/update_floating_sprite_offset.asm.
@@ -980,7 +980,7 @@ void spawn_floating_sprite(int16_t entity_slot, uint16_t table_index) {
     entities.surface_flags[new_offset] = entities.surface_flags[entity_offset];
 }
 
-/* Convenience wrappers — port of C4B524, C4B4FE, C4B54A */
+/* Convenience wrappers, port of C4B524, C4B4FE, C4B54A */
 
 void spawn_floating_sprite_for_npc(uint16_t npc_id, uint16_t table_index) {
     int16_t entity_offset = find_entity_by_npc_id(npc_id);

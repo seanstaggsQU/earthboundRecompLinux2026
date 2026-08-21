@@ -1,4 +1,4 @@
-/* Runtime asset loader — see runtime_assets.h.
+/* Runtime asset loader, see runtime_assets.h.
  *
  * Only compiled when EB_RUNTIME_ASSETS is defined (see the CMake option of
  * the same name in src/CMakeLists.txt). Uses POSIX mmap/open, matching the
@@ -52,7 +52,7 @@ static void hash_to_hex(const unsigned char *hash, char out[EB_PAK_HASH_SIZE * 2
 
 /* Resets every AssetEntry to "no data, zero size" and re-anchors size_ptr
  * at our own length table. size_ptr always points somewhere valid (even
- * pre-load / post-unload) so ASSET_SIZE() never dereferences NULL — only
+ * pre-load / post-unload) so ASSET_SIZE() never dereferences NULL, only
  * ASSET_DATA() returning NULL signals "not loaded", same as a compile-time
  * gap entry. */
 static void clear_globals(void) {

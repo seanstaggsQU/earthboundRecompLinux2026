@@ -1,5 +1,5 @@
 /*
- * buffer_layout.h — Named constants for ert.buffer[] offset regions.
+ * buffer_layout.h, Named constants for ert.buffer[] offset regions.
  *
  * ert.buffer is a 64 KB general-purpose work area mirroring SNES WRAM at
  * $7F0000 (BUFFER in the assembly).  Different game phases reuse the same
@@ -62,7 +62,7 @@
  * Phase-exclusive with pathfinding: VWF save/restore runs during
  * render_all_windows() (per-frame rendering phase), while pathfinding
  * runs during entity script ticks. They never execute concurrently
- * within a single frame. Overlaps BUF_PF_HEAP at 0x4980–0x5000. */
+ * within a single frame. Overlaps BUF_PF_HEAP at 0x4980-0x5000. */
 #define BUF_VWF_SAVE_SIZE        1664  /* VWF_BUFFER_TILES(52) * VWF_TILE_BYTES(32) */
 #define BUF_VWF_SAVE             (BUFFER_SIZE - BUF_VWF_SAVE_SIZE)  /* 0x4980 */
 
@@ -92,12 +92,12 @@
 #define BUF_NAME_TILEMAP_HEADER  0x0000  /* 2-byte tilemap header (width, height) */
 
 /* ===== PSI Animation (battle_psi.c) ===== */
-/* PSI arrangements use .arr.bundled format — decompressed per-bundle into
+/* PSI arrangements use .arr.bundled format, decompressed per-bundle into
  * PsiAnimationState.arr_bundle_buf (8 KB), not into ert.buffer.
- * PSI GFX decompresses directly to ppu.vram — no ert.buffer usage. */
+ * PSI GFX decompresses directly to ppu.vram, no ert.buffer usage. */
 
 /* ===== Ending / Credits (ending.c) ===== */
-/* Credits init decomp uses 0x0000–0x26FF transiently (immediate VRAM upload).
+/* Credits init decomp uses 0x0000-0x26FF transiently (immediate VRAM upload).
  * Cast tile GFX composes directly in ppu.vram (not ert.buffer).
  * Only the tilemap scratch and palette data persist during playback. */
 #define BUF_CREDITS_GFX_1        0x0200  /* Credits init: decomp region 1 (transient) */
@@ -195,7 +195,7 @@ typedef struct {
 _Static_assert(sizeof(EntityFadeEntry) == 20,
                "EntityFadeEntry must be 20 bytes");
 
-/* ---- Accessor helpers ---- */
+/* Accessor helpers */
 
 /* Get typed overlay for the palette fade engine region.
  * Caller must ensure buffer is in palette-fade mode (not entity-fade-sprite). */

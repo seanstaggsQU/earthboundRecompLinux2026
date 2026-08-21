@@ -1,5 +1,5 @@
 /*
- * Battle system core — utility functions for combat.
+ * Battle system core, utility functions for combat.
  *
  * Ports of assembly routines from asm/battle/:
  *   set_hp.asm, set_pp.asm, reduce_hp.asm, reduce_pp.asm,
@@ -56,14 +56,14 @@
 
 /* PSI defines moved to battle_psi.c */
 
-/* ---- Consolidated battle state ---- */
+/* Consolidated battle state */
 BattleState bt = {
     .current_flashing_enemy = -1,
     .current_flashing_row = -1,
     .last_selected_psi_description = 0x00FF,
 };
 
-/* ROM data pointers (not in BattleState — these are const ROM data, not saveable state) */
+/* ROM data pointers (not in BattleState, these are const ROM data, not saveable state) */
 const BattleAction *battle_action_table;
 const EnemyData *enemy_config_table;
 const uint8_t *battle_sprites_pointers_data;
@@ -73,7 +73,7 @@ static uint16_t instant_win_sorted_offense[4];
 static uint16_t instant_win_sorted_hp[4];
 static uint16_t instant_win_sorted_defense[4];
 
-/* BACKGROUND_COLOUR_BACKUP — saves palettes[0] before screen flash */
+/* BACKGROUND_COLOUR_BACKUP: saves palettes[0] before screen flash */
 /* bt.background_colour_backup and battle_menu_selection now in BattleState bt. */
 
 /* Assembly globals referenced by battle_routine and final-attack dispatch */
@@ -88,10 +88,10 @@ extern const uint8_t *consolation_item_table;
 /* clear_hppp_window_header() is implemented in window.c */
 
 /* DISPLAY_IN_BATTLE_TEXT (asm/text/display_in_battle_text.asm): the blocking
- * text-with-▼-wait battle surface. All of its forms — non-_addr, with-prompt,
- * display_text_wait_addr, and _addr — are now dead: every battle-text caller runs
+ * text-with-▼-wait battle surface. All of its forms, non-_addr, with-prompt,
+ * display_text_wait_addr, and _addr, are now dead: every battle-text caller runs
  * the prepare + battle_push_text STEP_PUSH path (check_dead_players' "ally
- * collapsed" message included — see mode_step_check_dead_players). The blocking
+ * collapsed" message included, see mode_step_check_dead_players). The blocking
  * display_in_battle_text_addr() had no remaining callers and was deleted with this
  * slice (text-leg cutover). */
 
@@ -306,11 +306,11 @@ void set_current_item(uint8_t item) {
  * Creates WINDOW::TARGETING_PROMPT and prints a targeting prompt text.
  * text_index: 0="Who?", 1="Which?", 2="Where?", 3="Whom?", 4="Where?"
  *
- * Now shared via window.h — display_menu_header_text() and close_menu_header_window().
+ * Now shared via window.h, display_menu_header_text() and close_menu_header_window().
  */
 
 /* ---------------------------------------------------------------------------
- * GAME_MODE_CHAR_SELECT — battle-style HP/PP character column selection.
+ * GAME_MODE_CHAR_SELECT: battle-style HP/PP character column selection.
  *
  * Run-to-completion port of char_select_prompt()'s battle path (mode 0/2). The
  * two-level render/input loop becomes a three-phase machine (CharSelectPhase),
@@ -323,7 +323,7 @@ void set_current_item(uint8_t item) {
 /* CSP_RENDER body: highlight the current character (mode 0), run one window frame,
  * draw pagination arrows, reset the input poll counter, then advance to CSP_PRIME.
  * The window frame uses window_tick_work_step() so a parked actionscript frame (the
- * overworld equip menu reaches char-select) STEP_PUSHes ACTIONSCRIPT_FRAME — the
+ * overworld equip menu reaches char-select) STEP_PUSHes ACTIONSCRIPT_FRAME, the
  * pagination/counter tail then runs at the cs_flush resume. Shared by every
  * re-render site (the head of the former outer loop). */
 static StepResult cs_render_tick(CharSelectState *st) {
@@ -386,7 +386,7 @@ StepResult mode_step_char_select(ModeState *ms) {
     case CSP_INIT: {
         /* Pre-loop one-shot (former char_select_prompt lines 556-561 /
          * party_character_selector lines 89-102): initial on_change, THEN reset the
-         * pagination animation, THEN the first render — preserving the blocking
+         * pagination animation, THEN the first render, preserving the blocking
          * original's order (on_change completes before pagination_animation_frame=0).
          * The no-push path falls through to the first render with no extra yield. */
         uint8_t mid = game_state.party_members[st->current_index] & 0xFF;
@@ -446,7 +446,7 @@ StepResult mode_step_char_select(ModeState *ms) {
                 /* Poll window expired: toggle the pagination arrow animation and
                  * reset the longer delay. The original (party_character_selector.asm
                  * @MULTI_PARTY_WINDOW6) only re-pokes the arrow tiles to VRAM inline
-                 * (PREPARE_VRAM_COPY) and falls straight back into the input loop —
+                 * (PREPARE_VRAM_COPY) and falls straight back into the input loop, 
                  * it does NOT run a WINDOW_TICK or the CSP_PRIME meter yield here, so
                  * input is polled every frame. Routing this through cs_render_tick()
                  * inserted two input-blind frames per blink cycle (~1/6 of presses
@@ -505,10 +505,10 @@ StepResult mode_step_char_select(ModeState *ms) {
 }
 
 /*
- * CHAR_SELECT_PROMPT — Port of asm/text/character_select_prompt.asm (~418 lines).
+ * CHAR_SELECT_PROMPT: Port of asm/text/character_select_prompt.asm (~418 lines).
  * Party member selection (mode 1 = overworld name window + SELECTION_MENU; modes
  * 0/2 = battle-style HP/PP column selection). The blocking char_select_prompt()
- * pump bridge over GAME_MODE_CHAR_SELECT was deleted in D4b — every caller now
+ * pump bridge over GAME_MODE_CHAR_SELECT was deleted in D4b, every caller now
  * builds the child init directly (char_select_make_init + STEP_PUSH CHAR_SELECT
  * for the battle path; char_select_overworld_prepare/finish bracketing a
  * STEP_PUSH SELECTION_MENU for the overworld path) and reads the choice from
@@ -521,7 +521,7 @@ StepResult mode_step_char_select(ModeState *ms) {
  * text attributes, create the party-sized select window, add one name item
  * per member (assembly lines 41-108: text_x = i * 6, text_y = 0), print, and
  * set the cursor-move callback. Returns the window id to close on finish.
- * NOTE: does not save argument_memory — the caller brackets that. */
+ * NOTE: does not save argument_memory, the caller brackets that. */
 uint16_t char_select_overworld_prepare(void (*on_change)(uint16_t)) {
     save_window_text_attributes();
 
@@ -669,7 +669,7 @@ void inventory_get_item_name(uint16_t char_id, uint16_t window_type) {
     open_window_and_print_menu(2, 0);
 }
 
-/* ---- PSI ability table accessor (loaded from ROM binary asset) ---- */
+/* PSI ability table accessor (loaded from ROM binary asset) */
 
 const PsiAbility *battle_psi_table = NULL;
 /* PSI table data and text arrays moved to battle_psi.c */
@@ -742,11 +742,11 @@ void hp_pp_roller(void) {
 
     CharStruct *ch = &party_characters[member - 1];
 
-    /* ---- HP section ---- */
+    /* HP section */
     if (bt.hppp_meter_flipout_mode == 0) {
         /* Check if rolling is active (bit 0 of fraction) */
         if ((ch->current_hp_fraction & 1) == 0) {
-            /* Not rolling — start if current != target */
+            /* Not rolling, start if current != target */
             if (ch->current_hp != ch->current_hp_target)
                 ch->current_hp_fraction = 1;
             goto pp_section;
@@ -776,7 +776,7 @@ void hp_pp_roller(void) {
                 ch->current_hp_fraction = 1;  /* flag: rolling done */
             }
         } else if (hp == target && ch->current_hp_fraction == 1) {
-            /* Reached target — clear rolling flag */
+            /* Reached target, clear rolling flag */
             ch->current_hp_fraction = 0;
         } else {
             /* HP decreasing */
@@ -802,7 +802,7 @@ void hp_pp_roller(void) {
     }
 
 pp_section:
-    /* ---- PP section ---- */
+    /* PP section */
     if (bt.hppp_meter_flipout_mode == 0) {
         if ((ch->current_pp_fraction & 1) == 0) {
             if (ch->current_pp != ch->current_pp_target)
@@ -874,7 +874,7 @@ check_flipout:
 }
 
 /* WAIT_FOR_FADE_WITH_TICK (asm/battle/wait_for_fade_with_tick.asm): the former
- * blocking bridge is gone — its sole caller (load_battle_scene) now STEP_PUSHes
+ * blocking bridge is gone, its sole caller (load_battle_scene) now STEP_PUSHes
  * GAME_MODE_FADE_WAIT (FADE_TICK_WINDOW = the former loop body) directly. */
 /*
  * FIND_NEXT_ENEMY_LETTER (asm/battle/find_next_enemy_letter.asm)
@@ -1082,7 +1082,7 @@ StepResult mode_step_battle_apply(ModeState *ms) {
                     if (battle_action_dispatch(s->action_addr, &child))
                         return STEP_RESULT_PUSH_INIT(GAME_MODE_BATTLE_ACTION,
                                                      &child);
-                    break;  /* ran inline — advance in pc 3 */
+                    break;  /* ran inline, advance in pc 3 */
                 }
             }
             bt.current_target += sizeof(Battler);
@@ -1101,16 +1101,16 @@ StepResult mode_step_battle_apply(ModeState *ms) {
     }
 }
 
-/* ---- Helpers ---- */
+/* Helpers */
 
 /* rand_byte() and rand_limit() now in battle_internal.h */
 
-/* WAIT (port of asm/system/wait.asm) — loop N frames calling window_tick() to keep
- * the UI responsive — is now the GAME_MODE_BATTLE_WAIT BW_FRAMES kind, STEP_PUSHed
+/* WAIT (port of asm/system/wait.asm), loop N frames calling window_tick() to keep
+ * the UI responsive, is now the GAME_MODE_BATTLE_WAIT BW_FRAMES kind, STEP_PUSHed
  * via push_battle_wait_frames() by the battle-action steppers; the blocking
  * battle_wait() bridge was deleted (D4b, callerless after the cutscene steppers). */
 
-/* GAME_MODE_BATTLE_WAIT — run-to-completion port of the battle "advance one frame
+/* GAME_MODE_BATTLE_WAIT: run-to-completion port of the battle "advance one frame
  * until <condition>" loops. The single yield belongs to the pump; this step only
  * does one frame's work and reports CONTINUE/POP. See the header for the per-kind
  * body/condition table and the `primed` ordering notes. */
@@ -1198,13 +1198,13 @@ void battle_set_hp(Battler *target, uint16_t new_hp) {
 
     if (target->ally_or_enemy == 0) {
         if (target->npc_id == 0) {
-            /* Player character — update hp_target; rolling meter handles display */
+            /* Player character, update hp_target; rolling meter handles display */
             target->hp_target = new_hp;
             /* Sync to char_struct */
             uint16_t char_idx = target->row;
             party_characters[char_idx].current_hp_target = new_hp;
         } else {
-            /* NPC ally — set both hp and hp_target immediately */
+            /* NPC ally, set both hp and hp_target immediately */
             target->hp = new_hp;
             target->hp_target = new_hp;
             /* Update game_state NPC HP (row 0 = npc_1_hp, row 1 = npc_2_hp) */
@@ -1214,7 +1214,7 @@ void battle_set_hp(Battler *target, uint16_t new_hp) {
                 game_state.party_npc_2_hp = new_hp;
         }
     } else {
-        /* Enemy — set both directly */
+        /* Enemy, set both directly */
         target->hp = new_hp;
         target->hp_target = new_hp;
     }
@@ -1236,7 +1236,7 @@ void battle_set_pp(Battler *target, uint16_t new_pp) {
             uint16_t char_idx = target->row;
             party_characters[char_idx].current_pp_target = new_pp;
         } else {
-            /* NPC ally — NPCs have no separate PP tracking in game_state */
+            /* NPC ally, NPCs have no separate PP tracking in game_state */
             target->pp = new_pp;
             target->pp_target = new_pp;
         }
@@ -1281,7 +1281,7 @@ void battle_reduce_pp(Battler *target, uint16_t cost) {
  *
  * Parameters: A = target offset, X = heal amount
  * Only works on conscious battlers (consciousness == 1).
- * Blocked if afflictions[0] == 1 (UNCONSCIOUS — heal blocked).
+ * Blocked if afflictions[0] == 1 (UNCONSCIOUS, heal blocked).
  * Displays battle text for full HP or partial recovery.
  */
 void battle_recover_hp_prepare(Battler *target, uint16_t heal_amount,
@@ -1379,7 +1379,7 @@ uint16_t battle_inflict_status(Battler *target, uint16_t status_group,
 
     uint8_t current = target->afflictions[status_group];
     if (current != 0) {
-        /* Status already active — don't overwrite worse (lower value) with milder.
+        /* Status already active, don't overwrite worse (lower value) with milder.
          * Assembly (BLTEQ): skip when current <= status_value (i.e. keep worse). */
         if (current <= (uint8_t)status_value)
             return 0;
@@ -1441,13 +1441,13 @@ uint16_t battle_count_chars(uint16_t side) {
  *   - Ghost/possession mechanics
  *
  * Run-to-completion: GAME_MODE_BATTLE_KO (see BattleKoState, mode_stack.h).
- * pc map — 0 = entry/dispatch (enemy setup; final-attack bracket + desc
+ * pc map, 0 = entry/dispatch (enemy setup; final-attack bracket + desc
  * text push); 1 = BATTLE_APPLY push (the final attack); 2 = bracket
  * restore; 3 = death text push; 4/5 = white-flash/black-fade BW_FRAMES
  * pushes; 6-8 = group-death sequence; 9 = ghost respawn + pop;
  * 10-12 = the player/NPC path. The enemy config (final action, death text,
  * death_type) is re-derived from enemy_config_table[target->id] at each pc
- * — ROM data, stable across yields.
+ *, ROM data, stable across yields.
  */
 void battle_ko_make_init(ModeState *init, uint16_t target_offset) {
     memset(init, 0, sizeof(*init));
@@ -1469,15 +1469,15 @@ StepResult mode_step_battle_ko(ModeState *ms) {
                 break;
             }
 
-            /* ---- ENEMY KO ---- */
+            /* ENEMY KO */
 
-            /* Skip for certain Giygas phases — they can't be killed normally */
+            /* Skip for certain Giygas phases, they can't be killed normally */
             uint16_t enemy_id = target->id;
             if (enemy_id == ENEMY_GIYGAS_2 || enemy_id == ENEMY_GIYGAS_3 ||
                 enemy_id == ENEMY_GIYGAS_5 || enemy_id == ENEMY_GIYGAS_6)
                 return STEP_RESULT_POP(0);
 
-            /* Check if this is the last enemy — if so, ensure players have >= 1 HP */
+            /* Check if this is the last enemy, if so, ensure players have >= 1 HP */
             if (battle_count_chars(1) == 1) {
                 reset_hppp_rolling();
                 for (int i = 0; i < TOTAL_PARTY_COUNT; i++) {
@@ -1491,7 +1491,7 @@ StepResult mode_step_battle_ko(ModeState *ms) {
                         continue;
                     if (b->npc_id != 0)
                         continue;
-                    /* Check char_struct current_hp — if 0, set to 1 */
+                    /* Check char_struct current_hp, if 0, set to 1 */
                     uint8_t char_row = b->row;
                     if (party_characters[char_row].current_hp == 0) {
                         b->hp_target = 1;
@@ -1628,7 +1628,7 @@ StepResult mode_step_battle_ko(ModeState *ms) {
             /* Check death_type for group death */
             if (enemy_config_table != NULL &&
                 enemy_config_table[target->id].death_type != 0) {
-                /* Group death — set all remaining enemies to alt spritemap */
+                /* Group death, set all remaining enemies to alt spritemap */
                 for (int i = FIRST_ENEMY_INDEX; i < BATTLER_COUNT; i++) {
                     if (bt.battlers_table[i].consciousness != 0)
                         bt.battlers_table[i].use_alt_spritemap = 1;
@@ -1691,7 +1691,7 @@ StepResult mode_step_battle_ko(ModeState *ms) {
                     }
                 }
 
-                /* Check if any party member is still possessed — respawn ghost */
+                /* Check if any party member is still possessed, respawn ghost */
                 for (int i = 0; i < TOTAL_PARTY_COUNT; i++) {
                     Battler *b = &bt.battlers_table[i];
                     if (b->consciousness == 0) continue;
@@ -1709,9 +1709,9 @@ StepResult mode_step_battle_ko(ModeState *ms) {
             return STEP_RESULT_POP(0);
 
         case 10: {
-            /* ---- PLAYER / NPC KO ---- */
+            /* PLAYER / NPC KO */
 
-            /* Check for possession — possessed chars that die have special handling.
+            /* Check for possession, possessed chars that die have special handling.
              * Assembly (ko_target.asm:27-62): when dying target IS possessed,
              * kill the ghost and respawn it for any OTHER possessed member. */
             if (target->afflictions[STATUS_GROUP_PERSISTENT_HARDHEAL] == STATUS_1_POSSESSED) {
@@ -1748,7 +1748,7 @@ StepResult mode_step_battle_ko(ModeState *ms) {
             target->afflictions[STATUS_GROUP_PERSISTENT_HARDHEAL] = 0;
 
             if (target->npc_id != 0) {
-                /* NPC enemy ally death — look up death text from enemy_config_table */
+                /* NPC enemy ally death, look up death text from enemy_config_table */
                 s->pc = 11;
                 if (enemy_config_table != NULL) {
                     uint32_t death_addr = enemy_config_table[target->id].death_text_ptr;
@@ -1807,7 +1807,7 @@ StepResult mode_step_battle_ko(ModeState *ms) {
                     }
                 }
             } else {
-                /* Non-teddy NPC death — reassign front row if needed */
+                /* Non-teddy NPC death, reassign front row if needed */
                 if (game_state.party_npc_1 != 0) {
                     for (int i = 0; i < BATTLER_COUNT; i++) {
                         Battler *b = &bt.battlers_table[i];
@@ -2043,9 +2043,9 @@ uint16_t battle_boss_battle_check(void) {
         if (b->ally_or_enemy != 1)
             continue;
         if (enemy_config_table[b->id].boss != 0)
-            return 0;  /* boss found — can't run */
+            return 0;  /* boss found, can't run */
     }
-    return 1;  /* no bosses — can run */
+    return 1;  /* no bosses, can run */
 }
 
 /*
@@ -2202,7 +2202,7 @@ char *return_battle_target_address(void) {
  * Battle entry points
  * ====================================================================== */
 
-/* ---- Battle action ID constants (from include/constants/actions.asm) ---- */
+/* Battle action ID constants (from include/constants/actions.asm) */
 #define BACT_NO_EFFECT         0
 #define BACT_USE_NO_EFFECT     1
 #define BACT_BASH              4
@@ -2239,7 +2239,7 @@ char *return_battle_target_address(void) {
 #define BACT_FINAL_PRAYER_8    298
 #define BACT_FINAL_PRAYER_9    299
 
-/* ---- Combat constants ---- */
+/* Combat constants */
 #define MUSHROOMIZED_TARGET_CHANGE_CHANCE 25
 #define CHANCE_OF_BODY_MOVING_AGAIN       15
 
@@ -2255,7 +2255,7 @@ char *return_battle_target_address(void) {
 /* color_math_register_table moved to battle_ui.c */
 
 /*
- * CHECK_DEAD_PLAYERS (asm/battle/check_dead_players.asm) — GAME_MODE_CHECK_DEAD_PLAYERS.
+ * CHECK_DEAD_PLAYERS (asm/battle/check_dead_players.asm), GAME_MODE_CHECK_DEAD_PLAYERS.
  *
  * Syncs HP/PP from party char_structs to battlers. If a player battler's HP has
  * dropped to 0 (from rolling HP), marks it unconscious, clears all afflictions,
@@ -2316,7 +2316,7 @@ StepResult mode_step_check_dead_players(ModeState *ms) {
 
         /* A NEW collapse (HP just hit 0, not already unconscious): mark KO, clear
          * afflictions, then push the "X collapsed!" text. (HP != 0, or already
-         * unconscious, falls straight through to the shared sync tail below — the
+         * unconscious, falls straight through to the shared sync tail below, the
          * blocking original's `goto sync_afflictions`.) */
         if (b->hp == 0 &&
             b->afflictions[STATUS_GROUP_PERSISTENT_EASYHEAL] != STATUS_0_UNCONSCIOUS) {
@@ -2335,7 +2335,7 @@ StepResult mode_step_check_dead_players(ModeState *ms) {
             s->pc = 1;
             if (battle_push_text(&child, MSG_BTL5_ALLY_COLLAPSED))
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
-            /* Unresolvable text (warn) — run the after-text path inline. */
+            /* Unresolvable text (warn), run the after-text path inline. */
             dt.blinking_triangle_flag = 0;
             if (!s->existing)
                 redirect_close_focus_window();
@@ -2353,15 +2353,15 @@ StepResult mode_step_check_dead_players(ModeState *ms) {
 }
 
 /*
- * BATTLE_SELECTION_MENU — Port of asm/battle/menu_handler.asm (994 lines).
+ * BATTLE_SELECTION_MENU: Port of asm/battle/menu_handler.asm (994 lines).
  *
  * Handles the entire player battle menu: auto-fight AI (tries PSI Lifeup/Healing
  * before falling back to bash/shoot), manual menu (Bash/Shoot, Goods, Auto Fight,
  * PSI/Spy, Defend, Run Away, Pray/Mirror), target selection, and debug controls.
  *
  * Parameters:
- *   char_id      — 1-based party member ID (NESS=1, PAULA=2, JEFF=3, POO=4)
- *   num_selected — how many characters have already selected actions (0 = first)
+ *   char_id, 1-based party member ID (NESS=1, PAULA=2, JEFF=3, POO=4)
+ *   num_selected, how many characters have already selected actions (0 = first)
  *
  * Returns: selected battle action ID (BACT_*), or 0 for cancel, 0xFFFF for debug exit.
  */
@@ -2444,7 +2444,7 @@ StepResult mode_step_battle_menu(ModeState *ms) {
                 }
             }
 
-            /* ---- Auto-fight AI (fully synchronous: resolves + pops inline) ---- */
+            /* Auto-fight AI (fully synchronous: resolves + pops inline) */
             if (game_state.auto_fight_enable & 0xFF) {
                 uint16_t char_id = st->char_id;
         /* Check for status conditions that prevent PSI decision-making:
@@ -2485,7 +2485,7 @@ StepResult mode_step_battle_menu(ModeState *ms) {
                     }
                 }
                 if (all_critical) {
-                    /* Everyone is below 25% HP — use Omega (target all) */
+                    /* Everyone is below 25% HP, use Omega (target all) */
                     bt.battle_menu_targetting = 4;
                     goto auto_fight_return;
                 }
@@ -2613,7 +2613,7 @@ StepResult mode_step_battle_menu(ModeState *ms) {
                 return STEP_RESULT_POP(bt.battle_menu_selected_action);
             }
 
-            /* ---- Manual menu setup ---- */
+            /* Manual menu setup */
             bt.half_hppp_meter_speed = 1;
 
             /* Determine window type index:
@@ -2730,7 +2730,7 @@ StepResult mode_step_battle_menu(ModeState *ms) {
                     }
                     /* R button = cycle through battle targets (debug) */
                     if (core.pad1_held & PAD_R) {
-                        /* cycle_battle_target — debug-only, skip for now */
+                        /* cycle_battle_target, debug-only, skip for now */
                         st->phase = BM_MAIN;
                         break;
                     }
@@ -2740,7 +2740,7 @@ StepResult mode_step_battle_menu(ModeState *ms) {
                  * skip the second debug block and return 0 directly. */
                 if (ow.battle_mode == 0 && ow.debug_flag) {
                     if (core.pad1_held & PAD_L) {
-                        /* debug_set_char_level — re-init all battler stats */
+                        /* debug_set_char_level, re-init all battler stats */
                         for (int i = 0; i < TOTAL_PARTY_COUNT; i++) {
                             uint8_t member = game_state.party_members[i];
                             if (member < PARTY_MEMBER_NESS || member > PARTY_MEMBER_POO) continue;
@@ -2750,7 +2750,7 @@ StepResult mode_step_battle_menu(ModeState *ms) {
                         break;
                     }
                     if (core.pad1_held & PAD_SELECT) {
-                        /* debug_y_button_goods — debug-only */
+                        /* debug_y_button_goods, debug-only */
                         st->phase = BM_MAIN;
                         break;
                     }
@@ -2841,7 +2841,7 @@ StepResult mode_step_battle_menu(ModeState *ms) {
                 bt.battle_menu_selected_target = (uint8_t)st->char_id;
 
                 if (st->char_id == PARTY_MEMBER_PAULA) {
-                    /* Pray — check Giygas phase for final prayers */
+                    /* Pray, check Giygas phase for final prayers */
                     switch (bt.giygas_phase) {
                     case GIYGAS_START_PRAYING:   st->selected_action = BACT_FINAL_PRAYER_1; break;
                     case GIYGAS_PRAYER_1_USED:   st->selected_action = BACT_FINAL_PRAYER_2; break;
@@ -2857,7 +2857,7 @@ StepResult mode_step_battle_menu(ModeState *ms) {
                     bt.battle_menu_selected_action = st->selected_action;
                     return bm_close_menu(st);
                 } else if (st->char_id == PARTY_MEMBER_POO) {
-                    /* Mirror — needs target selection */
+                    /* Mirror, needs target selection */
                     st->selected_action = BACT_MIRROR;
                     bt.battle_menu_selected_action = st->selected_action;
                     bt.battle_menu_targetting = 17;
@@ -2951,13 +2951,13 @@ StepResult mode_step_battle_menu(ModeState *ms) {
             uint8_t type_category = item_type & 0x30;
 
             if (type_category == 0x10 || type_category == 0x20) {
-                /* Offensive (0x10) or Support (0x20) item — has effect field */
+                /* Offensive (0x10) or Support (0x20) item, has effect field */
                 st->item_effect = item_entry->effect_id;
             } else if (type_category == 0x30) {
-                /* Equipment item — check if usable in battle */
+                /* Equipment item, check if usable in battle */
                 uint8_t equip_subtype = item_type & 0x0C;
                 if (equip_subtype != 0 && equip_subtype != 4) {
-                    /* Not a battle-usable equipment subtype — finish with the
+                    /* Not a battle-usable equipment subtype, finish with the
                      * defaults. Assembly: jumps to SET_DEFAULT_ACTION without
                      * modifying selected_action. */
                     return bm_item_done(st);
@@ -2971,10 +2971,10 @@ StepResult mode_step_battle_menu(ModeState *ms) {
                     return bm_item_done(st);
                 }
 
-                /* Equipment is usable — determine targeting from its effect */
+                /* Equipment is usable, determine targeting from its effect */
                 st->item_effect = item_entry->effect_id;
             } else {
-                /* Other item type — no targeting needed, use the defaults */
+                /* Other item type, no targeting needed, use the defaults */
                 return bm_item_done(st);
             }
 
@@ -3117,8 +3117,8 @@ void set_battler_target(uint16_t attacker_offset, uint16_t target_index) {
  * Closes all windows, ticks rendering, hides HPPP windows, ticks again.
  */
 void close_all_windows_and_hide_hppp(void) {
-    /* Battle-cleanup helper. The assembly issues THREE WINDOW_TICKs — one inside
-     * CLOSE_ALL_WINDOWS plus two explicit — each a separate presented frame in the
+    /* Battle-cleanup helper. The assembly issues THREE WINDOW_TICKs, one inside
+     * CLOSE_ALL_WINDOWS plus two explicit, each a separate presented frame in the
      * blocking original (a 3-frame teardown, the background advancing once per
      * frame). The run-to-completion port renders these as no-actionscript ticks
      * (battle branch = update_battle_screen_effects, no pump, no host yield) that
@@ -3129,7 +3129,7 @@ void close_all_windows_and_hide_hppp(void) {
      *
      * Fix: keep exactly one background advance per presented frame. Do all the
      * state mutation first (hide_hppp_windows only clears the menu indicator and
-     * sets redraw flags — pure buffer/flag writes, independent of window-close
+     * sets redraw flags, pure buffer/flag writes, independent of window-close
      * order), then let close_all_windows()'s single internal window_tick upload the
      * final combined state (windows cleared + HP/PP hidden) and advance the
      * background once. The two explicit ticks rendered no new window state the
@@ -3140,7 +3140,7 @@ void close_all_windows_and_hide_hppp(void) {
 }
 
 /*
- * ENEMY_SELECT_MODE — Port of asm/battle/enemy_select_mode.asm (332 lines).
+ * ENEMY_SELECT_MODE: Port of asm/battle/enemy_select_mode.asm (332 lines).
  *
  * Debug-only interactive battle group selector.
  * Opens a text window with a 4-digit number (the battle group ID).
@@ -3328,7 +3328,7 @@ close_and_return:
 }
 
 /*
- * SHOW_PSI_ANIMATION — Port of asm/battle/show_psi_animation.asm (518 lines).
+ * SHOW_PSI_ANIMATION: Port of asm/battle/show_psi_animation.asm (518 lines).
  *
  * Initializes a PSI visual effect:
  *   1. Loads and decompresses PSI graphics (2bpp → 4bpp conversion if needed)
@@ -3376,7 +3376,7 @@ const uint8_t *consolation_item_table;
  * DISPLAY_TEXT child init for `addr`. `prompt` is the with-prompt variant's
  * blinking_triangle_flag = 1; `has_cnum` is the wait_addr variant's
  * set_cnum(cnum). Returns false (warn, like display_text_from_addr) when the
- * address is unresolvable — the caller falls through to its resume phase
+ * address is unresolvable, the caller falls through to its resume phase
  * inline, which runs the epilogue (clearing the prompt flag). Shared with the
  * battle_actions.c action steppers (battle_internal.h). */
 bool battle_push_text_ex(ModeState *child, uint32_t addr, bool prompt,
@@ -3507,7 +3507,7 @@ static void btl_reinit_scene(BattleRoutineState *st) {
             /* Player character */
             battle_init_player_stats(member_id, &bt.battlers_table[i]);
         } else if (member_id >= 5) {
-            /* NPC party member — look up their enemy config from NPC_AI_TABLE */
+            /* NPC party member, look up their enemy config from NPC_AI_TABLE */
             Battler *b = &bt.battlers_table[i];
             if (npc_ai_table) {
                 uint8_t enemy_cfg = npc_ai_table[member_id * 2 + 1];
@@ -3566,7 +3566,7 @@ static void btl_reinit_party(BattleRoutineState *st) {
         if (member_id >= 1 && member_id <= 4) {
             battle_init_player_stats(member_id, &bt.battlers_table[slot]);
         } else if (member_id >= 5) {
-            /* NPC reinit — check AI table flag */
+            /* NPC reinit, check AI table flag */
             if (npc_ai_table) {
                 uint8_t ai_byte = npc_ai_table[member_id * 2];
                 if ((ai_byte & 1) == 0) continue;
@@ -3873,7 +3873,7 @@ static void btl_store_action(uint16_t member_id, uint16_t selected_action) {
 }
 
 /* ================================================================
- * Phase 6: Enemy AI — select actions (lines 1497-1921)
+ * Phase 6: Enemy AI, select actions (lines 1497-1921)
  * ================================================================ */
 static void btl_enemy_ai(BattleRoutineState *st) {
     {
@@ -4078,7 +4078,7 @@ static int16_t btl_find_attacker(void) {
 static void btl_status_overrides(Battler *attacker) {
     uint8_t status0 = attacker->afflictions[STATUS_GROUP_PERSISTENT_EASYHEAL];
 
-    /* ---- Status override: Paralyzed/Immobilized ---- */
+    /* Status override: Paralyzed/Immobilized */
     if (status0 == STATUS_0_PARALYZED ||
         attacker->afflictions[STATUS_GROUP_TEMPORARY] == STATUS_2_IMMOBILIZED) {
 
@@ -4110,7 +4110,7 @@ static void btl_status_overrides(Battler *attacker) {
         }
     }
 
-    /* ---- Status override: Asleep ---- */
+    /* Status override: Asleep */
     if (attacker->afflictions[STATUS_GROUP_TEMPORARY] == STATUS_2_ASLEEP) {
         if (attacker->current_action != 0) {
             attacker->current_action = BACT_ACTION_253;
@@ -4118,7 +4118,7 @@ static void btl_status_overrides(Battler *attacker) {
         }
     }
 
-    /* ---- Status override: Solidified ---- */
+    /* Status override: Solidified */
     if (attacker->afflictions[STATUS_GROUP_TEMPORARY] == STATUS_2_SOLIDIFIED) {
         if (attacker->current_action != 0) {
             attacker->current_action = BACT_ACTION_255;
@@ -4127,7 +4127,7 @@ static void btl_status_overrides(Battler *attacker) {
         }
     }
 
-    /* ---- Status override: Can't concentrate (blocks PSI) ---- */
+    /* Status override: Can't concentrate (blocks PSI) */
     if (attacker->afflictions[STATUS_GROUP_CONCENTRATION] != 0) {
         uint16_t action_id = attacker->current_action;
         if (battle_action_table && action_id != 0) {
@@ -4138,7 +4138,7 @@ static void btl_status_overrides(Battler *attacker) {
         }
     }
 
-    /* ---- Status override: Homesick (1/8 chance of wasting turn) ---- */
+    /* Status override: Homesick (1/8 chance of wasting turn) */
     if (attacker->afflictions[STATUS_GROUP_HOMESICKNESS] == STATUS_5_HOMESICK) {
         if (attacker->current_action != 0) {
             if ((rand_byte() & 7) == 0) {
@@ -4230,7 +4230,7 @@ static void btl_exec_setup_targets(BattleRoutineState *st, Battler *attacker) {
         }
     }
 
-    /* ---- Prepare and execute the action ---- */
+    /* Prepare and execute the action */
     fix_attacker_name(0);
     set_current_item_far(attacker->current_action_argument);
     set_target_if_targeted();
@@ -4303,7 +4303,7 @@ static void btl_ending_post_cleanup(void) {
     bt.battle_mode_flag = 0;
 }
 
-/* GAME_MODE_BATTLE step — run-to-completion port of battle_routine(). The
+/* GAME_MODE_BATTLE step, run-to-completion port of battle_routine(). The
  * former goto labels map onto the BTL_* phases (see BattleRoutineState,
  * mode_stack.h); the synchronous chunks live in the btl_* helpers above. */
 StepResult mode_step_battle(ModeState *ms) {
@@ -4376,7 +4376,7 @@ StepResult mode_step_battle(ModeState *ms) {
             break;
 
         case BTL_ANNOUNCE:
-            /* Announce initial enemy statuses (asleep, sealed, strange) —
+            /* Announce initial enemy statuses (asleep, sealed, strange), 
              * resumable per enemy (announce_i) and per text (announce_stage). */
             dt.blinking_triangle_flag = 0;
             while (st->announce_i < bt.enemies_in_battle) {
@@ -4419,7 +4419,7 @@ StepResult mode_step_battle(ModeState *ms) {
              * then run the skip-loop inline in BTL_MENU_BODY. The blocking original
              * called check_dead_players() at the top of every slot iteration, but
              * party HP is stable across the loop (menu selection doesn't execute
-             * actions), so every check after the first is a no-op — one push per
+             * actions), so every check after the first is a no-op, one push per
              * menu round is equivalent and avoids per-skipped-slot frame cost. */
             if (st->party_slot >= 6) {
                 st->phase = BTL_ENEMY_AI;
@@ -4593,7 +4593,7 @@ StepResult mode_step_battle(ModeState *ms) {
             break;
 
         case BTL_EXEC:
-            /* Phase 9: execute_turns (lines 2085-2926) — dead-check first. */
+            /* Phase 9: execute_turns (lines 2085-2926), dead-check first. */
             check_dead_players_make_init(&child_init);
             st->phase = BTL_EXEC_BODY;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_CHECK_DEAD_PLAYERS, &child_init);
@@ -4803,7 +4803,7 @@ StepResult mode_step_battle(ModeState *ms) {
             Battler *target = &bt.battlers_table[target_i];
             fix_target_name();
 
-            /* Check if target is dead — only some actions can target dead battlers */
+            /* Check if target is dead, only some actions can target dead battlers */
             if (target->afflictions[STATUS_GROUP_PERSISTENT_EASYHEAL] == STATUS_0_UNCONSCIOUS) {
                 bool can_target_dead = false;
                 for (uint16_t di = 0; dead_targettable_actions[di] != 0; di++) {
@@ -4876,7 +4876,7 @@ StepResult mode_step_battle(ModeState *ms) {
         }
 
         case BTL_AFTER_ACTION: {
-            /* ---- Post-action processing (lines 2927-3035) ---- */
+            /* Post-action processing (lines 2927-3035) */
             dt.blinking_triangle_flag = 0;
             Battler *attacker = &bt.battlers_table[st->attacker];
             st->phase = BTL_AFTER_STATUS;
@@ -4903,7 +4903,7 @@ StepResult mode_step_battle(ModeState *ms) {
             dt.blinking_triangle_flag = 0;
             /* Clear menu indicator */
             clear_battle_menu_character_indicator_far();
-            /* Post-action status recovery — dead-check first. */
+            /* Post-action status recovery, dead-check first. */
             check_dead_players_make_init(&child_init);
             st->phase = BTL_AFTER_STATUS_BODY;
             return STEP_RESULT_PUSH_INIT(GAME_MODE_CHECK_DEAD_PLAYERS, &child_init);
@@ -4914,7 +4914,7 @@ StepResult mode_step_battle(ModeState *ms) {
             fix_target_name();
 
             /* Check for status recovery (the affliction clear runs after the
-             * text, like the assembly — see BTL_AFTER_CURED) */
+             * text, like the assembly, see BTL_AFTER_CURED) */
             uint8_t temp_status = attacker->afflictions[STATUS_GROUP_TEMPORARY];
             uint32_t cured_text = 0;
             if (temp_status == STATUS_2_ASLEEP) {
@@ -5056,7 +5056,7 @@ StepResult mode_step_battle(ModeState *ms) {
 
                 if (gain_exp_prepare(b->id, bt.battle_exp_scratch)) {
                     level_up_make_init(&child_init, b->id);
-                    /* phase stays BTL_VICTORY_EXP — the resume re-enters the loop */
+                    /* phase stays BTL_VICTORY_EXP, the resume re-enters the loop */
                     return STEP_RESULT_PUSH_INIT(GAME_MODE_LEVEL_UP, &child_init);
                 }
             }
@@ -5507,7 +5507,7 @@ void battle_swirl_sequence(void) {
  *
  * For INITIATIVE_NORMAL: requires party min_speed >= max enemy speed AND
  *   party min_offense*2 >= every enemy's (HP + defense).
- * For INITIATIVE_PARTY_FIRST: uses sorted matching — strongest party members
+ * For INITIATIVE_PARTY_FIRST: uses sorted matching, strongest party members
  *   are paired against weakest enemies to simulate sequential attacks.
  *
  * Returns 1 if instant win, 0 otherwise.
@@ -5552,7 +5552,7 @@ static uint16_t instant_win_check(void) {
         if (status1 == STATUS_1_MUSHROOMIZED || status1 == STATUS_1_POSSESSED)
             continue;
 
-        /* Active member — store offense in sorted array */
+        /* Active member, store offense in sorted array */
         if (active_party_count < 4)
             instant_win_sorted_offense[active_party_count] = off;
         active_party_count++;
@@ -5563,7 +5563,7 @@ static uint16_t instant_win_check(void) {
         return 0;
 
     if (bt.battle_initiative == INITIATIVE_NORMAL) {
-        /* --- Normal initiative path --- */
+        /* Normal initiative path */
 
         /* Find max enemy speed */
         for (uint16_t i = 0; i < bt.enemies_in_battle; i++) {
@@ -5589,7 +5589,7 @@ static uint16_t instant_win_check(void) {
         return 1;
     }
 
-    /* --- Party-first initiative path (green swirl) --- */
+    /* Party-first initiative path (green swirl) */
 
     /* Collect enemy HP and defense into sorted arrays */
     for (uint16_t i = 0; i < bt.enemies_in_battle && i < 4; i++) {
@@ -5599,7 +5599,7 @@ static uint16_t instant_win_check(void) {
         instant_win_sorted_defense[i] = ed->defense;
     }
 
-    /* Bubble sort offense array — descending (strongest first) */
+    /* Bubble sort offense array, descending (strongest first) */
     for (;;) {
         int sorted = 1;
         for (uint16_t outer = 0; outer + 1 < active_party_count && outer < 4; outer++) {
@@ -5617,7 +5617,7 @@ static uint16_t instant_win_check(void) {
             break;
     }
 
-    /* Bubble sort enemy arrays — descending by HP (strongest first) */
+    /* Bubble sort enemy arrays, descending by HP (strongest first) */
     for (;;) {
         int sorted = 1;
         for (uint16_t outer = 0; outer + 1 < bt.enemies_in_battle && outer < 4; outer++) {
@@ -5649,12 +5649,12 @@ static uint16_t instant_win_check(void) {
         uint16_t toughness = enemy_hp + enemy_def;
 
         if (attack_power >= toughness) {
-            /* Enemy killed — advance to next enemy */
+            /* Enemy killed, advance to next enemy */
             enemy_idx++;
             if (enemy_idx >= bt.enemies_in_battle)
                 return 1;  /* All enemies defeated */
         } else {
-            /* Enemy survives — reduce its HP by (attack_power - defense) */
+            /* Enemy survives, reduce its HP by (attack_power - defense) */
             uint16_t damage = attack_power - enemy_def;
             instant_win_sorted_hp[enemy_idx] = enemy_hp - damage;
         }
@@ -5677,7 +5677,7 @@ static void iw_fill_palettes(uint16_t color) {
     ert.palette_upload_mode = PALETTE_UPLOAD_FULL;
 }
 
-/* The instant-win screen flash: green, red, blue twice, then black — each
+/* The instant-win screen flash: green, red, blue twice, then black, each
  * entry one fill_palettes_with_color() frame in the blocking original. */
 static const uint16_t iw_flash_colors[7] = {
     0x03E0, 0x001F, 0x7C00, 0x03E0, 0x001F, 0x7C00, 0x0000
@@ -5693,7 +5693,7 @@ static void iw_victory_setup(void) {
     /* Open the battle text window (WINDOW::TEXT_BATTLE = 0x0E) */
     create_window(0x0E);
 
-    /* --- Sum enemy money --- */
+    /* Sum enemy money */
     bt.battle_money_scratch = 0;
     for (uint16_t i = 0; i < bt.enemies_in_battle; i++) {
         uint16_t enemy_id = bt.enemies_in_battle_ids[i];
@@ -5711,7 +5711,7 @@ static void iw_victory_setup(void) {
     total_money += deposited;
     memcpy(game_state.unknownC4, &total_money, 4);
 
-    /* --- Clear and re-init battlers --- */
+    /* Clear and re-init battlers */
     for (int i = 0; i < BATTLER_COUNT; i++) {
         memset(&bt.battlers_table[i], 0, sizeof(Battler));
     }
@@ -5724,7 +5724,7 @@ static void iw_victory_setup(void) {
         battle_init_player_stats((uint16_t)party_member, &bt.battlers_table[i]);
     }
 
-    /* --- Sum enemy EXP --- */
+    /* Sum enemy EXP */
     bt.battle_exp_scratch = 0;
     for (uint16_t i = 0; i < bt.enemies_in_battle; i++) {
         uint16_t enemy_id = bt.enemies_in_battle_ids[i];
@@ -5742,7 +5742,7 @@ static void iw_victory_setup(void) {
 /* The random item-drop roll (verbatim from the blocking instant_win_handler).
  * Leaves the result in bt.item_dropped (0 = nothing dropped). */
 static void iw_roll_drop(void) {
-    /* --- Random item drop --- */
+    /* Random item drop */
     uint16_t rand_enemy_idx = rand_limit(bt.enemies_in_battle);
     uint16_t selected_enemy_id = bt.enemies_in_battle_ids[rand_enemy_idx];
     const EnemyData *drop_enemy = &enemy_config_table[selected_enemy_id];
@@ -5806,7 +5806,7 @@ StepResult mode_step_instant_win(ModeState *state) {
             break;
 
         case IW_FLASH:
-            /* Flash screen green/red/blue twice, then fill with black — one
+            /* Flash screen green/red/blue twice, then fill with black, one
              * palette fill per frame, exactly the blocking fill_palettes_
              * with_color() cadence (work, then the pump's yield). */
             if (st->flash_i < 7) {
@@ -5841,7 +5841,7 @@ StepResult mode_step_instant_win(ModeState *state) {
 
         case IW_VICTORY:
             /* Entity disable, battle text window, money, battler re-init,
-             * EXP split — then the "YOU WON" message with the EXP amount. */
+             * EXP split, then the "YOU WON" message with the EXP amount. */
             iw_victory_setup();
             st->phase = IW_EXP;
             st->battler_i = 0;
@@ -5851,7 +5851,7 @@ StepResult mode_step_instant_win(ModeState *state) {
             break;
 
         case IW_EXP:
-            /* display_text_wait_addr's epilogue (idempotent on re-entry —
+            /* display_text_wait_addr's epilogue (idempotent on re-entry, 
              * LEVEL_UP clears it itself before popping). */
             dt.blinking_triangle_flag = 0;
 
@@ -5873,7 +5873,7 @@ StepResult mode_step_instant_win(ModeState *state) {
 
                 if (gain_exp_prepare(b->id, bt.battle_exp_scratch)) {
                     level_up_make_init(&child_init, b->id);
-                    /* phase stays IW_EXP — the resume re-enters the loop */
+                    /* phase stays IW_EXP, the resume re-enters the loop */
                     return STEP_RESULT_PUSH_INIT(GAME_MODE_LEVEL_UP, &child_init);
                 }
             }
@@ -5895,7 +5895,7 @@ StepResult mode_step_instant_win(ModeState *state) {
             /* display_in_battle_text_addr's epilogue */
             dt.blinking_triangle_flag = 0;
 
-            /* --- Restore music and re-enable entities --- */
+            /* Restore music and re-enable entities */
             close_all_windows();
             hide_hppp_windows();
 
@@ -5912,10 +5912,10 @@ StepResult mode_step_instant_win(ModeState *state) {
 }
 
 /*
- * INSTANT_WIN_PP_RECOVERY — Port of asm/battle/instant_win_pp_recovery.asm (114 lines).
+ * INSTANT_WIN_PP_RECOVERY: Port of asm/battle/instant_win_pp_recovery.asm (114 lines).
  *
  * Called from event scripts after an instant-win battle (the
- * INSTANT_WIN_PP_RECOVERY callroutine — its only caller — plays the recovery
+ * INSTANT_WIN_PP_RECOVERY callroutine, its only caller, plays the recovery
  * SFX at the request point and GAME_MODE_ACTIONSCRIPT_FRAME pushes this mode).
  * Flashes the screen purple twice (palette fade effect), then recovers
  * 20 PP for each party member that is NESS (1), PAULA (2), or POO (4).
@@ -6020,7 +6020,7 @@ StepResult mode_step_battle_entry(ModeState *state) {
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_INSTANT_WIN, &child_init);
             }
 
-            /* Run the battle — init_battle_common's front half:
+            /* Run the battle, init_battle_common's front half:
              * FADE_OUT_WITH_MOSAIC(A=step, X=delay, Y=mosaic_enable) → (1, 1, 0) */
             fade_out(1, 1);
             child_init = (ModeState){0};
@@ -6058,12 +6058,12 @@ StepResult mode_step_battle_entry(ModeState *state) {
                 st->phase = BE_RESET;
                 return STEP_RESULT_PUSH(GAME_MODE_TELEPORT);
             } else if (result == 0) {
-                /* Normal victory — reload the map and fade in */
-                /* Debug: CHECK_VIEW_CHARACTER_MODE — skip in C port */
+                /* Normal victory, reload the map and fade in */
+                /* Debug: CHECK_VIEW_CHARACTER_MODE, skip in C port */
                 reload_map();
                 fade_in(1, 1);
             } else {
-                /* Party defeated or special result — caller handles */
+                /* Party defeated or special result, caller handles */
                 return STEP_RESULT_POP(0);
             }
             st->phase = BE_RESET;
@@ -6184,7 +6184,7 @@ StepResult mode_step_battle_scripted(ModeState *state) {
             return STEP_RESULT_PUSH_INIT(GAME_MODE_BATTLE_WAIT, &child_init);
 
         case BS_SWIRL_DONE:
-            /* Run the actual battle — init_battle_common's front half:
+            /* Run the actual battle, init_battle_common's front half:
              * FADE_OUT_WITH_MOSAIC(A=step, X=delay, Y=mosaic_enable) → (1, 1, 0) */
             fade_out(1, 1);
             child_init = (ModeState){0};
@@ -6207,11 +6207,11 @@ StepResult mode_step_battle_scripted(ModeState *state) {
                 st->phase = (result != 0) ? BS_TELEPORT_DEFEATED : BS_CLEANUP;
                 return STEP_RESULT_PUSH(GAME_MODE_TELEPORT);
             } else if (result == 0) {
-                /* Normal victory — reload map and fade in */
+                /* Normal victory, reload map and fade in */
                 reload_map();
                 fade_in(1, 1);
             } else {
-                /* Party defeated — return immediately */
+                /* Party defeated, return immediately */
                 return STEP_RESULT_POP(1);
             }
             st->phase = BS_CLEANUP;
@@ -6224,7 +6224,7 @@ StepResult mode_step_battle_scripted(ModeState *state) {
             return STEP_RESULT_POP(1);
 
         case BS_CLEANUP:
-            /* Post-battle cleanup — render_and_disable_entities() split at
+            /* Post-battle cleanup, render_and_disable_entities() split at
              * its render_frame_tick yield: the work half here, the entity
              * disable after the yield in BS_FINISH (work-then-yield matches
              * the blocking helper exactly). A parked actionscript frame

@@ -49,11 +49,11 @@ void memory_update_joypad(uint16_t raw_pad) {
     } else {
         /* Same state held */
         if (core.pad_timer != 0) {
-            /* Timer counting down — no auto-repeat yet */
+            /* Timer counting down, no auto-repeat yet */
             core.pad_timer--;
             core.pad1_autorepeat = 0;
         } else {
-            /* Timer expired — fire auto-repeat with current state */
+            /* Timer expired, fire auto-repeat with current state */
             core.pad1_autorepeat = current;
             core.pad_timer = PAD_REPEAT_DELAY;
         }

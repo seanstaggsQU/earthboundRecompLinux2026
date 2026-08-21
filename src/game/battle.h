@@ -1,5 +1,5 @@
 /*
- * Battle system core — data structures, constants, and utility functions.
+ * Battle system core, data structures, constants, and utility functions.
  *
  * Ports structs and enums from:
  *   include/structs.asm (battler, battle_action, enemy_data)
@@ -34,7 +34,7 @@
 #define EB_BATTLE_LETTERBOX 1
 #endif
 
-/* ---- Party member IDs (from include/enums.asm) ---- */
+/* Party member IDs (from include/enums.asm) */
 
 enum PartyMemberId {
     PARTY_MEMBER_NONE              = 0,
@@ -57,7 +57,7 @@ enum PartyMemberId {
     PARTY_MEMBER_PLUSH_TEDDY_BEAR  = 17,
 };
 
-/* ---- Party / battler limits (from include/config.asm) ---- */
+/* Party / battler limits (from include/config.asm) */
 
 #define PLAYER_CHAR_COUNT    4
 #define NONPLAYER_CHAR_COUNT 2
@@ -67,7 +67,7 @@ enum PartyMemberId {
 #define MAX_ENEMY_BATTLER_SLOTS (BATTLER_COUNT - FIRST_ENEMY_INDEX) /* 12 */
 #define MAX_ENEMY_ENCOUNTER_SLOTS 23 /* max enemies in a battle group roster (Giygas phases) */
 
-/* ---- Damage constants (from include/config.asm) ---- */
+/* Damage constants (from include/config.asm) */
 
 #define ROCKIN_ALPHA_DAMAGE   80
 #define ROCKIN_BETA_DAMAGE   180
@@ -113,19 +113,19 @@ enum PartyMemberId {
 #define ENEMY_MASTER_BELCH_2 169
 #define ENEMY_MASTER_BELCH_3 192
 
-/* ---- Combat constants (from include/config.asm) ---- */
+/* Combat constants (from include/config.asm) */
 
 #define GUTS_FLOOR_FOR_SMAAAASH_CHANCE  25
 #define SMAAAASH_FLASH_DURATION         (1 * FRAMES_PER_SECOND)
 #define CHANCE_OF_WAKING_UP_WHEN_ATTACKED 128  /* out of 255 (~50%) */
 
-/* ---- Timing constants (from include/enums.asm) ---- */
+/* Timing constants (from include/enums.asm) */
 
 #define SIXTH_OF_A_SECOND   10
 #define THIRD_OF_A_SECOND   20
 #define HALF_OF_A_SECOND    30
 
-/* ---- Status groups (from include/constants/battle.asm) ---- */
+/* Status groups (from include/constants/battle.asm) */
 
 enum StatusGroup {
     STATUS_GROUP_PERSISTENT_EASYHEAL = 0,
@@ -186,7 +186,7 @@ enum Status6 {
     STATUS_6_SHIELD           = 4,
 };
 
-/* ---- Action types (from include/constants/battle.asm) ---- */
+/* Action types (from include/constants/battle.asm) */
 
 enum ActionDirection {
     ACTION_DIRECTION_PARTY = 0,
@@ -210,7 +210,7 @@ enum ActionType {
     ACTION_TYPE_OTHER             = 5,
 };
 
-/* ---- Initiative (from include/constants/battle.asm) ---- */
+/* Initiative (from include/constants/battle.asm) */
 
 enum Initiative {
     INITIATIVE_NORMAL       = 0,
@@ -218,7 +218,7 @@ enum Initiative {
     INITIATIVE_ENEMIES_FIRST = 2,
 };
 
-/* ---- Initial status for enemies (from include/constants/battle.asm) ---- */
+/* Initial status for enemies (from include/constants/battle.asm) */
 
 enum InitialStatus {
     INITIAL_STATUS_NONE              = 0,
@@ -231,7 +231,7 @@ enum InitialStatus {
     INITIAL_STATUS_STRANGE           = 7,
 };
 
-/* ---- Giygas phases (from include/constants/battle.asm) ---- */
+/* Giygas phases (from include/constants/battle.asm) */
 
 enum GiygasPhase {
     GIYGAS_BATTLE_STARTED        = 1,
@@ -249,7 +249,7 @@ enum GiygasPhase {
     GIYGAS_DEFEATED              = 0xFFFF,
 };
 
-/* ---- Battler struct (78 bytes, from include/structs.asm) ---- */
+/* Battler struct (78 bytes, from include/structs.asm) */
 
 PACKED_STRUCT
 typedef struct {
@@ -312,7 +312,7 @@ typedef struct {
 END_PACKED_STRUCT
 ASSERT_STRUCT_SIZE(Battler, 78);
 
-/* ---- Battle action struct (12 bytes, from include/structs.asm) ---- */
+/* Battle action struct (12 bytes, from include/structs.asm) */
 
 PACKED_STRUCT
 typedef struct {
@@ -326,7 +326,7 @@ typedef struct {
 END_PACKED_STRUCT
 ASSERT_STRUCT_SIZE(BattleAction, 12);
 
-/* ---- Enemy data struct (94 bytes USA, from include/structs.asm) ---- */
+/* Enemy data struct (94 bytes USA, from include/structs.asm) */
 
 #define ENEMY_NAME_SIZE 25  /* USA */
 
@@ -407,7 +407,7 @@ enum EnemyId {
 /* Mirror (metamorphose) system constant */
 #define DEFAULT_MIRROR_TURN_COUNT 16
 
-/* ---- Consolidated battle system runtime state ---- */
+/* Consolidated battle system runtime state */
 typedef struct {
     Battler battlers_table[BATTLER_COUNT];
     uint32_t battler_target_flags;
@@ -525,15 +525,15 @@ extern BattleState bt;
 #define ENEMY_GROUP_BOSS_GIYGAS_AFTER_PRAYER_7 480
 #define ENEMY_GROUP_BOSS_GIYGAS_PHASE_FINAL 483
 
-/* ---- Battle action table (loaded from ROM) ---- */
+/* Battle action table (loaded from ROM) */
 
 extern const BattleAction *battle_action_table;
 
-/* ---- Enemy configuration table (loaded from ROM) ---- */
+/* Enemy configuration table (loaded from ROM) */
 
 extern const EnemyData *enemy_config_table;
 
-/* ---- Battler access helpers ---- */
+/* Battler access helpers */
 
 /* Convert a byte offset to a Battler pointer.
  * In assembly, battler pointers are byte offsets from BATTLERS_TABLE start. */
@@ -546,7 +546,7 @@ static inline uint16_t battler_to_offset(const Battler *b) {
     return (uint16_t)((const uint8_t *)b - (const uint8_t *)bt.battlers_table);
 }
 
-/* ---- HP / PP management ---- */
+/* HP / PP management */
 
 /* SET_HP: Clamp new_hp to [0, hp_max], update hp_target.
  * For player characters, also updates char_struct::current_hp_target.
@@ -568,13 +568,13 @@ void battle_reduce_pp(Battler *target, uint16_t cost);
  * callers use battle_recover_hp_prepare() / battle_recover_pp_prepare()
  * (battle_internal.h) + a battle_push_text STEP_PUSH for the tail text. */
 
-/* ---- Status effects ---- */
+/* Status effects */
 
 /* INFLICT_STATUS_BATTLE: Apply status to target.
  * Returns 1 if status was applied, 0 if blocked (NPC or already active). */
 uint16_t battle_inflict_status(Battler *target, uint16_t status_group, uint16_t status_value);
 
-/* ---- Combat calculations ---- */
+/* Combat calculations */
 
 /* DETERMINE_DODGE: Check if current target dodges current attacker's attack.
  * Returns 1 if dodged, 0 if not. Paralyzed/asleep/immobilized/solidified targets can't dodge. */
@@ -597,7 +597,7 @@ uint16_t battle_success_speed(uint16_t base_chance);
  * side: 0=party, 1=enemies. */
 uint16_t battle_count_chars(uint16_t side);
 
-/* ---- Damage variance ---- */
+/* Damage variance */
 
 /* TWENTY_FIVE_PERCENT_VARIANCE: Apply +/- 12.5% random variance to a value.
  * Uses two random numbers, picks the one closer to center (triangular distribution). */
@@ -607,7 +607,7 @@ uint16_t battle_25pct_variance(uint16_t value);
  * Same triangular distribution method but double the magnitude. */
 uint16_t battle_50pct_variance(uint16_t value);
 
-/* ---- PSI resistance modifiers ---- */
+/* PSI resistance modifiers */
 
 /* CALC_PSI_DMG_MODIFIERS: Returns damage multiplier (0-255) based on resistance level.
  * 0=none(255), 1=low(179), 2=med(102), 3=high(13). Multiply damage × result / 255. */
@@ -617,7 +617,7 @@ uint8_t battle_calc_psi_dmg_modifier(uint8_t resist_level);
  * 0=none(255), 1=low(128), 2=med(26), 3=high(0). */
 uint8_t battle_calc_psi_res_modifier(uint8_t resist_level);
 
-/* ---- Stat modification ---- */
+/* Stat modification */
 
 /* INCREASE_OFFENSE_16TH: Increase target's offense by 1/16th, clamp to base*5/4. */
 void battle_increase_offense(Battler *target);
@@ -631,21 +631,21 @@ void battle_increase_defense(Battler *target);
 /* HEXADECIMATE_DEFENSE: Decrease target's defense by 1/16th, clamp to base*3/4. */
 void battle_decrease_defense(Battler *target);
 
-/* ---- PSI shield ---- */
+/* PSI shield */
 
 /* PSI_SHIELD_NULLIFY is GAME_MODE_BATTLE_CALC kind BC_PSI_SHIELD_NULLIFY
- * (mode_step_battle_calc) — the blocking battle_psi_shield_nullify() form was
+ * (mode_step_battle_calc), the blocking battle_psi_shield_nullify() form was
  * deleted with pump_mode; STEP_PUSH via battle_calc_make_init instead. */
 
-/* ---- KO / Revive ---- */
+/* KO / Revive */
 
-/* KO_TARGET is GAME_MODE_BATTLE_KO (mode_step_battle_ko, battle.c) — pushed
+/* KO_TARGET is GAME_MODE_BATTLE_KO (mode_step_battle_ko, battle.c), pushed
  * via battle_ko_make_init (battle_internal.h). */
 
 /* REVIVE_TARGET is GAME_MODE_BATTLE_REVIVE (mode_step_battle_revive,
- * battle.c) — pushed via battle_revive_make_init (battle_internal.h). */
+ * battle.c), pushed via battle_revive_make_init (battle_internal.h). */
 
-/* ---- Damage application ---- */
+/* Damage application */
 
 /* GET_BATTLE_ACTION_TYPE: Look up the action type (physical/PSI/etc.) for a given action ID. */
 uint16_t battle_get_action_type(uint16_t action_id);
@@ -653,7 +653,7 @@ uint16_t battle_get_action_type(uint16_t action_id);
 /* The damage/miss/smaaaash/level-attack/heal-strangeness/weaken-shield blocking
  * forms (battle_calc_damage / battle_calc_resist_damage / battle_miss_calc /
  * battle_smaaaash / battle_level_[1-4]_attack / battle_heal_strangeness /
- * battle_weaken_shield) were deleted with pump_mode at cutover — they are now
+ * battle_weaken_shield) were deleted with pump_mode at cutover, they are now
  * GAME_MODE_BATTLE_CALC kinds (BC_CALC_DAMAGE / BC_RESIST_DAMAGE / BC_MISS_CALC /
  * BC_SMAAAASH / BC_HEAL_STRANGENESS / BC_WEAKEN_SHIELD) and the btlact_level_N_attack
  * steppers, STEP_PUSHed via battle_calc_make_init. */
@@ -663,7 +663,7 @@ uint16_t battle_get_action_type(uint16_t action_id);
  * Returns 0 if new shield applied, 1 if existing shield refreshed. */
 uint16_t battle_shields_common(Battler *target, uint16_t shield_type);
 
-/* ---- Battle action IDs (from include/constants/actions.asm, subset) ---- */
+/* Battle action IDs (from include/constants/actions.asm, subset) */
 
 enum BattleActionId {
     BATTLE_ACTION_PSI_LIFEUP_ALPHA     = 32,
@@ -704,7 +704,7 @@ enum BattleActionId {
     BATTLE_ACTION_ACTION_158           = 158,
 };
 
-/* ---- Targeting ---- */
+/* Targeting */
 
 /* TARGET_BATTLER: Set the bit for battler_index in battler_target_flags. */
 void battle_target_battler(uint16_t battler_index);
@@ -743,12 +743,12 @@ void battle_remove_status_untargettable_targets(void);
 /* SET_BATTLER_TARGETS_BY_ACTION: Set battler_target_flags based on action targeting type. */
 void set_battler_targets_by_action(uint16_t attacker_offset);
 
-/* ---- Enemy lookup ---- */
+/* Enemy lookup */
 
 /* GET_ENEMY_TYPE: Returns the type byte for enemy at given index. */
 uint16_t battle_get_enemy_type(uint16_t enemy_id);
 
-/* ---- Luck-based success checks ---- */
+/* Luck-based success checks */
 
 /* SUCCESS_LUCK40: Random check vs target's luck with range 40.
  * Returns 1 if rand(40) >= target.luck, 0 otherwise. */
@@ -758,22 +758,22 @@ uint16_t battle_success_luck40(void);
  * Returns 1 if rand(80) >= target.luck, 0 otherwise. */
 uint16_t battle_success_luck80(void);
 
-/* FAIL_ATTACK_ON_NPCS is GAME_MODE_BATTLE_CALC kind BC_FAIL_ON_NPCS — the
+/* FAIL_ATTACK_ON_NPCS is GAME_MODE_BATTLE_CALC kind BC_FAIL_ON_NPCS, the
  * blocking battle_fail_attack_on_npcs() form was deleted with pump_mode. */
 
-/* ---- Status HP loss ---- */
+/* Status HP loss */
 
 /* LOSE_HP_STATUS: Reduce target's HP by amount (status damage like poison).
  * Subtracts directly from hp_target, floors at 0. */
 void battle_lose_hp_status(Battler *target, uint16_t amount);
 
-/* ---- Shield targeting ---- */
+/* Shield targeting */
 
 /* GET_SHIELD_TARGETTING: Returns 1 if the shield action targets a single ally
  * (sigma/omega variants), 0 for all-ally targeting (alpha/beta). */
 uint16_t battle_get_shield_targeting(uint16_t action);
 
-/* ---- Additional targeting ---- */
+/* Additional targeting */
 
 /* TARGET_ALLIES: Set bits for all party members and NPC allies. */
 void battle_target_allies(void);
@@ -784,7 +784,7 @@ void battle_remove_npc_targeting(void);
 /* FEELING_STRANGE_RETARGETTING: Re-roll targeting for a confused battler. */
 void battle_feeling_strange_retargeting(void);
 
-/* ---- Post-battle ---- */
+/* Post-battle */
 
 /* RESET_POST_BATTLE_STATS: Clear temporary afflictions from party after battle. */
 void battle_reset_post_battle_stats(void);
@@ -801,9 +801,9 @@ char *return_battle_target_address(void);
 /* ENEMY_FLASHING_OFF: Turn off the currently flashing enemy sprite during targeting. */
 void enemy_flashing_off(void);
 
-/* ---- Battle action handlers ---- */
+/* Battle action handlers */
 
-/* (The blocking PSI Flash sub-effect forms were dead bridges and were deleted —
+/* (The blocking PSI Flash sub-effect forms were dead bridges and were deleted , 
  * item #6; the live logic is in the battle_actions.c steppers.) */
 
 /* Null/empty actions (pure, stepper-less: their blocking form is the .func column) */
@@ -848,7 +848,7 @@ void btlact_steal(void);
 /* Character stat recalculation */
 void recalc_character_miss_rate(uint16_t character_id);
 
-/* ---- Battle initialization ---- */
+/* Battle initialization */
 
 /* FIND_NEXT_ENEMY_LETTER (asm/battle/find_next_enemy_letter.asm)
  * Scans battlers_table for enemies with the same ID, marks their letters as used,
@@ -865,16 +865,16 @@ void battle_init_enemy_stats(Battler *battler, uint16_t enemy_id);
  * afflictions, and calculates PSI resistances. character is 1-based. */
 void battle_init_player_stats(uint16_t character, Battler *target);
 
-/* ---- Battle entry points (asm/battle/init_*.asm) ---- */
+/* Battle entry points (asm/battle/init_*.asm) */
 
-/* INIT_BATTLE_OVERWORLD (asm/battle/init_overworld.asm) — random encounters from
- * the overworld — is GAME_MODE_BATTLE_ENTRY (mode_step_battle_entry); the overworld
+/* INIT_BATTLE_OVERWORLD (asm/battle/init_overworld.asm), random encounters from
+ * the overworld, is GAME_MODE_BATTLE_ENTRY (mode_step_battle_entry); the overworld
  * root STEP_PUSHes it. (The init_battle_overworld() pump bridge was deleted in D4b;
  * scripted battles run as GAME_MODE_BATTLE_SCRIPTED pushed by CC_1F_23.) */
 
-/* ---- External dependencies (implemented elsewhere) ---- */
+/* External dependencies (implemented elsewhere) */
 
-/* Battle text display — port of asm/text/display_in_battle_text.asm. All of its
+/* Battle text display, port of asm/text/display_in_battle_text.asm. All of its
  * blocking forms (non-_addr, with-prompt, display_text_wait_addr, _addr) are now
  * deleted: every battle-text caller uses the prepare + battle_push_text STEP_PUSH
  * path (resolve MSG_BTL_* addresses from data/battle_text_data.h). */
@@ -900,7 +900,7 @@ extern void fix_attacker_name(uint16_t param);
 extern void fix_target_name(void);
 extern void set_target_if_targeted(void);
 /* APPLY_ACTION_TO_TARGETS is GAME_MODE_BATTLE_APPLY (mode_step_battle_apply,
- * battle.c) — pushed/pumped via battle_apply_make_init (battle_internal.h). */
+ * battle.c), pushed/pumped via battle_apply_make_init (battle_internal.h). */
 
 /* Battle utility functions */
 extern uint16_t is_row_valid(void);
@@ -986,7 +986,7 @@ void initialize_battle_ui_state(void);
  * Configures and starts the battle swirl screen transition effect. */
 void battle_swirl_sequence(void);
 
-/* PSI animation system — visual effects for PSI attacks in battle.
+/* PSI animation system, visual effects for PSI attacks in battle.
  * PSI_ANIMATION_ENEMY_TARGETS tracks which enemy sprite slots are affected.
  * PSI_ANIMATION_X/Y_OFFSET positions the animation relative to the target. */
 
@@ -1017,7 +1017,7 @@ bool check_battle_target_type(uint16_t ally_effect, uint16_t enemy_effect);
  * Backs up palettes to buffer+0x2000, then replaces with grey. */
 void desaturate_palettes(void);
 
-/* ---- PSI constants (from constants/battle.asm) ---- */
+/* PSI constants (from constants/battle.asm) */
 
 /* PSI category flags (PSI_CATEGORY bitmask) */
 #define PSI_CAT_OFFENSE   1
@@ -1071,14 +1071,14 @@ ASSERT_STRUCT_SIZE(PsiAbility, 15);
 #define PSI_TELEPORT_ALPHA   51
 #define PSI_TELEPORT_BETA    52
 
-/* ---- PSI ability table (loaded from ROM binary asset) ---- */
+/* PSI ability table (loaded from ROM binary asset) */
 
 /* Pointer to the PSI ability table.  Loaded lazily by
  * ensure_battle_psi_table(). */
 extern const PsiAbility *battle_psi_table;
 bool ensure_battle_psi_table(void);
 
-/* ---- PSI availability checks ---- */
+/* PSI availability checks */
 
 /* CHECK_CHARACTER_HAS_PSI_ABILITY: Port of asm/text/check_character_has_psi_ability.asm.
  * Returns 1 if char_id has any PSI ability matching usability and category masks. */
@@ -1090,7 +1090,7 @@ uint16_t check_character_has_psi_ability(uint16_t char_id,
  * Returns nonzero if the character has PSI abilities in the given category (1-3). */
 uint16_t check_psi_category_available(uint16_t category, uint16_t char_id);
 
-/* ---- PSI menu shared functions (used by status menu in text.c) ---- */
+/* PSI menu shared functions (used by status menu in text.c) */
 
 /* GENERATE_BATTLE_PSI_LIST: Port of asm/battle/ui/generate_battle_psi_list.asm.
  * Cursor move callback that generates the PSI ability list for a category.
@@ -1112,13 +1112,13 @@ void display_character_psi_list(uint16_t char_id);
 void display_psi_description(uint16_t ability_id);
 
 
-/* ---- Targeting ---- */
+/* Targeting */
 
 /* JUMP_TEMP_FUNCTION_POINTER (asm/overworld/jump_temp_function_pointer.asm).
  * Dispatches the battle action at the ROM address stored in
  * temp_function_pointer.  Looks up the address in the btlact_dispatch_table
  * and calls the corresponding C function. Converted actions (those with a
- * resumable GAME_MODE_BATTLE_ACTION stepper) are pumped to completion here —
+ * resumable GAME_MODE_BATTLE_ACTION stepper) are pumped to completion here , 
  * this is the blocking bridge for unconverted drivers and action→action
  * calls. */
 void jump_temp_function_pointer(void);
@@ -1126,19 +1126,19 @@ void jump_temp_function_pointer(void);
 /* Driver-side battle-action dispatch for converted mode steps (battle.c
  * BTL_TARGET, text.c PS_EXEC_* / UI_EXEC_*). Writes `func_addr` to
  * bt.temp_function_pointer (as the assembly does before the JML), then either
- * fills *init for a GAME_MODE_BATTLE_ACTION STEP_PUSH (converted action —
+ * fills *init for a GAME_MODE_BATTLE_ACTION STEP_PUSH (converted action , 
  * returns true) or runs the action inline-blocking via
  * jump_temp_function_pointer (returns false). */
 union ModeState;
 bool battle_action_dispatch(uint32_t func_addr, union ModeState *init);
 
-/* --- Shared utility functions (promoted from static for sound stone, etc.) --- */
+/* Shared utility functions (promoted from static for sound stone, etc.) */
 
 /* FORCE_BLANK_AND_WAIT_VBLANK (asm/system/force_blank_and_wait_vblank.asm)
  * Sets force blank, disables HDMA, cancels fade, waits one frame. */
 void force_blank_and_wait_vblank(void);
 
-/* BLANK_SCREEN_AND_WAIT_VBLANK — like above but keeps HDMA and fade. */
+/* BLANK_SCREEN_AND_WAIT_VBLANK, like above but keeps HDMA and fade. */
 void blank_screen_and_wait_vblank(void);
 
 /* Park-propagating forms (savestate cutover): return true iff an actionscript

@@ -1,7 +1,7 @@
 /*
  * Battle calculation functions.
  *
- * Extracted from battle.c — contains damage calculations, success checks,
+ * Extracted from battle.c, contains damage calculations, success checks,
  * dodge/miss/smash mechanics, stat modifiers, shield handling, and
  * physical attack level implementations.
  */
@@ -34,7 +34,7 @@
  * point (at the pushing pc, never re-run at a resume pc).
  *
  * The KO checks in BC_RESIST_DAMAGE are GAME_MODE_BATTLE_KO child pushes
- * (the death driver — death text, palette flashes, the final-attack path —
+ * (the death driver, death text, palette flashes, the final-attack path, 
  * is its own mode; see mode_step_battle_ko, battle.c).
  *
  * The blocking battle_*() forms (battle_miss_calc / battle_smaaaash /
@@ -104,7 +104,7 @@ uint16_t battle_success_speed(uint16_t base_chance) {
     uint16_t adjusted_threshold;
 
     if (target_speed_2x < attacker_speed) {
-        /* Attacker is faster — threshold = 0 (always succeeds) */
+        /* Attacker is faster, threshold = 0 (always succeeds) */
         adjusted_threshold = 0;
     } else {
         /* Target has speed advantage */
@@ -129,7 +129,7 @@ uint16_t battle_success_speed(uint16_t base_chance) {
 uint16_t battle_determine_dodge(void) {
     Battler *tgt = battler_from_offset(bt.current_target);
 
-    /* Status checks — disabled targets can't dodge */
+    /* Status checks, disabled targets can't dodge */
     if (tgt->afflictions[STATUS_GROUP_PERSISTENT_EASYHEAL] == STATUS_0_PARALYZED)
         return 0;
 
@@ -205,7 +205,7 @@ uint16_t battle_25pct_variance(uint16_t value) {
 /*
  * FIFTY_PERCENT_VARIANCE (asm/battle/50_percent_variance.asm)
  *
- * Same as 25% variance but without the /2 — full percentage offset.
+ * Same as 25% variance but without the /2, full percentage offset.
  * Effective range is roughly +/- 25%.
  */
 uint16_t battle_50pct_variance(uint16_t value) {
@@ -225,7 +225,7 @@ uint16_t battle_50pct_variance(uint16_t value) {
         chosen_abs = abs_r2;
     }
 
-    /* No /2 for 50% variant — full adjustment */
+    /* No /2 for 50% variant, full adjustment */
     uint8_t adjustment = (uint8_t)(((uint16_t)value * chosen_abs) >> 8);
 
     if (chosen < 0) {
@@ -250,10 +250,10 @@ uint16_t battle_50pct_variance(uint16_t value) {
  */
 uint8_t battle_calc_psi_dmg_modifier(uint8_t resist_level) {
     switch (resist_level) {
-        case 0: return 255;  /* No resistance — full damage */
-        case 1: return 179;  /* Low — ~70% */
-        case 2: return 102;  /* Medium — ~40% */
-        case 3: return 13;   /* High — ~5% */
+        case 0: return 255;  /* No resistance, full damage */
+        case 1: return 179;  /* Low, ~70% */
+        case 2: return 102;  /* Medium, ~40% */
+        case 3: return 13;   /* High, ~5% */
         default: return 255;
     }
 }
@@ -266,10 +266,10 @@ uint8_t battle_calc_psi_dmg_modifier(uint8_t resist_level) {
  */
 uint8_t battle_calc_psi_res_modifier(uint8_t resist_level) {
     switch (resist_level) {
-        case 0: return 255;  /* No resistance — always lands */
-        case 1: return 128;  /* Low — ~50% */
-        case 2: return 26;   /* Medium — ~10% */
-        case 3: return 0;    /* High — immune */
+        case 0: return 255;  /* No resistance, always lands */
+        case 1: return 128;  /* Low, ~50% */
+        case 2: return 26;   /* Medium, ~10% */
+        case 3: return 0;    /* High, immune */
         default: return 255;
     }
 }
@@ -406,13 +406,13 @@ static StepResult bc_psi_shield_nullify_step(BattleCalcState *st) {
             uint8_t shield = tgt->afflictions[STATUS_GROUP_SHIELD];
 
             if (shield == STATUS_6_PSI_SHIELD_POWER) {
-                /* PSI Shield Power — reflect attack */
+                /* PSI Shield Power, reflect attack */
                 st->pc = 1;
                 if (battle_push_text(&child, MSG_BTL5_PSI_POWER_SHIELD_DEFLECTED))
                     return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
                 break;
             } else if (shield == STATUS_6_PSI_SHIELD) {
-                /* PSI Shield — absorb attack */
+                /* PSI Shield, absorb attack */
                 st->pc = 2;
                 if (battle_push_text(&child, MSG_BTL5_PSYCHIC_SHIELD_NULLIFIED))
                     return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
@@ -639,7 +639,7 @@ static StepResult bc_calc_damage_step(BattleCalcState *st) {
         }
 
         case 2:
-            /* Post-text effects — everything the blocking form runs AFTER
+            /* Post-text effects, everything the blocking form runs AFTER
              * display_text_wait_addr returns. */
             dt.blinking_triangle_flag = 0;
             tgt = battler_from_offset(st->arg0);
@@ -702,14 +702,14 @@ static StepResult bc_calc_damage_step(BattleCalcState *st) {
  *  10. Check sleep wake chance
  *
  * Parameters:
- *   damage: raw damage amount (may be negative for heals — floored to 0)
+ *   damage: raw damage amount (may be negative for heals, floored to 0)
  *   resist_modifier: 0-255 resistance factor (255 = full damage)
  *
  * Returns: final damage dealt (after all modifiers)
  *
  * Resumable (BC_RESIST_DAMAGE): arg0 = the mutable damage (the blocking
  * local), arg1 = resist_modifier, local[0] = reflected damage. The target
- * is re-derived from bt.current_target at each pc — BC_CALC_DAMAGE's Giygas
+ * is re-derived from bt.current_target at each pc, BC_CALC_DAMAGE's Giygas
  * redirect restores it before popping, and the reflection swap/swap-back
  * brackets pcs 2-3/9 exactly as in the blocking form. Both KO checks are
  * GAME_MODE_BATTLE_KO child pushes. pc map: 0 = modifiers + push
@@ -941,7 +941,7 @@ static StepResult bc_miss_calc_step(BattleCalcState *st) {
         uint16_t miss_chance;
 
         if (atk->ally_or_enemy == 0 && atk->npc_id == 0) {
-            /* Player character — look up weapon miss rate */
+            /* Player character, look up weapon miss rate */
             uint8_t char_row = atk->row;
             uint8_t weapon_slot = party_characters[char_row].equipment[EQUIP_WEAPON];
 
@@ -961,7 +961,7 @@ static StepResult bc_miss_calc_step(BattleCalcState *st) {
                     miss_chance = 1;
                 }
             } else {
-                /* No weapon — default miss chance of 1/16 */
+                /* No weapon, default miss chance of 1/16 */
                 miss_chance = 1;
             }
 
@@ -971,7 +971,7 @@ static StepResult bc_miss_calc_step(BattleCalcState *st) {
                 miss_chance += 8;
             }
         } else {
-            /* Enemy or NPC — read miss_rate from enemy config table */
+            /* Enemy or NPC, read miss_rate from enemy config table */
             if (enemy_config_table != NULL) {
                 miss_chance = enemy_config_table[atk->id].miss_rate;
             } else {
@@ -991,7 +991,7 @@ static StepResult bc_miss_calc_step(BattleCalcState *st) {
                                              ? MSG_BTL4_RESULT_NARROWLY_MISSED  /* gun miss */
                                              : MSG_BTL4_RESULT_JUST_MISSED))    /* physical miss */
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
-            /* FALLTHROUGH — unresolvable text: epilogue inline */
+            /* FALLTHROUGH: unresolvable text: epilogue inline */
         } else {
             return STEP_RESULT_POP(0);
         }
@@ -1026,7 +1026,7 @@ static StepResult bc_miss_calc_step(BattleCalcState *st) {
  * Returns: 1 if SMAAAASH, 0 if not
  *
  * Resumable (BC_SMAAAASH): pc 0 = the one RNG roll + flash + push the
- * SMAAAASH text; pc 1 = post-text work (shield weaken / flag / damage —
+ * SMAAAASH text; pc 1 = post-text work (shield weaken / flag / damage, 
  * all of which the blocking form runs AFTER the text) + push
  * BC_RESIST_DAMAGE; pc 2 = pop 1.
  */
@@ -1161,7 +1161,7 @@ static StepResult bc_weaken_shield_step(BattleCalcState *st) {
             st->pc = 1;
             if (battle_push_text(&child, MSG_BTL5_SHIELD_DISAPPEARED))
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_DISPLAY_TEXT, &child);
-            /* FALLTHROUGH — unresolvable text: epilogue inline */
+            /* FALLTHROUGH: unresolvable text: epilogue inline */
         } else {
             bt.damage_is_reflected = 0;
             return STEP_RESULT_POP(0);
@@ -1205,14 +1205,14 @@ static StepResult bc_weaken_shield_step(BattleCalcState *st) {
  */
 uint16_t battle_shields_common(Battler *target, uint16_t shield_type) {
     if (target->afflictions[STATUS_GROUP_SHIELD] == (uint8_t)shield_type) {
-        /* Same shield already active — refresh by adding 3, cap at 8 */
+        /* Same shield already active, refresh by adding 3, cap at 8 */
         target->shield_hp += 3;
         if (target->shield_hp >= 9)
             target->shield_hp = 8;
         return 1;
     }
 
-    /* New shield type (or no shield) — apply fresh */
+    /* New shield type (or no shield), apply fresh */
     target->afflictions[STATUS_GROUP_SHIELD] = (uint8_t)shield_type;
     target->shield_hp = 3;
     return 0;

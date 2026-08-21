@@ -2,23 +2,23 @@
  * Overworld initialization functions needed by attract mode.
  *
  * Ported from:
- *   OVERWORLD_INITIALIZE        — asm/overworld/initialize.asm
- *   OVERWORLD_SETUP_VRAM        — asm/overworld/setup_vram.asm
- *   PLACE_LEADER_AT_POSITION    — asm/overworld/place_leader_at_position.asm
- *   INITIALIZE_MISC_OBJECT_DATA — asm/overworld/initialize_misc_object_data.asm
- *   RESET_PARTY_STATE           — asm/overworld/reset_party_state.asm
- *   INITIALIZE_PARTY            — asm/overworld/initialize_party.asm
- *   CLEAR_MAP_ENTITIES          — asm/overworld/clear_map_entities.asm
- *   REMOVE_ENTITY               — asm/overworld/remove_entity.asm
- *   GET_ON_BICYCLE              — asm/overworld/get_on_bicycle.asm
- *   DISMOUNT_BICYCLE            — asm/overworld/dismount_bicycle.asm
- *   UPDATE_OVERWORLD_FRAME      — asm/overworld/update_overworld_frame.asm
- *   UPDATE_ENTITY_SCREEN_POSITIONS — asm/overworld/entity/update_entity_screen_positions.asm
- *   UPDATE_SCREEN               — asm/overworld/clear_oam_and_update_screen.asm
- *   WAIT_FRAMES_WITH_UPDATES    — asm/overworld/wait_frames_with_updates.asm
- *   RUN_FRAMES_UNTIL_FADE_DONE  — asm/system/palette/run_frames_until_fade_done.asm
- *   RENDER_FRAME_TICK           — asm/system/render_frame_tick.asm
- *   ALLOC_SPRITE_MEM            — asm/system/alloc_sprite_mem.asm
+ *   OVERWORLD_INITIALIZE: asm/overworld/initialize.asm
+ *   OVERWORLD_SETUP_VRAM: asm/overworld/setup_vram.asm
+ *   PLACE_LEADER_AT_POSITION: asm/overworld/place_leader_at_position.asm
+ *   INITIALIZE_MISC_OBJECT_DATA, asm/overworld/initialize_misc_object_data.asm
+ *   RESET_PARTY_STATE: asm/overworld/reset_party_state.asm
+ *   INITIALIZE_PARTY: asm/overworld/initialize_party.asm
+ *   CLEAR_MAP_ENTITIES: asm/overworld/clear_map_entities.asm
+ *   REMOVE_ENTITY: asm/overworld/remove_entity.asm
+ *   GET_ON_BICYCLE: asm/overworld/get_on_bicycle.asm
+ *   DISMOUNT_BICYCLE: asm/overworld/dismount_bicycle.asm
+ *   UPDATE_OVERWORLD_FRAME: asm/overworld/update_overworld_frame.asm
+ *   UPDATE_ENTITY_SCREEN_POSITIONS, asm/overworld/entity/update_entity_screen_positions.asm
+ *   UPDATE_SCREEN: asm/overworld/clear_oam_and_update_screen.asm
+ *   WAIT_FRAMES_WITH_UPDATES: asm/overworld/wait_frames_with_updates.asm
+ *   RUN_FRAMES_UNTIL_FADE_DONE: asm/system/palette/run_frames_until_fade_done.asm
+ *   RENDER_FRAME_TICK: asm/system/render_frame_tick.asm
+ *   ALLOC_SPRITE_MEM: asm/system/alloc_sprite_mem.asm
  */
 
 #include "game/overworld_internal.h"
@@ -74,7 +74,7 @@ OverworldState ow = {
     .current_queued_interaction_type = 0xFFFF,
 };
 
-/* ---- OVERWORLD_SETUP_VRAM (asm/overworld/setup_vram.asm) ---- */
+/* OVERWORLD_SETUP_VRAM (asm/overworld/setup_vram.asm) */
 void overworld_setup_vram(void) {
     /* SET_BGMODE(9): mode 1, BG3 priority bit set */
     ppu.bgmode = 0x09;
@@ -97,11 +97,11 @@ void overworld_setup_vram(void) {
     ppu.bg_hofs[2] = 0;
     ppu.bg_vofs[2] = 0;
 
-    /* The overworld BG3 is always the 32-tile text/overlay layer — never a
+    /* The overworld BG3 is always the 32-tile text/overlay layer, never a
      * filling layer. Force CENTER (render at SNES_WIDTH, centered with blank
      * gutters) to clear any stale BG_VIEWPORT_FILL left over from the intro
      * company logos (logo_screen.c sets FILL on BG3 and never resets it). Without
-     * this, attract mode — which runs before file_select.c restores CENTER —
+     * this, attract mode, which runs before file_select.c restores CENTER , 
      * renders full-screen BG3 credit cards ("Produced by Shigesato Itoi",
      * "Nintendo Presentation") with the 256px tilemap wrapping across a wider
      * viewport, duplicating the image into the gutter. Inert at native res. */
@@ -125,14 +125,14 @@ void overworld_setup_vram(void) {
     /* sprite_x_offset/sprite_y_offset stay 0: overworld entity/OAM positions
      * are already computed camera-relative (EB_VIEWPORT_CENTER_X/Y math in
      * map_loader.c/callroutine*.c), so they're already correct across the
-     * full canvas -- a nonzero sprite_y_offset would double-shift every
+     * full canvas, a nonzero sprite_y_offset would double-shift every
      * entity and would incorrectly cull entities in the wide-FOV zoom's
      * extra revealed area (render_obj_scanline's off-native-range cull is
      * gated on sprite_y_offset != 0).
      *
      * bg_win_y_offset (a separate field, see its comment in ppu.h) DOES need
      * EB_VIEWPORT_PAD_TOP here: it's what aligns the non-filling text/window
-     * BG3 layer -- which draws in fixed screen-space, not camera-relative --
+     * BG3 layer, which draws in fixed screen-space, not camera-relative,
      * with the vertically-centered native slice the default (non-zoomed)
      * display crops to (platform_video_end_frame(), sdl2_video.c). Without
      * this, dialogue/menu windows render top-aligned to the full 256-tall
@@ -143,22 +143,22 @@ void overworld_setup_vram(void) {
     ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP;
 }
 
-/* ---- OVERWORLD_INITIALIZE (asm/overworld/initialize.asm) ---- */
+/* OVERWORLD_INITIALIZE (asm/overworld/initialize.asm) */
 void overworld_initialize(void) {
     overworld_setup_vram();
 
     /* Assembly: COPY_TO_VRAM1P with size=0 and fixed-source DMA mode 3.
-     * On SNES, DMA size 0 means 0x10000 (65536) bytes — clears ALL VRAM. */
+     * On SNES, DMA size 0 means 0x10000 (65536) bytes, clears ALL VRAM. */
     memset(ppu.vram, 0, sizeof(ppu.vram));
 
-    /* Reset tracking variables — invalidate both overworld.c caches and
+    /* Reset tracking variables, invalidate both overworld.c caches and
      * the tileset combo cache in map_loader.c so next sector load reloads GFX. */
     ow.loaded_map_palette = -1;
     ow.loaded_map_tile_combo = -1;
     invalidate_loaded_tileset_combo();
 }
 
-/* ---- PLACE_LEADER_AT_POSITION (asm/overworld/place_leader_at_position.asm) ---- */
+/* PLACE_LEADER_AT_POSITION (asm/overworld/place_leader_at_position.asm) */
 void place_leader_at_position(uint16_t x, uint16_t y) {
     /* Assembly params: A = y_coord, X = x_coord
      * Then TXY (Y = X = x_coord), TAX (X = A = y_coord)
@@ -215,7 +215,7 @@ void clear_all_enemies(void) {
     ow.overworld_enemy_count = 0;
 
     /* Remove all entities that are NOT party members.
-     * Assembly: INC; CMP #6; BLTEQ — skips if (script_id + 1) <= 6,
+     * Assembly: INC; CMP #6; BLTEQ, skips if (script_id + 1) <= 6,
      * i.e., script_id <= 5 (party slots 0-5) or -1 (inactive, wraps to 0). */
     for (int i = 0; i < MAX_ENTITIES; i++) {
         int16_t script_id = entities.script_table[ENT(i)];
@@ -230,7 +230,7 @@ void clear_all_enemies(void) {
     }
 }
 
-/* ---- INITIALIZE_MISC_OBJECT_DATA (asm/overworld/initialize_misc_object_data.asm) ---- */
+/* INITIALIZE_MISC_OBJECT_DATA (asm/overworld/initialize_misc_object_data.asm) */
 void initialize_misc_object_data(void) {
     for (int i = 0; i < MAX_ENTITIES; i++) {
         entities.movement_speeds[i] = 0;
@@ -313,7 +313,7 @@ uint16_t check_enemy_should_flee(void) {
     int16_t offset = ENT(ert.current_entity_slot);
     uint16_t npc_id = entities.npc_ids[offset] & 0x7FFF;
 
-    /* --- Run-away flag check (BTL_ENTRY_PTR_TABLE) --- */
+    /* Run-away flag check (BTL_ENTRY_PTR_TABLE) */
     static const uint8_t *btl_ptr_tbl = NULL;
     if (!btl_ptr_tbl)
         btl_ptr_tbl = ASSET_DATA(ASSET_DATA_BTL_ENTRY_PTR_TABLE_BIN);
@@ -330,7 +330,7 @@ uint16_t check_enemy_should_flee(void) {
         }
     }
 
-    /* --- Level threshold checks --- */
+    /* Level threshold checks */
     uint16_t level_sum = sum_alive_party_levels();
     uint16_t enemy_id = (uint16_t)entities.enemy_ids[offset];
     if (!enemy_config_table) return 0;
@@ -443,7 +443,7 @@ static const CharacterEntityEntry *get_character_entity_entry(uint16_t char_id) 
  *
  * Port of asm/overworld/initialize_party.asm.
  * Rebuilds the party from game_state.party_members[]. Clears party arrays,
- * then calls add_party_member() for each non-zero member — matching the
+ * then calls add_party_member() for each non-zero member, matching the
  * assembly which calls JSL ADD_PARTY_MEMBER in a loop. */
 void initialize_party(void) {
     game_state.player_controlled_party_count = 0;
@@ -460,7 +460,7 @@ void initialize_party(void) {
     /* Assembly lines 45-64: call ADD_PARTY_MEMBER for each non-zero member.
      * add_party_member() handles slot conflict detection (base_slot+1 if occupied),
      * insertion ordering, position buffer setup, entity creation, and per-member
-     * rebuild/update calls — matching the assembly exactly. */
+     * rebuild/update calls, matching the assembly exactly. */
     for (int i = 0; i < TOTAL_PARTY_COUNT; i++) {
         uint8_t member = game_state.party_members[i];
         if (member == 0)
@@ -490,7 +490,7 @@ uint16_t add_party_member(uint16_t char_id) {
     const CharacterEntityEntry *entry = get_character_entity_entry(char_id);
     if (!entry) return 0;
 
-    /* ---- Phase 1: Find insertion point ---- */
+    /* Phase 1: Find insertion point */
     uint16_t insert_pos = 0;
 
     if (char_id >= 5) {
@@ -523,7 +523,7 @@ uint16_t add_party_member(uint16_t char_id) {
         }
     }
 
-    /* ---- Phase 2: Shift existing members right ---- */
+    /* Phase 2: Shift existing members right */
     if (game_state.party_order[insert_pos] != 0) {
         for (uint16_t i = 5; i > insert_pos; i--) {
             game_state.party_order[i] = game_state.party_order[i - 1];
@@ -536,7 +536,7 @@ uint16_t add_party_member(uint16_t char_id) {
         }
     }
 
-    /* ---- Phase 3: Store new member ---- */
+    /* Phase 3: Store new member */
     game_state.party_order[insert_pos] = (uint8_t)char_id;
     game_state.party_count++;
 
@@ -559,7 +559,7 @@ uint16_t add_party_member(uint16_t char_id) {
     ert.new_entity_var[1] = (int16_t)member_offset;
     game_state.player_controlled_party_members[insert_pos] = (uint8_t)member_offset;
 
-    /* ---- Phase 4: Set position_index ---- */
+    /* Phase 4: Set position_index */
     if (game_state.party_count == 1) {
         /* First member: use position_buffer_index directly */
         party_characters[member_offset].position_index =
@@ -577,7 +577,7 @@ uint16_t add_party_member(uint16_t char_id) {
             party_characters[prev_char_idx].position_index;
     }
 
-    /* ---- Phase 5: Look up position from ert.buffer ---- */
+    /* Phase 5: Look up position from ert.buffer */
     uint16_t pos_idx = party_characters[member_offset].position_index;
     uint16_t buf_idx;
     if (pos_idx == 0) {
@@ -588,7 +588,7 @@ uint16_t add_party_member(uint16_t char_id) {
     int16_t x = pb.player_position_buffer[buf_idx].x_coord;
     int16_t y = pb.player_position_buffer[buf_idx].y_coord;
 
-    /* ---- Phase 6: Select sprite and create entity ---- */
+    /* Phase 6: Select sprite and create entity */
     uint16_t sprite_id;
     if (game_state.character_mode == CHARACTER_MODE_SMALL && entry->small_sprite != 0xFFFF)
         sprite_id = entry->small_sprite;
@@ -602,7 +602,7 @@ uint16_t add_party_member(uint16_t char_id) {
     entities.screen_x[ent_off] = x - (int16_t)ppu.bg_hofs[0];
     entities.screen_y[ent_off] = y - (int16_t)ppu.bg_vofs[0];
 
-    /* ---- Phase 7: Update current_party_members and rebuild ---- */
+    /* Phase 7: Update current_party_members and rebuild */
     /* Set current_party_members from leader's base slot (assembly reads
      * CHARACTER_INITIAL_ENTITY_DATA[party_order[0]-1].base_slot). */
     uint8_t leader_id = game_state.party_order[0];
@@ -824,7 +824,7 @@ void deactivate_npc_entity(uint16_t npc_id, uint16_t fade_param) {
     ow.entity_prepared_direction = entities.directions[offset];
     /* Assembly uses BRIEF_PAUSE_END_TASK (pause + jump to EVENT_DESPAWN) for non-6 params,
      * or EVENT_DESPAWN directly for param 6. BRIEF_PAUSE_END_TASK is a 1/15s delay before
-     * deallocation — intended to overlap with fade effect. Since we don't have
+     * deallocation, intended to overlap with fade effect. Since we don't have
      * the delay script as a numbered event, use EVENT_DESPAWN for both. */
     reassign_entity_script(offset, EVENT_SCRIPT_DESPAWN);
 }
@@ -938,7 +938,7 @@ void remove_entity(int16_t slot) {
     /* ALLOC_SPRITE_MEM(slot, 0): free VRAM allocation */
     alloc_sprite_mem((uint16_t)slot, 0);
 
-    /* Assembly lines 17-22: if NPC ID upper bits == 0x8000, it's an enemy —
+    /* Assembly lines 17-22: if NPC ID upper bits == 0x8000, it's an enemy , 
      * decrement ow.overworld_enemy_count. */
     if ((entities.npc_ids[slot] & 0xF000) == 0x8000) {
         ow.overworld_enemy_count--;
@@ -1189,7 +1189,7 @@ void dismount_bicycle(void) {
      * The main player dismount runs through the BD_DISMOUNT mode-step (park-
      * propagating). This blocking form serves the secondary one-shot callers
      * (mushroom auto-dismount, debug); its render no longer advances an
-     * actionscript frame (no nested pump) — a no-actionscript present keeps the
+     * actionscript frame (no nested pump), a no-actionscript present keeps the
      * current sprites for the one transition frame, then the sprite swap runs. */
     if (!ow.pending_interactions) {
         render_frame_tick_no_actionscript();
@@ -1231,7 +1231,7 @@ void dismount_bicycle_finish(void) {
 
 /* ---- UPDATE_OVERWORLD_FRAME (port of C05200) ----
  *
- * Per-frame overworld update — tick callback for the init entity (slot 23).
+ * Per-frame overworld update, tick callback for the init entity (slot 23).
  * Set by EVENT_001 (main overworld tick) via EVENT_SET_TICK_CALLBACK.
  *
  * Assembly sequence:
@@ -1253,11 +1253,11 @@ void update_overworld_frame(int16_t entity_offset) {
 
     /* 2. Mini ghost entity management (assembly lines 9-20) */
     if (ow.possessed_player_count) {
-        /* Ghost needed — create if doesn't exist yet */
+        /* Ghost needed, create if doesn't exist yet */
         if (ow.mini_ghost_entity_id == -1)
             create_mini_ghost_entity();
     } else {
-        /* No ghost needed — destroy if exists */
+        /* No ghost needed, destroy if exists */
         if (ow.mini_ghost_entity_id != -1)
             destroy_mini_ghost_entity();
     }
@@ -1275,7 +1275,7 @@ void update_overworld_frame(int16_t entity_offset) {
     if (item_transformations_loaded)
         process_item_transformations();
 
-    /* 6. UPDATE_LEADER_MOVEMENT — the critical call (assembly line 34) */
+    /* 6. UPDATE_LEADER_MOVEMENT, the critical call (assembly line 34) */
     update_leader_movement(entity_offset);
 
     /* 7. Sector music change detection (assembly lines 35-55).
@@ -1352,7 +1352,7 @@ void freeze_and_queue_text_interaction(uint32_t text_ptr) {
     queue_interaction(8, text_ptr);
 }
 
-/* ---- Entity creation queue (port of C06578 / C065A3) ---- */
+/* Entity creation queue (port of C06578 / C065A3) */
 
 /* QUEUE_ENTITY_CREATION (C06578): append sprite+script to creation queue. */
 void queue_entity_creation(uint16_t sprite_id, uint16_t script_id) {
@@ -1380,7 +1380,7 @@ void flush_entity_creation_queue(void) {
     }
 }
 
-/* ---- OAM_CLEAR (port of asm/system/oam.asm) ---- */
+/* OAM_CLEAR (port of asm/system/oam.asm) */
 /* Backup of the displayed OAM Y positions, taken by oam_clear() before it blanks
  * them. oam_restore_displayed() puts them back so a PARKED actionscript frame can
  * keep showing the last rendered sprites for the single modal-transition frame
@@ -1400,7 +1400,7 @@ void oam_clear(void) {
 
     /* Park sprites off-screen. oam_full_y[] gets the real sentinel
      * (EB_VIEWPORT_HEIGHT, safely representable at int16_t width and always
-     * past the bottom of whatever height is actually being displayed --
+     * past the bottom of whatever height is actually being displayed,
      * native or the overworld's zoomed-out footprint); the narrow 8-bit
      * oam[].y gets PPU_OAM_Y_HIDDEN instead of EB_VIEWPORT_HEIGHT directly,
      * since that field can't represent 256+ without wrapping (see
@@ -1414,7 +1414,7 @@ void oam_clear(void) {
     }
 }
 
-/* Restore the OAM Y positions blanked by the most recent oam_clear() — used when
+/* Restore the OAM Y positions blanked by the most recent oam_clear(), used when
  * an actionscript frame parks, so the modal-transition frame shows the last
  * rendered sprites instead of a blank flash. */
 void oam_restore_displayed(void) {
@@ -1447,7 +1447,7 @@ void update_entity_screen_positions(void) {
  * Triple-buffering is not needed in the C port (we render directly).
  *
  * Callers must call oam_clear() and build_entity_draw_list() separately
- * before this — matching the assembly's three-step pipeline:
+ * before this, matching the assembly's three-step pipeline:
  *   1. OAM_CLEAR (clears OAM + priority queues)
  *   2. BUILD_ENTITY_DRAW_LIST (sorts entities, queues sprites)
  *   3. UPDATE_SCREEN (flushes queues to OAM, syncs palettes) */
@@ -1459,12 +1459,12 @@ void update_screen(void) {
 /* ---- GAME_MODE_WAIT_FRAMES step (run-to-completion port of C0DD2C
  * WAIT_FRAMES_WITH_UPDATES) ----
  *
- * Renders `remaining` frames — each OAM_CLEAR → RUN_ACTIONSCRIPT_FRAME →
- * UPDATE_SCREEN → (yield) — then POPs. The blocking original pumped any parked
+ * Renders `remaining` frames, each OAM_CLEAR → RUN_ACTIONSCRIPT_FRAME →
+ * UPDATE_SCREEN → (yield), then POPs. The blocking original pumped any parked
  * callroutine to completion; here a park becomes a STEP_PUSH of
  * GAME_MODE_ACTIONSCRIPT_FRAME and WF_FLUSH finishes that frame on resume, so the
  * whole wait lives on the serializable mode stack (save-anywhere). The original's
- * platform_input_quit_requested() escape hatch is dropped — quit is handled at the
+ * platform_input_quit_requested() escape hatch is dropped, quit is handled at the
  * root loop. Used by the door/teleport exit transition's 2-frame entity-disable
  * settle (the sole caller of the former blocking helper). */
 StepResult mode_step_wait_frames(ModeState *ms) {
@@ -1491,7 +1491,7 @@ StepResult mode_step_wait_frames(ModeState *ms) {
     }
 }
 
-/* RUN_FRAMES_UNTIL_FADE_DONE (C0DD0F) — its body is the GAME_MODE_FADE_WAIT step's
+/* RUN_FRAMES_UNTIL_FADE_DONE (C0DD0F), its body is the GAME_MODE_FADE_WAIT step's
  * FADE_TICK_OVERWORLD_RENDER tick. The blocking run_frames_until_fade_done() pump
  * bridge was deleted in D4b; its only callers (PSI teleport arrival/departure)
  * STEP_PUSH GAME_MODE_FADE_WAIT directly from mode_step_teleport. */
@@ -1510,7 +1510,7 @@ StepResult mode_step_wait_frames(ModeState *ms) {
 
 /* ---- RENDER_FRAME_TICK_WORK (run-to-completion half of render_frame_tick) ----
  *
- * Identical to render_frame_tick() but WITHOUT the trailing wait_for_vblank() —
+ * Identical to render_frame_tick() but WITHOUT the trailing wait_for_vblank() , 
  * the yield is owned by the caller (pump_mode today, the root loop at cutover).
  * Used by the mode-stack step functions and the non-yielding window_tick_work()/
  * update_hppp_meter_work() wrappers. See docs/plans/savestate-unified-loop.md.
@@ -1521,7 +1521,7 @@ StepResult mode_step_wait_frames(ModeState *ms) {
  * accepted for GAME_MODE_FADE_WAIT's FADE_TICK_BATTLE_EFFECTS and is imperceptible
  * (the effects animate a frame earlier within the same fade/menu). */
 /* render_frame_tick_work() (blocking pump-bridge form) was deleted in the final
- * pump_mode cutover — its only callers were the deleted window_tick_work() /
+ * pump_mode cutover, its only callers were the deleted window_tick_work() /
  * update_hppp_meter_work() bodies. The park-propagating render_frame_tick_work_
  * step()/_flush() split below is the surviving form. */
 
@@ -1582,7 +1582,7 @@ void render_frame_tick_no_actionscript(void) {
     update_screen();
 }
 
-/* ---- ALLOC_SPRITE_MEM (port of asm/system/alloc_sprite_mem.asm) ---- */
+/* ALLOC_SPRITE_MEM (port of asm/system/alloc_sprite_mem.asm) */
 void alloc_sprite_mem(uint16_t id, uint16_t param) {
     /* When id == 0x8000, clear the entire sprite VRAM table.
      * Otherwise, mark/free specific entries based on param matching. */
@@ -1599,7 +1599,7 @@ void alloc_sprite_mem(uint16_t id, uint16_t param) {
 /* ---- CALCULATE_PROSPECTIVE_POSITION (asm/overworld/calculate_prospective_position.asm) ----
  * Adds delta velocity to absolute position to determine where an entity
  * will be next frame. Stores result in ow.entity_movement_prospective_x/y.
- * Returns count of changed axes (0=none, 1=one, 2=both) — assembly uses
+ * Returns count of changed axes (0=none, 1=one, 2=both), assembly uses
  * INY (increment Y from 0), NOT bit flags. Callers only test zero vs nonzero.
  * Entry point CALCULATE_PROSPECTIVE_POSITION uses CURRENT_ENTITY_OFFSET;
  * Entry point CALCULATE_PROSPECTIVE_POSITION_ENTRY2 takes entity slot in A.
@@ -1609,7 +1609,7 @@ int calculate_prospective_position(int16_t entity_slot) {
     int changed = 0;
 
     /* Add fractional + integer X with carry propagation.
-     * Assembly: CLC; ADC frac; ADC int — carry from frac flows into int add. */
+     * Assembly: CLC; ADC frac; ADC int, carry from frac flows into int add. */
     uint32_t fx = (uint32_t)entities.frac_x[offset] +
                   (uint32_t)entities.delta_frac_x[offset];
     int16_t new_x = entities.abs_x[offset] + entities.delta_x[offset] +
@@ -1953,7 +1953,7 @@ void initialize_overworld_state(void) {
     /* Assembly line 12: JSL CLEAR_OVERWORLD_SPRITEMAPS */
     clear_overworld_spritemaps();
 
-    /* Assembly lines 13-15: ALLOC_SPRITE_MEM(0, $8000) — clear entire sprite VRAM table.
+    /* Assembly lines 13-15: ALLOC_SPRITE_MEM(0, $8000), clear entire sprite VRAM table.
      * Assembly loads X=0, A=$8000. ALLOC_SPRITE_MEM(id=A, param=X). */
     alloc_sprite_mem(0x8000, 0);
 
@@ -1989,7 +1989,7 @@ void initialize_overworld_state(void) {
 
     /* Assembly lines 37-44: create init entity at slot 23 with EVENT_001
      * (main overworld tick). Set allocation range to [23, 24) so INIT_ENTITY
-     * allocates slot 23. The init entity has no sprite — it only runs EVENT_001
+     * allocates slot 23. The init entity has no sprite, it only runs EVENT_001
      * which sets UPDATE_OVERWORLD_FRAME as the tick callback. */
     entities.alloc_min_slot = INIT_ENTITY_SLOT;
     entities.alloc_max_slot = PARTY_LEADER_ENTITY_INDEX;
@@ -2119,7 +2119,7 @@ static uint16_t auto_movement_index;  /* current write position */
 static const AutoMovementEntry *demo_read_ptr;
 static uint16_t demo_initial_pad_state;
 
-/* ---- Savestate snapshot (see OverworldDeferredSaveState in overworld.h) ---- */
+/* Savestate snapshot (see OverworldDeferredSaveState in overworld.h) */
 
 /* Chain the per-file overworld-task callback resolvers (savestate pointer purge,
  * build item #3). restore_bg_palette_callback (overworld_palette.c) is exported, so
@@ -2175,7 +2175,7 @@ void overworld_savestate_rebind(void) {
             ? undraw_flyover_text : NULL;
 }
 
-/* AUTO_MOVEMENT_DIRECTION_TABLE — maps quantized 8-direction index to
+/* AUTO_MOVEMENT_DIRECTION_TABLE, maps quantized 8-direction index to
  * pad/direction code used by the movement system.
  * From asm/data/unknown/C48C59.asm. */
 static const uint16_t auto_movement_direction_table[8] = {
@@ -2206,7 +2206,7 @@ static void record_auto_movement_step(uint16_t direction) {
         return;
     }
 
-    /* Check if same direction as current entry — extend the run */
+    /* Check if same direction as current entry, extend the run */
     if (auto_movement_buffer[auto_movement_index].direction == direction) {
         auto_movement_buffer[auto_movement_index].count++;
         return;
@@ -2232,14 +2232,14 @@ void record_repeated_auto_movement(uint16_t direction_index,
     }
 }
 
-/* start_demo_playback — begin playback of the auto-movement ert.buffer.
+/* start_demo_playback, begin playback of the auto-movement ert.buffer.
  * Port of START_DEMO_PLAYBACK (C083E3). */
 static void start_demo_playback(void) {
     if (ow.demo_recording_flags & DEMO_FLAG_PLAYBACK)
         return;  /* already playing */
 
     if (auto_movement_buffer[0].count == 0) {
-        /* Empty ert.buffer — clear flags */
+        /* Empty ert.buffer, clear flags */
         ow.demo_recording_flags = 0;
         return;
     }
@@ -2265,7 +2265,7 @@ void queue_auto_movement_step(void) {
     start_demo_playback();
 }
 
-/* demo_playback_tick — per-frame demo ert.buffer consumer.
+/* demo_playback_tick, per-frame demo ert.buffer consumer.
  * Called from the joypad update path.
  * Port of READ_JOYPAD demo section (asm/system/read_joypad.asm). */
 void demo_playback_tick(void) {
@@ -2280,7 +2280,7 @@ void demo_playback_tick(void) {
     demo_read_ptr++;
 
     if (demo_read_ptr->count == 0) {
-        /* End of demo — clear playback flag */
+        /* End of demo, clear playback flag */
         ow.demo_recording_flags &= ~DEMO_FLAG_PLAYBACK;
         ow.demo_frames_left = 0;
         return;
@@ -2373,7 +2373,7 @@ uint16_t attempt_homesickness(void) {
             continue;
         }
 
-        /* Level is in this bracket — check probability */
+        /* Level is in this bracket, check probability */
         uint8_t prob = homesickness_probability[bracket];
         if (prob == 0)
             return 0;
@@ -2397,10 +2397,10 @@ uint16_t attempt_homesickness(void) {
  *
  * Wrapper function that calls the four map initialization steps in order.
  * Assembly: A=x, X=y, Y=direction.
- * 1. RESOLVE_MAP_SECTOR_MUSIC(x, y) — determine music for map sector
- * 2. LOAD_MAP_AT_POSITION(x, y) — load map tiles, collision, palette
- * 3. SET_LEADER_POSITION_AND_LOAD_PARTY(x, y, direction) — place party
- * 4. APPLY_NEXT_MAP_MUSIC() — start playing the resolved music */
+ * 1. RESOLVE_MAP_SECTOR_MUSIC(x, y), determine music for map sector
+ * 2. LOAD_MAP_AT_POSITION(x, y), load map tiles, collision, palette
+ * 3. SET_LEADER_POSITION_AND_LOAD_PARTY(x, y, direction), place party
+ * 4. APPLY_NEXT_MAP_MUSIC(), start playing the resolved music */
 void initialize_map(uint16_t x, uint16_t y, uint16_t direction) {
     resolve_map_sector_music(x, y);
     load_map_at_position(x, y);

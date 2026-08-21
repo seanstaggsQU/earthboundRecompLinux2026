@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdio.h>
 
-/* DISTORT_30FPS — when set, layer 2 distortion runs at 30fps (skip odd frames).
+/* DISTORT_30FPS: when set, layer 2 distortion runs at 30fps (skip odd frames).
  * Set by LOAD_BATTLE_BG when layer 2 has active distortion styles. */
 uint16_t distort_30fps;
 
@@ -18,7 +18,7 @@ uint16_t distort_30fps;
 int16_t bg2_scanline_hoffset[BATTLEBG_MAX_SCANLINES];
 bool bg2_distortion_active = false;
 
-/* Loaded BG data structs — palette, cycling, and animation config per layer.
+/* Loaded BG data structs, palette, cycling, and animation config per layer.
  * Assembly: LOADED_BG_DATA_LAYER1/LAYER2 in BSS (ram.asm lines 1511-1514). */
 LoadedBGData loaded_bg_data_layer1;
 LoadedBGData loaded_bg_data_layer2;
@@ -44,7 +44,7 @@ void battle_bg_savestate_unpack(const void *in) {
      * running process: loading a non-battle snapshot while currently IN a
      * battle otherwise leaves the current battle's bg2_distortion_active +
      * stale hoffset table applied to the loaded scene forever (nothing
-     * outside battle code ever clears them — the "rebuilt each frame"
+     * outside battle code ever clears them, the "rebuilt each frame"
      * invariant above only holds while battle frames run).
      * In-battle snapshots recover on their next battle frame: the
      * full-config path (generate_battlebg_frame) re-asserts the flag and
@@ -62,7 +62,7 @@ static void palette_cycle_rotate(LoadedBGData *data, uint8_t first,
                                  uint16_t count, uint8_t step);
 static uint16_t bg_palette_count;
 
-/* Sine table for distortion — matches ROM's SINE_LOOKUP_TABLE (256 signed
+/* Sine table for distortion, matches ROM's SINE_LOOKUP_TABLE (256 signed
  * bytes, peak ±127).  Generated mathematically: round(127 * sin(i*2π/256)).
  * The ROM stores these as .BYTE in asm/data/sine_table.asm. */
 const int8_t sine_table[256] = {
@@ -134,7 +134,7 @@ void battle_bg_load_at(uint16_t bg_id, uint16_t gfx_vram_addr,
         arr_index = bg_id;
     }
 
-    /* Load graphics — decompress directly to ppu.vram (no intermediate buffer) */
+    /* Load graphics, decompress directly to ppu.vram (no intermediate buffer) */
     size_t gfx_compressed_size = ASSET_SIZE(ASSET_BATTLE_BGS_GRAPHICS(gfx_index));
     const uint8_t *gfx_compressed = ASSET_DATA(ASSET_BATTLE_BGS_GRAPHICS(gfx_index));
     if (gfx_compressed) {
@@ -142,7 +142,7 @@ void battle_bg_load_at(uint16_t bg_id, uint16_t gfx_vram_addr,
         decomp(gfx_compressed, gfx_compressed_size, vram_dst, 0x2000);
     }
 
-    /* Load arrangement — decompress directly to ppu.vram, fixup in-place */
+    /* Load arrangement, decompress directly to ppu.vram, fixup in-place */
     size_t arr_compressed_size = ASSET_SIZE(ASSET_BATTLE_BGS_ARRANGEMENTS(arr_index));
     const uint8_t *arr_compressed = ASSET_DATA(ASSET_BATTLE_BGS_ARRANGEMENTS(arr_index));
     if (arr_compressed) {
@@ -203,7 +203,7 @@ void battle_bg_load_at(uint16_t bg_id, uint16_t gfx_vram_addr,
     ppu.bg_nba[0] = (ppu.bg_nba[0] & 0x0F) | (uint8_t)((gfx_vram_addr >> 8) & 0xF0);
 
     /* For gas station: set target_layer, call generate_battlebg_frame for
-     * initial frame, and disable layer 2 — matching assembly lines 140-148. */
+     * initial frame, and disable layer 2, matching assembly lines 140-148. */
     if (bg_id == BATTLEBG_GAS_STATION) {
         loaded_bg_data_layer1.target_layer = 2;  /* assembly line 140-141 */
         memcpy(&ert.palettes[cgram_start], loaded_bg_data_layer1.palette,
@@ -245,7 +245,7 @@ void battle_bg_update(void) {
         return;
     }
 
-    /* --- Simplified path for backgrounds without full config --- */
+    /* Simplified path for backgrounds without full config */
 
     /* --- Scrolling ---
      * Assembly (generate_frame.asm 456-466): velocity updated FIRST,
@@ -364,7 +364,7 @@ void battle_bg_update(void) {
 }
 
 /*
- * LOAD_BG_LAYER_CONFIG — Port of asm/battle/load_bg_layer_config.asm (101 lines).
+ * LOAD_BG_LAYER_CONFIG: Port of asm/battle/load_bg_layer_config.asm (101 lines).
  *
  * Zeroes the entire loaded_bg_data struct, then copies config fields from a
  * bg_layer_config_entry source (loaded from BG_DATA_TABLE).
@@ -402,15 +402,15 @@ void load_bg_layer_config(LoadedBGData *target, const BGLayerConfigEntry *config
 }
 
 /*
- * INTERPOLATE_BG_PALETTE_COLOR — Port of asm/battle/effects/interpolate_bg_palette_color.asm (191 lines).
+ * INTERPOLATE_BG_PALETTE_COLOR: Port of asm/battle/effects/interpolate_bg_palette_color.asm (191 lines).
  *
  * Adjusts a single palette entry in a loaded_bg_data struct.
  *
  * Special brightness values:
- *   0xFFFF — set to white (0xFFFF)
- *   0x0000 — set to black (0x0000)
- *   0x0100 — restore from backup (palette2 → palette)
- *   other  — interpolate: for each R/G/B channel of palette2[index],
+ *   0xFFFF, set to white (0xFFFF)
+ *   0x0000, set to black (0x0000)
+ *   0x0100, restore from backup (palette2 → palette)
+ *   other, interpolate: for each R/G/B channel of palette2[index],
  *            compute (channel * brightness) >> 8 and reassemble
  *
  * After computing the new color, stores it to both data->palette[index]
@@ -469,7 +469,7 @@ void interpolate_bg_palette_color(LoadedBGData *data, uint16_t index,
 }
 
 /*
- * INTERPOLATE_BG_PALETTE_COLORS — Port of asm/battle/effects/interpolate_bg_palette_colors.asm (46 lines).
+ * INTERPOLATE_BG_PALETTE_COLORS: Port of asm/battle/effects/interpolate_bg_palette_colors.asm (46 lines).
  *
  * Adjusts all palette entries for the loaded background layer(s).
  *
@@ -493,7 +493,7 @@ void interpolate_bg_palette_colors(uint16_t brightness) {
 }
 
 /*
- * DARKEN_BG_PALETTES — Port of asm/battle/effects/darken_bg_palettes.asm (52 lines).
+ * DARKEN_BG_PALETTES: Port of asm/battle/effects/darken_bg_palettes.asm (52 lines).
  *
  * For each of the 16 palette entries in BOTH layers:
  *   LSR (shift right 1) + AND $3DEF  →  halves each 5-bit RGB channel.
@@ -524,7 +524,7 @@ void darken_bg_palettes(void) {
 }
 
 /*
- * ROTATE_BG_DISTORTION — Port of asm/battle/rotate_bg_distortion.asm (22 lines).
+ * ROTATE_BG_DISTORTION: Port of asm/battle/rotate_bg_distortion.asm (22 lines).
  *
  * Cycles the distortion style entries in loaded_bg_data_layer1:
  *   - Swaps distortion_styles[0] and distortion_styles[3]
@@ -542,7 +542,7 @@ void rotate_bg_distortion(void) {
 }
 
 /*
- * RESTORE_BG_PALETTE_BACKUPS — Port of asm/battle/effects/restore_bg_palette_backups.asm (56 lines).
+ * RESTORE_BG_PALETTE_BACKUPS: Port of asm/battle/effects/restore_bg_palette_backups.asm (56 lines).
  *
  * Copies palette2[] (backup) → palette[] for both layers,
  * then copies palette[] → global ert.palettes[] via palette_index.
@@ -611,7 +611,7 @@ static void palette_cycle_pingpong(LoadedBGData *data, uint8_t first,
 }
 
 /*
- * GENERATE_BATTLEBG_FRAME — Port of asm/misc/battlebgs/generate_frame.asm.
+ * GENERATE_BATTLEBG_FRAME: Port of asm/misc/battlebgs/generate_frame.asm.
  *
  * Per-layer animation state machine. Handles:
  *   1. Palette shifting (3 styles of color cycling)
@@ -829,7 +829,7 @@ void generate_battlebg_frame(LoadedBGData *data, int layer_index) {
 
     int16_t comp_accum = 0;
     if (dist_style >= 2 && target_layer >= 1 && target_layer <= 4) {
-        /* Assembly: LDA bg_vofs; XBA; AND #$FF00 — low byte shifted to high byte */
+        /* Assembly: LDA bg_vofs; XBA; AND #$FF00, low byte shifted to high byte */
         comp_accum = (int16_t)((ppu.bg_vofs[target_layer - 1] & 0xFF) << 8);
     }
     int16_t comp_rate = data->distortion_compression_rate;

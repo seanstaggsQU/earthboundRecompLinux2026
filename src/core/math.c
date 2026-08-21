@@ -2,7 +2,7 @@
 #include "game/battle_bg.h"   /* sine_table[] */
 #include <stdbool.h>
 
-/* RNG state — two 16-bit variables, matching assembly's RAND_A/RAND_B.
+/* RNG state, two 16-bit variables, matching assembly's RAND_A/RAND_B.
  * Initialized by MOVE_INT_CONSTANT $56781234, RAND_A in reset.asm:
  *   RAND_A = 0x1234, RAND_B = 0x5678 (little-endian 32-bit store). */
 RNGState rng_state = { .a = 0x1234, .b = 0x5678 };
@@ -32,7 +32,7 @@ uint8_t rng_next_byte(void) {
     rng_state.b = (uint16_t)sum;
     bool carry = (sum >> 16) & 1;
 
-    /* LDA f:RDMPYL; ROR; ROR — two rotates through carry on mult result */
+    /* LDA f:RDMPYL; ROR; ROR, two rotates through carry on mult result */
     uint16_t val = mult;
     bool new_carry;
 
@@ -60,7 +60,7 @@ uint8_t rng_next_byte(void) {
 
     rng_state.a = val;
 
-    /* PLA; ROR; ROR; AND #$00FF — compute return value */
+    /* PLA; ROR; ROR; AND #$00FF, compute return value */
     val = saved;
 
     new_carry = val & 1;
@@ -108,7 +108,7 @@ int16_t cosine_sine(int16_t value, uint8_t angle) {
     return (int16_t)(((int32_t)value * (int32_t)sine_table[angle]) >> 8);
 }
 
-/* COSINE — cos(angle) = sin(angle - 64).
+/* COSINE: cos(angle) = sin(angle - 64).
  * Assembly subtracts 0x40 from X before falling into COSINE_SINE. */
 int16_t cosine_func(int16_t value, uint8_t angle) {
     return cosine_sine(value, (uint8_t)((angle - 64) & 0xFF));

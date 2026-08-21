@@ -1,5 +1,5 @@
 /*
- * Sprite loading infrastructure — VRAM allocation, tile upload, spritemap management.
+ * Sprite loading infrastructure, VRAM allocation, tile upload, spritemap management.
  *
  * Ports of:
  *   LOAD_SPRITE_GROUP_PROPERTIES   (asm/overworld/entity/load_sprite_group_properties.asm)
@@ -17,15 +17,15 @@
 
 #include "core/types.h"
 
-/* ---- VRAM Allocation ---- */
+/* VRAM Allocation */
 
 /* Max VRAM sprite allocation slots */
 #define SPRITE_VRAM_TABLE_SIZE 88
 
-/* VRAM allocation table — each byte: 0=free, bit 7 set=allocated */
+/* VRAM allocation table, each byte: 0=free, bit 7 set=allocated */
 extern uint8_t sprite_vram_table[SPRITE_VRAM_TABLE_SIZE];
 
-/* ---- OVERWORLD_SPRITEMAPS buffer ---- */
+/* OVERWORLD_SPRITEMAPS buffer */
 
 /* 5-byte spritemap entry (matches assembly spritemap struct) */
 #define SPRITEMAP_ENTRY_SIZE 5
@@ -39,19 +39,19 @@ extern uint8_t sprite_vram_table[SPRITE_VRAM_TABLE_SIZE];
 
 extern uint8_t overworld_spritemaps[OVERWORLD_SPRITEMAPS_SIZE];
 
-/* ---- Sprite grouping data ---- */
+/* Sprite grouping data */
 
 /* sprite_grouping struct layout (9 bytes header + variable spritepointerarray):
  *   [0] height (byte)
- *   [1] width (byte) — high nybble = tile width, low nybble = other param
- *   [2] size (byte) — sprite type/direction count
+ *   [1] width (byte), high nybble = tile width, low nybble = other param
+ *   [2] size (byte), sprite type/direction count
  *   [3] palette (byte)
  *   [4] hitbox_width_ud (byte)
  *   [5] hitbox_height_ud (byte)
  *   [6] hitbox_width_lr (byte)
  *   [7] hitbox_height_lr (byte)
  *   [8] spritebank (byte)
- *   [9..] spritepointerarray — 1 bank byte + N × 2-byte within-bank offsets
+ *   [9..] spritepointerarray, 1 bank byte + N × 2-byte within-bank offsets
  */
 #define SPRITE_GROUPING_HEADER_SIZE 9
 
@@ -65,7 +65,7 @@ extern uint8_t overworld_spritemaps[OVERWORLD_SPRITEMAPS_SIZE];
 /* VRAM base address for OBJ tiles */
 #define VRAM_OBJ_BASE 0x4000
 
-/* ---- Sprite graphics banks ---- */
+/* Sprite graphics banks */
 
 #define SPRITE_BANK_COUNT 5
 #define SPRITE_BANK_FIRST 0x11   /* SNES banks $11-$15 ($D1-$D5 HiROM) */
@@ -73,7 +73,7 @@ extern uint8_t overworld_spritemaps[OVERWORLD_SPRITEMAPS_SIZE];
 extern const uint8_t *sprite_banks[SPRITE_BANK_COUNT];
 extern uint32_t sprite_bank_sizes[SPRITE_BANK_COUNT];
 
-/* ---- Runtime-loaded support data ---- */
+/* Runtime-loaded support data */
 
 extern const uint8_t *sprite_grouping_ptr_table;
 extern uint16_t sprite_grouping_ptr_count;
@@ -86,7 +86,7 @@ extern uint32_t spritemap_config_size;
 extern uint16_t new_sprite_tile_width;
 extern uint16_t new_sprite_tile_height;
 
-/* ---- Direction mapping (from ROM, constant) ---- */
+/* Direction mapping (from ROM, constant) */
 
 /* SPRITE_DIRECTION_MAPPING_4_DIRECTION: maps entity direction to graphics offset.
  * Used by RENDER_ENTITY_SPRITE (C0A443) for entities with 4-directional sprites.
@@ -102,7 +102,7 @@ static const uint16_t sprite_direction_mapping_8dir[8] = {
     0, 4, 1, 5, 2, 6, 3, 7
 };
 
-/* ---- Public API ---- */
+/* Public API */
 
 /* Load all sprite system data from binary assets */
 void load_sprite_data(void);
@@ -147,11 +147,11 @@ void load_overworld_spritemaps(uint16_t buf_offset, uint16_t vram_index,
 uint16_t load_sprite_tiles_to_vram(uint16_t sprite_id, uint16_t sub_palette_idx,
                                     uint16_t vram_base);
 
-/* Render entity sprite — upload current frame's tile data to ppu.vram[].
+/* Render entity sprite, upload current frame's tile data to ppu.vram[].
  * Called per-frame for entities that need their VRAM tiles updated. */
 void render_entity_sprite(int16_t entity_offset);
 
-/* Update entity sprite (8-dir) — sets use_8dir_sprites and renders.
+/* Update entity sprite (8-dir), sets use_8dir_sprites and renders.
  * Used for party member sprites with 8-directional walking animations.
  * Port of UPDATE_ENTITY_SPRITE (asm/overworld/update_entity_sprite.asm). */
 void update_entity_sprite(int16_t entity_offset);

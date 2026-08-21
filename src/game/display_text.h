@@ -1,5 +1,5 @@
 /*
- * DISPLAY_TEXT — text bytecode interpreter.
+ * DISPLAY_TEXT: text bytecode interpreter.
  *
  * Port of asm/text/display_text.asm and asm/text/ccs/ control code handlers.
  *
@@ -27,7 +27,7 @@ typedef enum {
     TEXT_SRC_COUNT,
 } TextSource;
 
-/* Script reading cursor — offset-based so it holds no raw pointers and can live in
+/* Script reading cursor, offset-based so it holds no raw pointers and can live in
  * a serializable ModeState (savestate-anywhere migration). `source` selects the
  * asset; ptr_off/end_off are byte offsets within it. prefix_off is the CC 0x15-0x17
  * dictionary-substitution cursor (-1 = none); that CC is not yet wired up in the C
@@ -117,7 +117,7 @@ typedef struct {
     /* PAGINATION_ANIMATION_FRAME: animation state for pagination arrow. */
     int16_t pagination_animation_frame;
 
-    /* ENABLE_WORD_WRAP (ram.asm:995) — 0=off, 0xFF=on */
+    /* ENABLE_WORD_WRAP (ram.asm:995), 0=off, 0xFF=on */
     uint16_t enable_word_wrap;
 
     /* ALLOW_TEXT_OVERFLOW (ram.asm:1624) */
@@ -129,9 +129,9 @@ typedef struct {
     /* Current interacting event flag */
     uint16_t current_interacting_event_flag;
 
-    /* --- Promoted file-statics (saveable runtime state) --- */
+    /* Promoted file-statics (saveable runtime state) */
 
-    /* UPCOMING_WORD_LENGTH (ram.asm:1110) — word wrap state. */
+    /* UPCOMING_WORD_LENGTH (ram.asm:1110), word wrap state. */
     uint16_t upcoming_word_length;
 
     /* Text script pointers for battle character selection (4 per party member). */
@@ -259,7 +259,7 @@ void render_pagination_arrows(void);
 
 /* Park-propagating split of window_tick (savestate D4b): a parked
  * actionscript callroutine becomes a STEP_PUSH instead of a nested pump_mode.
- * _step() returns true iff a frame parked — the caller must push
+ * _step() returns true iff a frame parked, the caller must push
  * GAME_MODE_ACTIONSCRIPT_FRAME (actionscript_frame_take_push) and call _flush() at
  * its resume phase; on no park the tick finishes inline and _step() returns false. */
 bool window_tick_work_step(void);

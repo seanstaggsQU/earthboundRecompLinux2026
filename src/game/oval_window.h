@@ -31,7 +31,7 @@ typedef struct {
     ABI_PTR_PAD(arr_bundled_data)
     uint32_t arr_bundled_size;        /* total asset size (fixed-width for savestate ABI) */
     int16_t arr_current_bundle;       /* currently decompressed bundle index (-1 = none) */
-    uint16_t arr_current_anim_id;     /* anim id backing arr_bundled_data — serializable form
+    uint16_t arr_current_anim_id;     /* anim id backing arr_bundled_data, serializable form
                                          of the asset ptr, used to rebind it after a state load
                                          (savestate pointer purge, build item #3) */
     uint8_t *ABI_PTR_ALIGN arr_bundle_buf; /* 8 KB staging buffer (= ert.buffer during PSI);
@@ -106,7 +106,7 @@ void set_swirl_auto_restore(uint8_t value);
  * The swirl / oval-window animation runs across many frames driven by file-static
  * state in oval_window.c; a savestate taken mid-animation must round-trip it. One
  * tagged section, gathered/scattered by the pack/unpack pair. (loaded_oval_window is
- * a raw cursor pointer — valid in-process; cross-platform purge is build item #3.) */
+ * a raw cursor pointer, valid in-process; cross-platform purge is build item #3.) */
 typedef struct {
     uint8_t  frames_until_next_swirl_update;
     uint8_t  frames_until_next_swirl_frame;

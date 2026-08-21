@@ -1,7 +1,7 @@
 /*
  * Battle targeting functions.
  *
- * Extracted from battle.c — target selection, row-based targeting,
+ * Extracted from battle.c, target selection, row-based targeting,
  * target dispatch, and mask-based targeting operations.
  */
 #include "game/battle.h"
@@ -273,12 +273,12 @@ static void set_battler_flashing(uint16_t row) {
  * action_param: index into battle_action_table for targetability check.
  */
 /* The "WINDOW_TICK equivalent" battle render the targeting UIs run each frame,
- * minus the trailing wait_for_vblank() — the pump owns the single yield. Shared
+ * minus the trailing wait_for_vblank(), the pump owns the single yield. Shared
  * by both targeting modes below.
  *
  * Park-propagating split (savestate D4b): a parked actionscript callroutine
  * becomes a STEP_PUSH instead of a nested pump_mode. _step() returns true iff a
- * frame parked — the caller must STEP_PUSH GAME_MODE_ACTIONSCRIPT_FRAME
+ * frame parked, the caller must STEP_PUSH GAME_MODE_ACTIONSCRIPT_FRAME
  * (actionscript_frame_take_push) and call _flush() at its resume; on no park the
  * render finishes inline and _step() returns false. */
 static bool targeting_render_work_step(void) {
@@ -308,7 +308,7 @@ static bool et_display_work(BattleEnemySelectState *s) {
     return targeting_render_work_step();
 }
 
-/* GAME_MODE_BATTLE_ENEMY_SELECT — run-to-completion port of select_battle_target.
+/* GAME_MODE_BATTLE_ENEMY_SELECT: run-to-completion port of select_battle_target.
  * See mode_stack.h for the phase mapping of the blocking goto-machine. */
 StepResult mode_step_battle_enemy_select(ModeState *ms) {
     BattleEnemySelectState *s = &ms->battle_enemy_select;
@@ -380,7 +380,7 @@ StepResult mode_step_battle_enemy_select(ModeState *ms) {
             return STEP_RESULT_POP(0);
         }
 
-        /* Navigation — decide the outcome, mirroring the blocking gotos:
+        /* Navigation, decide the outcome, mirroring the blocking gotos:
          *   change  -> apply_selection[_common] (recreate window + two renders)
          *   refresh -> update_target_display    (one render, no change/sfx)
          *   neither -> idle update_hppp_meter_work frame, stay in ET_INPUT.
@@ -513,7 +513,7 @@ static bool br_render_work(uint16_t current_row) {
     return targeting_render_work_step();
 }
 
-/* GAME_MODE_BATTLE_ROW_SELECT — run-to-completion port of select_battle_row.
+/* GAME_MODE_BATTLE_ROW_SELECT: run-to-completion port of select_battle_row.
  * Three-phase machine (BattleRowSelectPhase) in the verified char-select idiom. */
 StepResult mode_step_battle_row_select(ModeState *ms) {
     BattleRowSelectState *s = &ms->battle_row_select;
@@ -626,14 +626,14 @@ static void row_select_make_init(ModeState *init, uint16_t allow_cancel) {
 }
 
 /* SELECT_BATTLE_TARGET_DISPATCH (asm/battle/ui/select_battle_target_dispatch
- * .asm) — the blocking mode-0/mode-1 dispatcher — was deleted when its last
+ * .asm), the blocking mode-0/mode-1 dispatcher, was deleted when its last
  * caller (battle_routine's command menu) became GAME_MODE_BATTLE_MENU; its
  * callers now push GAME_MODE_BATTLE_ENEMY_SELECT / GAME_MODE_BATTLE_ROW_SELECT
  * directly via the *_make_init builders above. */
 
 
 /*
- * GAME_MODE_DETERMINE_TARGETING step — run-to-completion port of
+ * GAME_MODE_DETERMINE_TARGETING step, run-to-completion port of
  * determine_targetting() (asm/battle/determine_targetting.asm). See
  * TargetingState in mode_stack.h.
  *
@@ -667,7 +667,7 @@ StepResult mode_step_determine_targeting(ModeState *ms) {
 
             switch (target_type) {
             case ACTION_TARGET_NONE:
-                /* No specific target selection — default to single with
+                /* No specific target selection, default to single with
                  * auto-target. Assembly: stores char_id as VIRTUAL01,
                  * returns immediately. */
                 st->targeting_mode = TARGETTED_ENEMIES | TARGETTED_SINGLE;
@@ -684,7 +684,7 @@ StepResult mode_step_determine_targeting(ModeState *ms) {
                                              &child_init);
 
             case ACTION_TARGET_RANDOM: {
-                /* Random enemy — pick from alive enemies */
+                /* Random enemy, pick from alive enemies */
                 st->targeting_mode = TARGETTED_ENEMIES | TARGETTED_SINGLE;
                 uint16_t count = battle_count_chars(1);
                 if (count > 0) {
@@ -714,7 +714,7 @@ StepResult mode_step_determine_targeting(ModeState *ms) {
 
             switch (target_type) {
             case ACTION_TARGET_NONE:
-                /* No specific target — default to self */
+                /* No specific target, default to self */
                 st->targeting_mode = TARGETTED_SINGLE | TARGETTED_ALLIES;
                 target_index = (uint8_t)st->char_id;
                 break;
@@ -724,7 +724,7 @@ StepResult mode_step_determine_targeting(ModeState *ms) {
                 st->targeting_mode = TARGETTED_SINGLE | TARGETTED_ALLIES;
                 uint16_t party_count = game_state.player_controlled_party_count & 0xFF;
                 if (party_count <= 1) {
-                    /* Only one party member — auto-select */
+                    /* Only one party member, auto-select */
                     target_index = (uint8_t)st->char_id;
                     break;
                 }
@@ -821,7 +821,7 @@ static uint16_t find_targettable_npc(void) {
         }
 
         /* Search battlers for one with matching npc_id.
-         * Assembly uses shared counter LOCAL01 for both loops — when inner
+         * Assembly uses shared counter LOCAL01 for both loops, when inner
          * loop exhausts without match, LOCAL01 = TOTAL_PARTY_COUNT, incremented
          * to 7, which exits the outer loop immediately. */
         for (uint16_t bi = 0; bi < TOTAL_PARTY_COUNT; bi++) {
@@ -832,7 +832,7 @@ static uint16_t find_targettable_npc(void) {
                 return bi + 1;  /* 1-based */
             }
         }
-        break;  /* No matching battler found — exit outer loop */
+        break;  /* No matching battler found, exit outer loop */
     }
     return 0;
 }
@@ -1375,7 +1375,7 @@ void battle_feeling_strange_retargeting(void) {
 /*
  * IS_ROW_VALID (asm/battle/is_row_valid.asm)
  *
- * Always returns 1 — matches assembly (LDA #1; END_C_FUNCTION).
+ * Always returns 1, matches assembly (LDA #1; END_C_FUNCTION).
  */
 uint16_t is_row_valid(void) {
     return 1;
@@ -1413,7 +1413,7 @@ uint16_t pick_random_enemy_target(uint16_t attacker_offset) {
 
 
 /*
- * CHECK_BATTLE_TARGET_TYPE — Port of asm/battle/check_battle_target_type.asm (36 lines).
+ * CHECK_BATTLE_TARGET_TYPE: Port of asm/battle/check_battle_target_type.asm (36 lines).
  *
  * Checks bt.current_target's type and applies the appropriate PSI battle effect:
  *   - If target is TINY_LIL_GHOST → return true (no effect applied)

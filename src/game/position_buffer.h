@@ -1,5 +1,5 @@
 /*
- * PLAYER_POSITION_BUFFER — circular history buffer for follow-the-leader.
+ * PLAYER_POSITION_BUFFER: circular history buffer for follow-the-leader.
  *
  * Port of the position buffer system used by:
  *   INIT_PARTY_POSITION_BUFFER  (asm/overworld/party/init_party_position_buffer.asm)
@@ -25,10 +25,10 @@
 typedef struct {
     int16_t  x_coord;       /* 0 */
     int16_t  y_coord;       /* 2 */
-    uint8_t  tile_flags;    /* 4 — surface flags, only low byte used */
-    uint8_t  walking_style; /* 5 — 0–13 */
-    uint8_t  direction;     /* 6 — 0–7 */
-    uint8_t  pad;           /* 7 — alignment padding */
+    uint8_t  tile_flags;    /* 4, surface flags, only low byte used */
+    uint8_t  walking_style; /* 5, 0-13 */
+    uint8_t  direction;     /* 6, 0-7 */
+    uint8_t  pad;           /* 7, alignment padding */
 } PositionBufferEntry;
 
 /* Speed table dimensions. */
@@ -96,7 +96,7 @@ void update_follower_visuals(int16_t entity_offset);
 void update_party_entity_graphics(int16_t char_id, uint16_t walking_style,
                                    int16_t entity_offset, int16_t party_idx);
 
-/* Camera shake (enemy contact) — screen shake + direction control.
+/* Camera shake (enemy contact), screen shake + direction control.
  * Port of START_CAMERA_SHAKE (C04A88).
  * Sets camera_mode=3 with a 12-frame timer, plays collision SFX. */
 void start_camera_shake(void);

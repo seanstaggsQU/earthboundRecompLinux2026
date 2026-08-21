@@ -64,11 +64,11 @@ static const uint16_t init_intro_attract_scenes[] = { 0, 2, 3, 4, 5, 6, 7, 9 };
 static ModeState ii_child_init;
 
 /*
- * GAME_MODE_INIT_INTRO step — run-to-completion port of INIT_INTRO's state
+ * GAME_MODE_INIT_INTRO step, run-to-completion port of INIT_INTRO's state
  * machine (asm/intro/init_intro.asm, US retail path). See InitIntroState in
- * mode_stack.h. Every child stage — the intro leaves (logos, gas station, title
+ * mode_stack.h. Every child stage, the intro leaves (logos, gas station, title
  * screen), the attract scenes (GAME_MODE_ATTRACT), and the file menu
- * (GAME_MODE_FILE_MENU) — is STEP_PUSHed as its own mode after its yield-free
+ * (GAME_MODE_FILE_MENU), is STEP_PUSHed as its own mode after its yield-free
  * setup runs inline; the result each hands back (button skip vs normal
  * completion) is read via mode_child_result() in the matching *_RESULT phase.
  * The intro is now STEP_PUSH end-to-end. The brief fade_out_if_visible() /
@@ -90,7 +90,7 @@ StepResult mode_step_init_intro(ModeState *ms) {
 
         case II_LOGO_RESULT:
             if (mode_child_result() != 0) {
-                /* Button during logos — WRITE_APU_PORT1(2) + FADE_OUT_WITH_MOSAIC
+                /* Button during logos, WRITE_APU_PORT1(2) + FADE_OUT_WITH_MOSAIC
                  * then skip directly to the title (quick mode). asm:78-97. */
                 write_apu_port1(2);
                 fade_out_if_visible();
@@ -115,7 +115,7 @@ StepResult mode_step_init_intro(ModeState *ms) {
 
         case II_GAS_RESULT:
             if (mode_child_result() != 0) {
-                /* Button during gas station — WRITE_APU_PORT1(2) +
+                /* Button during gas station, WRITE_APU_PORT1(2) +
                  * FADE_OUT_WITH_MOSAIC + PPU cleanup, skip to title (quick).
                  * asm:110-138. */
                 write_apu_port1(2);
@@ -142,10 +142,10 @@ StepResult mode_step_init_intro(ModeState *ms) {
 
         case II_TITLE_RESULT:
             if (mode_child_result() != 0) {
-                /* Button — go to file select. */
+                /* Button, go to file select. */
                 st->phase = II_FILE_MENU;
             } else {
-                /* Timed out — start the attract sequence. */
+                /* Timed out, start the attract sequence. */
                 st->attract_index = 0;
                 st->phase = II_ATTRACT;
             }
@@ -170,7 +170,7 @@ StepResult mode_step_init_intro(ModeState *ms) {
 
         case II_ATTRACT_RESULT:
             if (mode_child_result() != 0) {
-                /* Button during a scene — exit to file select. */
+                /* Button during a scene, exit to file select. */
                 st->phase = II_FILE_MENU;
             } else {
                 st->attract_index++;
@@ -201,18 +201,18 @@ StepResult mode_step_init_intro(ModeState *ms) {
             /* RUN_FILE_MENU post-cleanup (run_file_menu.asm:13-17). The single
              * window_tick() becomes window_tick_work_step() + the CONTINUE yield.
              * Boot/intro context: the overworld isn't loaded yet, so there are no
-             * entity action scripts to park — the work_step never returns true. */
+             * entity action scripts to park, the work_step never returns true. */
             clear_instant_printing();
             (void)window_tick_work_step();
             st->phase = II_FILE_MENU_FADE;
             return STEP_RESULT_CONTINUE();
 
         case II_FILE_MENU_FADE: {
-            /* Assembly file_select_init.asm:78-81 — FADE_OUT_WITH_MOSAIC(step=1,
+            /* Assembly file_select_init.asm:78-81, FADE_OUT_WITH_MOSAIC(step=1,
              * delay=1, mosaic=0) blanks the confirmation screen to black before
              * returning to MAIN_LOOP. Without this the screen is left at full
              * brightness (the file menu never fades out), so MAIN_LOOP's FADE_IN
-             * is a no-op and the first overworld frame renders bright — showing
+             * is a no-op and the first overworld frame renders bright, showing
              * the map centered on the new leader position for one frame before the
              * prologue script's CAMERA_FOLLOW / TELEPORT_TO repositions the camera.
              * MF_OUT ends force-blanked (inidisp=0x80), so the boot FADE_IN then
@@ -235,7 +235,7 @@ StepResult mode_step_init_intro(ModeState *ms) {
         case II_FILE_MENU_DONE:
             /* Critical: ow.disabled_transitions must be cleared or the overworld
              * text/palette/pajama systems won't function. event_script_data is
-             * NOT freed — it's needed by the main game loop. */
+             * NOT freed, it's needed by the main game loop. */
             ow.disabled_transitions = 0;
             free_title_screen_script_data();
             return STEP_RESULT_POP(0);
@@ -247,7 +247,7 @@ StepResult mode_step_init_intro(ModeState *ms) {
 }
 
 /*
- * Port of INIT_INTRO from asm/intro/init_intro.asm (US retail path) — one-shot
+ * Port of INIT_INTRO from asm/intro/init_intro.asm (US retail path), one-shot
  * boot setup that ends by PUSHing GAME_MODE_INIT_INTRO onto the mode stack.
  *
  * The one-shot initialization (asm:20-42, including the two startup vblanks)
@@ -285,7 +285,7 @@ void init_intro(void) {
     ppu.bg_hofs[2] = 0; ppu.bg_vofs[2] = 0;
     wait_for_vblank();
 
-    /* Load script data early — needed by gas station (EVENT_860)
+    /* Load script data early, needed by gas station (EVENT_860)
      * and title screen (EVENT_BATTLE_FX through TITLE_SCREEN_11, 787-798). */
     load_title_screen_script_data();
     load_event_script_data();

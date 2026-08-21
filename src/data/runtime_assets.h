@@ -33,7 +33,7 @@ EbAssetLoadResult eb_runtime_assets_load(const char *path);
 bool eb_runtime_assets_ready(void);
 
 /* Unmaps the current pack and clears embedded_assets[]/family arrays back
- * to all-NULL entries. Only needed for clean shutdown / tests — the OS
+ * to all-NULL entries. Only needed for clean shutdown / tests, the OS
  * reclaims the mapping on process exit regardless. */
 void eb_runtime_assets_unload(void);
 

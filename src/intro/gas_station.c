@@ -4,14 +4,14 @@
  * and RUN_GAS_STATION_CREDITS (asm/overworld/run_gas_station_credits.asm).
  *
  * ROM flow:
- *   1. GAS_STATION_LOAD — load BG1 graphics + BG2 battle BG 295
- *   2. FADE_IN (step=1, delay=11) — NMI-driven brightness fade
+ *   1. GAS_STATION_LOAD, load BG1 graphics + BG2 battle BG 295
+ *   2. FADE_IN (step=1, delay=11), NMI-driven brightness fade
  *   3. RUN_GAS_STATION_CREDITS:
  *      Phase 1: 236 frames (battle BG effects + brightness fade)
  *      Phase 2: 480 frames (palette interpolation + battle BG animation)
  *      Phase 3: FINALIZE_PALETTE_FADE, disable color math, wait 120 frames
  *      Phase 4: Music change + EVENT_860 flash palette sequence
- *      Phase 5: PREPARE_PALETTE_FADE_FROM_CURRENT(330) — fade to WHITE
+ *      Phase 5: PREPARE_PALETTE_FADE_FROM_CURRENT(330), fade to WHITE
  *   4. 330-frame loop with UPDATE_MAP_PALETTE_ANIMATION
  *   5. Clear ert.palettes, wait 30 frames
  */
@@ -36,7 +36,7 @@
 #include "game_main.h"
 
 
-/* MAP_PALETTE_BACKUP — saves battle BG palette during palette fade.
+/* MAP_PALETTE_BACKUP: saves battle BG palette during palette fade.
  * The ROM saves/restores palette group 2 (colors 32-47) around
  * UPDATE_MAP_PALETTE_ANIMATION to prevent the fade from touching
  * the battle BG's separately-managed palette. */
@@ -45,7 +45,7 @@ static uint16_t map_palette_backup[16];
 /*
  * Sync palettes to CGRAM, then force the screen backdrop (cgram[0]) black.
  *
- * The gas station never shows cgram[0] as visible content — BG1 covers the
+ * The gas station never shows cgram[0] as visible content, BG1 covers the
  * centered SNES area opaquely. In a wide viewport, though, the letterbox
  * gutters inherit cgram[0], which the palette fade drives from black up to
  * the gas-station background colour, tinting the gutters. Pinning cgram[0]
@@ -78,7 +78,7 @@ static void gas_station_load(void) {
 
     /* Graphics -> VRAM $0000
        ROM: COPY_TO_VRAM1P BUFFER, $0000, $C000, 0
-       Decompress directly to VRAM — no intermediate buffer needed. */
+       Decompress directly to VRAM, no intermediate buffer needed. */
     comp_size = ASSET_SIZE(ASSET_INTRO_GAS_STATION_GFX_LZHAL);
     comp_data = ASSET_DATA(ASSET_INTRO_GAS_STATION_GFX_LZHAL);
     if (comp_data) {
@@ -122,10 +122,10 @@ static void gas_station_load(void) {
     /* battle_bg_load_at already wrote the BG295 palette to both
        ppu.cgram[32..47] and ert.palettes[32..47], plus called
        generate_battlebg_frame for the initial frame (step=0 = no-op).
-       No additional copy is needed here — matches assembly flow where
+       No additional copy is needed here, matches assembly flow where
        SETUP_GAS_STATION_BACKGROUND sets PALETTES directly. */
 
-    /* ROM: COPY_FADE_BUFFER_TO_PALETTES — save PALETTES → BUFFER as fade target.
+    /* ROM: COPY_FADE_BUFFER_TO_PALETTES, save PALETTES → BUFFER as fade target.
        At this point:
          ert.palettes[0..31] = gas station colors
          ert.palettes[32..47] = battle BG 295 palette (set by battle_bg_load_at)
@@ -144,7 +144,7 @@ static void gas_station_load(void) {
        ROM: MEMSET16 PALETTES+3*BPP4PALETTE_SIZE, 0, 13*BPP4PALETTE_SIZE */
     memset((uint8_t *)ert.palettes + 3 * BPP4PALETTE_SIZE, 0, 13 * BPP4PALETTE_SIZE);
 
-    /* PREPARE_PALETTE_FADE(480, $FFFF) — fade all palette groups over 480 frames.
+    /* PREPARE_PALETTE_FADE(480, $FFFF): fade all palette groups over 480 frames.
        From black → gas station palette (groups 0-1)
        From battle BG palette → black (group 2)
        Groups 3-15: 0 → 0 (no change) */
@@ -200,7 +200,7 @@ static void gas_station_load(void) {
  * work then decrements `remaining`; on the frame `remaining` reaches 0 it runs
  * the (yield-free) transition into the next phase, so frame counts match the
  * blocking loops. Every phase but GS_PH6 pops 1 on any button (post-yield read,
- * checked at the top of the step — the same <=1-frame placement the other
+ * checked at the top of the step, the same <=1-frame placement the other
  * conversions accept). */
 StepResult mode_step_gas_station(ModeState *st) {
     GasStationState *s = &st->gas_station;
@@ -297,7 +297,7 @@ StepResult mode_step_gas_station(ModeState *st) {
         /* A script callroutine (the gas-station cutscene has dialogue) may park
          * the frame: STEP_PUSH GAME_MODE_ACTIONSCRIPT_FRAME and run the palette
          * sync at GS_PH4_FLUSH when it pops. (This step function is a bare switch
-         * — no enclosing loop — so the no-park path runs the sync inline.) */
+         *, no enclosing loop, so the no-park path runs the sync inline.) */
         if (run_actionscript_frame_step()) {
             s->phase = GS_PH4_FLUSH;
             return actionscript_frame_take_push();
@@ -333,7 +333,7 @@ StepResult mode_step_gas_station(ModeState *st) {
         return STEP_RESULT_CONTINUE();
 
     case GS_PH6:
-        /* 30-frame final wait — NOT button-skippable (WAIT_FRAMES_OR_UNTIL_
+        /* 30-frame final wait, NOT button-skippable (WAIT_FRAMES_OR_UNTIL_
          * PRESSED(30) with mask 0). Check-at-top so it yields exactly 30 frames
          * before the terminal pop (which does not yield). */
         if (s->remaining == 0)

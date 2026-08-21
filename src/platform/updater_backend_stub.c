@@ -3,7 +3,7 @@
  *
  * Mirrors src/platform/settings_backend_stub.c's convention exactly, for
  * the same reason: platform_update_* (platform.h) is target-specific and
- * not universally available -- desktop (port/unix) has a real
+ * not universally available, desktop (port/unix) has a real
  * implementation (platform/sdl2_updater.c) when built with a private
  * release feed configured; an embedded target has no self-update story at
  * all yet.
@@ -13,7 +13,7 @@
  * Updates" row's platform_update_supported() gate in file_select.c) never
  * need '#ifdef EB_EMBEDDED' at the call site.
  *
- * Desktop is excluded by the EB_EMBEDDED guard -- sdl2_updater.c provides
+ * Desktop is excluded by the EB_EMBEDDED guard, sdl2_updater.c provides
  * platform_update_* there instead (whether or not a release feed is
  * actually configured; see that file's own EB_UPDATER_ENABLED branch for
  * the desktop-but-unconfigured case), so this TU is empty on desktop.
@@ -38,7 +38,7 @@ void platform_update_poll(EbUpdateProgress *out) {
 }
 
 /* platform_get_version_string() lives here too, despite the "updater"
- * filename -- same reasoning as everything else in this file: an
+ * filename, same reasoning as everything else in this file: an
  * embedded target has no build-time git-describe step (or self-update
  * story) at all yet. Desktop's real implementation is in port/unix/
  * main.c, unconditionally (not gated behind EB_UPDATER_ENABLED). */

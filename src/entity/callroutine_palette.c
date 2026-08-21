@@ -19,7 +19,7 @@
 #include "game_main.h"
 #include <string.h>
 
-/* ---- Palette fade engine state (see buffer_layout.h) ---- */
+/* Palette fade engine state (see buffer_layout.h) */
 #include "entity/buffer_layout.h"
 
 int16_t get_colour_fade_slope(int16_t current, int16_t target,
@@ -177,7 +177,7 @@ void finalize_palette_fade(void) {
 }
 
 /*
- * SETUP_COLOR_MATH_WINDOW — Port of asm/system/palette/setup_color_math_window.asm.
+ * SETUP_COLOR_MATH_WINDOW, Port of asm/system/palette/setup_color_math_window.asm.
  * Sets color math PPU registers for screen darkening/brightening effects.
  *   cgadsub_val: CGADSUB value ($33 = add to BG1+BG2+OBJ+backdrop,
  *                                $B3 = subtract from same)
@@ -201,7 +201,7 @@ void setup_color_math_window(uint8_t cgadsub_val, uint8_t intensity) {
 }
 
 /*
- * CLAMP_COLOR_CHANNEL — Port of asm/system/palette/clamp_color_channel.asm.
+ * CLAMP_COLOR_CHANNEL, Port of asm/system/palette/clamp_color_channel.asm.
  * Clamps a signed 16-bit value to the range [0, 31].
  */
 int16_t clamp_color_channel(int16_t value) {
@@ -211,7 +211,7 @@ int16_t clamp_color_channel(int16_t value) {
 }
 
 /*
- * ADJUST_PALETTE_BRIGHTNESS — Port of asm/system/palette/adjust_palette_brightness.asm.
+ * ADJUST_PALETTE_BRIGHTNESS, Port of asm/system/palette/adjust_palette_brightness.asm.
  * For a single 16-color sub-palette, reads from MAP_PALETTE_BACKUP,
  * adds brightness offset to each R/G/B channel (clamped to [0,31]),
  * and writes to PALETTES at sub-palette (palette_index + 2).
@@ -238,7 +238,7 @@ void adjust_palette_brightness(int palette_index, int16_t brightness) {
 }
 
 /*
- * APPLY_PALETTE_BRIGHTNESS_ALL — Port of asm/system/palette/apply_palette_brightness_all.asm.
+ * APPLY_PALETTE_BRIGHTNESS_ALL, Port of asm/system/palette/apply_palette_brightness_all.asm.
  * Applies brightness offset to all 16 sub-ert.palettes, then triggers full upload.
  */
 void apply_palette_brightness_all(int16_t brightness) {
@@ -249,7 +249,7 @@ void apply_palette_brightness_all(int16_t brightness) {
 }
 
 /*
- * SETUP_ENTITY_COLOR_MATH — Port of asm/overworld/entity/setup_entity_color_math.asm.
+ * SETUP_ENTITY_COLOR_MATH, Port of asm/overworld/entity/setup_entity_color_math.asm.
  * Reads the current entity's var0 to determine color math mode.
  * If var0 >= 0: add mode (cgadsub = $33), intensity = var0
  * If var0 < 0:  subtract mode (cgadsub = $B3), intensity = -var0
@@ -272,7 +272,7 @@ void setup_entity_color_math(void) {
     setup_color_math_window(cgadsub_val, intensity);
 }
 
-/* ---- Palette-related CALLROUTINE implementations ---- */
+/* Palette-related CALLROUTINE implementations */
 
 int16_t cr_cycle_entity_palette(int16_t ent, int16_t scr,
                                        uint16_t pc, uint16_t *out_pc) {
@@ -403,7 +403,7 @@ int16_t cr_fill_palettes_black(int16_t ent, int16_t scr,
     return 0;
 }
 
-/* ---- Gas station callroutines ---- */
+/* Gas station callroutines */
 
 /*
  * LOAD_GAS_STATION_PALETTE (C0F3E8)

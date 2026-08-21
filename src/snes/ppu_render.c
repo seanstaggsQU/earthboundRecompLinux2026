@@ -7,12 +7,12 @@
 
 /* Embedded ports can define these at build time to optimize rendering:
  *
- *   EB_PPU_RAM_SECTION — section name for placing hot functions in fast memory.
+ *   EB_PPU_RAM_SECTION: section name for placing hot functions in fast memory.
  *     Examples: ".time_critical" (RP2040), ".dtcm" (STM32 DTCM-RAM),
  *              ".iram1" (ESP32).  Eliminates instruction cache misses
  *              for the decode + scanline render inner loops (~3KB).
  *
- *   EB_PPU_FORCE_SPEED_OPT — when defined, forces -O3 for this file even when
+ *   EB_PPU_FORCE_SPEED_OPT: when defined, forces -O3 for this file even when
  *     the library is compiled with -Os.  Useful when the port uses -Os
  *     globally to reduce code size / cache pressure, but still wants
  *     maximum speed for the PPU rendering hot path. */
@@ -27,7 +27,7 @@
 #define PPU_HOT_FUNC(name) name
 #endif
 
-/* EB_PPU_LINEBUF_ATTR — embedded ports can route the per-scanline working buffers
+/* EB_PPU_LINEBUF_ATTR: embedded ports can route the per-scanline working buffers
  * into fast memory (e.g. STM32 DTCM) by defining this at build time. Defaults
  * to nothing on desktop, so the buffers stay in normal BSS. */
 #ifndef EB_PPU_LINEBUF_ATTR
@@ -39,7 +39,7 @@ PPUProfile ppu_profile;
 #define PROF_SECTION(name) uint64_t _prof_##name = platform_timer_ticks()
 #define PROF_END(name, acc) (acc) += (uint32_t)(platform_timer_ticks() - _prof_##name)
 
-/* Cheap per-call BG work counters (increments only — no timers in the inner
+/* Cheap per-call BG work counters (increments only, no timers in the inner
  * loop, so they don't distort the PROF section timings).  Accumulated across
  * BG_PROF_FRAMES frames, then printf'd (with the last frame's phase timings)
  * and reset.  Purely diagnostic; no effect on rendering. */
@@ -104,7 +104,7 @@ typedef struct {
     const uint8_t *tm_line; /* per-pixel main screen mask (always valid, never NULL) */
     const uint8_t *ts_line; /* per-pixel sub screen mask (always valid when sub active) */
     uint16_t gp0_lm, gp1_lm; /* packed gp|layer_bit<<8 for tile prio 0 and 1 */
-    uint8_t layer_bit;       /* layer bitmask (LAYER_BG1..BG4) — for window checks */
+    uint8_t layer_bit;       /* layer bitmask (LAYER_BG1..BG4), for window checks */
     /* No-window fast path: when windows are globally inactive, eff_tm_line/
      * eff_ts_line are uniform, so the per-pixel window mask collapses to these
      * loop-invariant booleans and the per-pixel tm_line/ts_line loads drop out. */
@@ -112,7 +112,7 @@ typedef struct {
     uint8_t main_on;         /* (base_tm & layer_bit)!=0; valid when no_window */
     uint8_t sub_on;          /* (base_ts & layer_bit)!=0; valid when no_window */
     /* 1 = target merge buffer is known-empty (freshly cleared) for every pixel
-     * this layer writes, so the per-pixel priority load+compare is dead — the
+     * this layer writes, so the per-pixel priority load+compare is dead, the
      * write always wins. Set for the first BG layer into best_bg and for every
      * temp-buffer layer (both buffers enter each use all-zero via consumer
      * store-back + a once-per-frame clear). Requires no_window + main_on;
@@ -121,14 +121,14 @@ typedef struct {
     TileRowCacheEntry *tile_cache; /* per-context tile cache (may be in fast SRAM) */
     /* Emit-span tracking: emit_tile_run widens [emit_lo, emit_hi) with every
      * run that survives the blank-row skip. The temp-layer merge uses it to
-     * scan only the columns the temp render could have written — on the
+     * scan only the columns the temp render could have written, on the
      * overworld BG3 (HUD/text) is usually entirely blank, collapsing the
      * 256-column merge scan to nothing. Callers that consume the span must
      * re-init it (lo = INT_MAX, hi = 0) before each render_bg_scanline call. */
     int emit_lo, emit_hi;
 } BGRenderCtx;
 
-/* Helpers to extract fields from a packed main word (or a 16-bit gp_lm —
+/* Helpers to extract fields from a packed main word (or a 16-bit gp_lm, 
  * GP/LM live in the same low bits either way). */
 #define GP_LM_GP(v)    ((uint8_t)(v))
 #define GP_LM_LM(v)    ((uint8_t)((v) >> 8))
@@ -165,7 +165,7 @@ void ppu_prepare_palette(void) {
 
 static TileRowCacheEntry tile_row_cache[EB_PPU_NUM_RENDER_CONTEXTS][TILE_CACHE_SIZE];
 
-/* Decode a single 2bpp tile row (8 pixels) — unrolled, no loop.
+/* Decode a single 2bpp tile row (8 pixels), unrolled, no loop.
  * Not force-inlined: keeping as regular functions reduces render_bg_scanline
  * code size to fit within the 16KB RP2040 XIP cache alongside other hot code. */
 static void PPU_HOT_FUNC(decode_2bpp_row)(const uint8_t *tile_data, int row,
@@ -299,7 +299,7 @@ void emit_tile_run(
     const uint8_t *tile_data = &ppu.vram[tile_addr];
 
     /* Quick blank-row check: if all bitplane bytes for this row are zero,
-     * every pixel is transparent — skip decode + emit entirely. */
+     * every pixel is transparent, skip decode + emit entirely. */
     {
         const uint8_t *bp = tile_data + pixel_y * 2;
         uint8_t any = bp[0] | bp[1];
@@ -308,7 +308,7 @@ void emit_tile_run(
         if (!any) { BGC_INC(blank_skips); return; }
     }
 
-    /* Tile row cache lookup — avoids redundant decode across scanlines,
+    /* Tile row cache lookup, avoids redundant decode across scanlines,
      * horizontal tile repeats, and cross-layer tile sharing. */
     uint32_t cache_key = tile_addr | ((uint32_t)pixel_y << 17);
     uint32_t cache_idx = ((tile_addr >> 1) ^ pixel_y) & TILE_CACHE_MASK;
@@ -321,7 +321,7 @@ void emit_tile_run(
             BGC_INC(cache_hits);
             indices = cache[cache_idx].indices;
         } else {
-            /* Cache miss — decode and store */
+            /* Cache miss, decode and store */
             BGC_INC(cache_misses);
             uint8_t *dest = cache[cache_idx].indices;
             if (bpp == 8)
@@ -352,10 +352,10 @@ void emit_tile_run(
     uint16_t gp_lm = prio_bit ? ctx->gp1_lm : ctx->gp0_lm;
     uint8_t gp = GP_LM_GP(gp_lm);
 
-    /* Inner pixel loop — split into sub/no-sub variants to eliminate the
+    /* Inner pixel loop, split into sub/no-sub variants to eliminate the
      * per-pixel sub_gp NULL check.  The sub-screen path adds ~5 loads per
      * pixel; skipping it when unused saves ~15% of render_bg_scanline time.
-     * tm_line is always valid (never NULL) — caller provides an all-0xFF
+     * tm_line is always valid (never NULL), caller provides an all-0xFF
      * array when windows are inactive, eliminating the NULL check. */
 #define EMIT_PIXELS(HAS_SUB) do { \
     for (int _i = 0; _i < count; _i++) { \
@@ -382,7 +382,7 @@ void emit_tile_run(
 
     /* No-window variant: windows globally inactive, so eff_tm_line/eff_ts_line
      * are uniform. The per-pixel `tm_line[_sx] & layer_bit` load+AND collapses
-     * to the loop-invariant booleans main_on/sub_on — one memory load removed
+     * to the loop-invariant booleans main_on/sub_on, one memory load removed
      * from the critical path of every emitted pixel. */
 #define EMIT_PIXELS_NW(HAS_SUB) do { \
     for (int _i = 0; _i < count; _i++) { \
@@ -403,7 +403,7 @@ void emit_tile_run(
 } while(0)
 
     /* Unconditional variant: the merge buffer is known-empty for this layer's
-     * pixels (uncond), so the priority load+compare is dropped — the write
+     * pixels (uncond), so the priority load+compare is dropped, the write
      * always wins. main is written unconditionally (selection guarantees
      * main_on); sub is gated by the loop-invariant sub_on. Each screen_x is
      * written at most once per layer, so no intra-layer overwrite hazard. */
@@ -462,10 +462,10 @@ void emit_tile_run(
  *
  * Correctness: keyed on (tile_row_map, scroll_x, render_width) and invalidated at
  * frame start, so a replay can only occur for scanlines of the same frame that map
- * to the same tile row at the same scroll — exactly when the plan is identical.
+ * to the same tile row at the same scroll, exactly when the plan is identical.
  * 8x8 tiles only; 16x16 and bg2 HDMA distortion (per-scanline scroll) fall back to
  * the full loop. Assumes a single render context (the cache is global, not per
- * ctx_id) — auto-disabled otherwise. */
+ * ctx_id), auto-disabled otherwise. */
 #ifndef EB_PPU_BG_ROW_CACHE
 #define EB_PPU_BG_ROW_CACHE 1
 #endif
@@ -493,7 +493,7 @@ static struct {
 
 #if EB_PPU_BG_ROW_CACHE
 /* A tile whose entire graphic (all bytes_per_tile bytes) is zero is palette
- * index 0 everywhere — fully transparent on every row (emit_tile_run would skip
+ * index 0 everywhere, fully transparent on every row (emit_tile_run would skip
  * every pixel via `if (_cidx == 0) continue`). Detected once while building the
  * row plan and elided from it, so it costs nothing on any of the tile row's
  * scanlines, not just the per-row blank-skip. On the overworld ~80% of BG tiles
@@ -533,13 +533,13 @@ static void PPU_HOT_FUNC(render_bg_scanline)(int bg_index, int scanline, int bpp
     /* Check for 16x16 tile mode */
     bool big_tiles = (ppu.bgmode >> (4 + bg_index)) & 1;
     int tile_size = big_tiles ? 16 : 8;
-    int tile_mask = tile_size - 1;      /* 7 or 15 — replaces % tile_size */
-    int tile_shift = big_tiles ? 4 : 3; /* log2(tile_size) — replaces / tile_size */
+    int tile_mask = tile_size - 1;      /* 7 or 15, replaces % tile_size */
+    int tile_shift = big_tiles ? 4 : 3; /* log2(tile_size), replaces / tile_size */
 
     /* Apply scroll offset.
      *
      * x_pad shifts a FILL-mode layer's content right by EB_VIEWPORT_PAD_LEFT so
-     * its native 256px window lands at viewport x [PAD_LEFT, PAD_LEFT+256) — the
+     * its native 256px window lands at viewport x [PAD_LEFT, PAD_LEFT+256), the
      * same horizontal span the CENTER path places content at (dst_start =
      * PAD_LEFT) and the span sprites occupy (drawn at SNES x + PAD_LEFT). Without
      * it a FILL background renders from screen x=0 and sits PAD_LEFT to the left
@@ -714,7 +714,7 @@ static void PPU_HOT_FUNC(render_bg_scanline)(int bg_index, int scanline, int bpp
 #if EB_PPU_BG_ROW_CACHE
     /* Commit the plan for replay by this row's other scanlines. Only when it fit
      * (plan_n < MAXCOL); if it ever overflowed we leave the cache invalid and just
-     * recompute — correct, only slower. */
+     * recompute, correct, only slower. */
     if (row_cacheable && plan_n < BG_ROW_PLAN_MAXCOL) {
         bg_row_cache[bg_index].row      = tile_row_map;
         bg_row_cache[bg_index].scroll_x = scroll_x;
@@ -726,7 +726,7 @@ static void PPU_HOT_FUNC(render_bg_scanline)(int bg_index, int scanline, int bpp
 
 /* Blend two BGR565 colors for color math (add/subtract, optionally halved).
  * All channels are 5-bit precision (green stored as g5<<6 in BGR565).
- * BGR565 layout: BBBBBGGGGGGRRRRR — R[4:0], G[10:6]@5bit, B[15:11]. */
+ * BGR565 layout: BBBBBGGGGGGRRRRR, R[4:0], G[10:6]@5bit, B[15:11]. */
 static inline __attribute__((always_inline))
 uint16_t blend_colors(uint16_t main_c, uint16_t sub_c,
                       bool subtract, bool half) {
@@ -806,7 +806,7 @@ static void PPU_HOT_FUNC(build_obj_buckets)(void) {
     int size_sel = (ppu.obsel >> 5) & 0x07;
 
     /* 127->0 so each band list is ordered high-index-first; the inner emit
-     * overwrites, so the last (lowest-index) sprite wins — matching HW. */
+     * overwrites, so the last (lowest-index) sprite wins, matching HW. */
     int n = 0;
     for (int i = 127; i >= 0; i--) {
         int hi_byte = i / 4;
@@ -863,7 +863,7 @@ static int obj_prio_dirty_hi = LINE_BUF_WIDTH;
 static bool PPU_HOT_FUNC(render_obj_scanline)(int scanline, uint16_t *obj_color, uint8_t *obj_prio, TileRowCacheEntry *tile_cache) {
     /* When vertical centering is active, sprites only render within the
      * SNES-visible scanline range. The border scanlines (above/below the
-     * centered area) show only BG content — no sprites. This prevents
+     * centered area) show only BG content, no sprites. This prevents
      * "parked" sprites at high OAM Y values from wrapping into view. */
     if (ppu.sprite_y_offset) {
         int snes_sl = scanline - ppu.sprite_y_offset;
@@ -1020,7 +1020,7 @@ static const uint8_t win_layer_bits[5] = {
     LAYER_BG1, LAYER_BG2, LAYER_BG3, LAYER_BG4, LAYER_OBJ
 };
 
-/* Pre-classified window layer batches — depends only on window config
+/* Pre-classified window layer batches, depends only on window config
  * registers (w12sel, w34sel, wobjsel, wbglog, wobjlog, tmw, tsw), which
  * are frame-constant.  Computed once per frame, reused for all scanlines. */
 typedef struct {
@@ -1112,7 +1112,7 @@ static void classify_window_layers(WindowClassification *wc) {
  * Kept as a separate noinline function to reduce ppu_render_frame code size
  * below the 16KB RP2040 XIP cache threshold.  Called once per scanline.
  * Placed in SRAM via PPU_HOT_FUNC to avoid XIP cache thrashing with
- * ppu_render_frame — these two functions would otherwise ping-pong the 16KB
+ * ppu_render_frame, these two functions would otherwise ping-pong the 16KB
  * XIP cache on every scanline. */
 static __attribute__((noinline))
 void PPU_HOT_FUNC(precompute_window_masks)(
@@ -1144,7 +1144,7 @@ void PPU_HOT_FUNC(precompute_window_masks)(
 
         /* Outer bounds for inverted (outside-the-window) spans.  In wide mode
          * these extend to the full viewport (in SNES-space coordinates) so the
-         * padding columns outside the native 0-255 range are also masked —
+         * padding columns outside the native 0-255 range are also masked, 
          * otherwise the blanking region (e.g. the oval window spotlight) stops
          * short of the viewport edges and the filling BG shows through. */
         int inv_lo = wide_mode ? wx_offset : 0;
@@ -1161,7 +1161,7 @@ void PPU_HOT_FUNC(precompute_window_masks)(
         memset(eff_tm_line, base_tm, render_width);
         memset(eff_ts_line, base_ts, render_width);
 
-        /* Apply batched single-window groups — one pass per group */
+        /* Apply batched single-window groups, one pass per group */
         #define BATCH_SPAN(ws, we, tm_mask, ts_mask) do { \
             int _xs = (int)(ws) - wx_offset; \
             int _xe = (int)(we) - wx_offset; \
@@ -1318,7 +1318,7 @@ void PPU_HOT_FUNC(precompute_window_masks)(
                      * native 0-255; wide-mode gutter columns (wx<0 or wx>255)
                      * have no native coordinate. Clamp to the nearest native
                      * edge so the window's state at the edge extends continuously
-                     * into the gutter — equivalent to the inv_lo/inv_hi gutter
+                     * into the gutter, equivalent to the inv_lo/inv_hi gutter
                      * extension in the single-window branches above. */
                     int cwx = wx < 0 ? 0 : (wx > 255 ? 255 : wx);
                     bool in_w1 = ((uint8_t)cwx >= w1_left && (uint8_t)cwx <= w1_right);
@@ -1348,7 +1348,7 @@ void PPU_HOT_FUNC(precompute_window_masks)(
  * When EB_PPU_NUM_RENDER_CONTEXTS == 1 (default), this is a single set of arrays
  * with no runtime overhead vs. the old stack allocation. */
 static pixel_t  line_out_ctx[EB_PPU_NUM_RENDER_CONTEXTS][EB_VIEWPORT_WIDTH] EB_PPU_LINEBUF_ATTR;
-/* Interleaved main merge buffer: color(hi16) | lmask | gp — see BGRenderCtx.
+/* Interleaved main merge buffer: color(hi16) | lmask | gp, see BGRenderCtx.
  * Same total RAM as the two uint16 arrays it replaced. */
 static uint32_t best_bg_ctx[EB_PPU_NUM_RENDER_CONTEXTS][LINE_BUF_WIDTH] EB_PPU_LINEBUF_ATTR;
 static uint16_t sub_bg_color_ctx[EB_PPU_NUM_RENDER_CONTEXTS][LINE_BUF_WIDTH] EB_PPU_LINEBUF_ATTR;
@@ -1398,7 +1398,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
 
     uint8_t brightness = ppu.inidisp & 0x0F;
 
-    /* Invalidate tile row cache for this context — VRAM may have changed. */
+    /* Invalidate tile row cache for this context, VRAM may have changed. */
     memset(tile_cache, 0xFF, TILE_CACHE_SIZE * sizeof(TileRowCacheEntry));
 
     /* Shadow palette: built by ppu_prepare_palette() before this call.
@@ -1431,7 +1431,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
     bool use_sub_screen = (ppu.cgwsel & 0x02) != 0;
     bool subtract_mode = (ppu.cgadsub & 0x80) != 0;
     bool half_math = (ppu.cgadsub & 0x40) != 0;
-    /* Fixed color for color math — convert directly to BGR565 */
+    /* Fixed color for color math, convert directly to BGR565 */
     uint16_t fixed_color = (uint16_t)ppu.coldata_r |
                            ((uint16_t)ppu.coldata_g << 6) |
                            ((uint16_t)ppu.coldata_b << 11);
@@ -1465,7 +1465,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
     int fb_y_offset = 0;
 
     if (!wide_mode && (EB_VIEWPORT_WIDTH != SNES_WIDTH || EB_VIEWPORT_HEIGHT != SNES_HEIGHT)) {
-        /* No filling layers — render at SNES resolution, centered/cropped.
+        /* No filling layers, render at SNES resolution, centered/cropped.
          * Always render SNES_WIDTH pixels into line buffers, then crop/pad
          * when writing to the output. */
         render_height = EB_VIEWPORT_HEIGHT < SNES_HEIGHT ? EB_VIEWPORT_HEIGHT : SNES_HEIGHT;
@@ -1545,7 +1545,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
      * aliased above. */
     uint8_t win_cache_key[6] = {0xFF, 0, 0, 0, 0, 0}; /* force first compute */
 
-    /* Classify window layers once per frame — depends only on window config
+    /* Classify window layers once per frame, depends only on window config
      * registers which don't change within a frame (only positions change). */
     WindowClassification win_class;
     bool has_layer_windows = (ppu.tmw || ppu.tsw);
@@ -1554,7 +1554,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
     bool has_cm_windows = color_math_active && (prevent_mode == 1 || prevent_mode == 2);
     bool has_windows = has_layer_windows || has_cm_windows;
     /* CM-only windows (e.g. EB's darkness/tint scenes: cgadsub math with a
-     * prevent window but TMW/TSW=0) mask COLOR MATH only — the per-pixel
+     * prevent window but TMW/TSW=0) mask COLOR MATH only, the per-pixel
      * layer masks eff_tm/ts_line stay uniform (= base_tm/base_ts;
      * precompute_window_masks writes them only under `if (ppu.tmw||ppu.tsw)`).
      * Everything except the color-math prevent check can therefore use the
@@ -1570,7 +1570,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
     int render_y_start = fb_y_offset;
     int render_y_end = fb_y_offset + render_height;
 
-    /* #4: when the compositor covers the entire output line (wide mode — no
+    /* #4: when the compositor covers the entire output line (wide mode, no
      * left/right black borders) it overwrites every line_out pixel each
      * scanline, so the per-scanline clear is dead work. This mirrors the
      * composite loop's coverage exactly: it writes line_out[x + fb_x_offset]
@@ -1596,7 +1596,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
      * with no windows at all and no per-scanline TM/TS HDMA, base_tm/base_ts
      * are frame-constant (ppu.tm/ppu.ts) and nothing mutates these buffers
      * mid-frame (precompute_window_masks only runs when windows are active;
-     * emit only reads them) — so the per-scanline fill is identical 240×/frame.
+     * emit only reads them), so the per-scanline fill is identical 240×/frame.
      * Fill once here and skip it in the loop. Removes ~2 × 320 × 240 ≈ 150
      * KB/frame of memset (each fill is render_width bytes). Frame-constant
      * predicate, hoisted. */
@@ -1625,7 +1625,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
 
     PROF_SECTION(iter);
     for (int out_y = y_start; out_y < y_end; out_y += y_stride) {
-        /* Border scanline — outside the renderable area */
+        /* Border scanline, outside the renderable area */
         if (out_y < render_y_start || out_y >= render_y_end) {
             memset(line_out, 0, EB_VIEWPORT_WIDTH * sizeof(pixel_t));
             send_scanline(out_y, line_out);
@@ -1634,12 +1634,12 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
 
         int scanline = out_y - fb_y_offset;
         /* Per-scanline buffers are static per-context (aliased above).
-         * Merged BG priority buffers — BG layers write directly here. */
+         * Merged BG priority buffers, BG layers write directly here. */
         bool need_sub = color_math_active && use_sub_screen;
 
         PROF_SECTION(clear);
         /* best_bg is NOT cleared here: it enters every scanline all-zero
-         * — the once-per-frame clear above establishes the invariant and the
+         *, the once-per-frame clear above establishes the invariant and the
          * compositor maintains it by zeroing each entry as it reads it
          * (store-back), including the head/tail it doesn't visit. */
         if (need_sub)
@@ -1649,7 +1649,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
             /* Skip the clear when no sprite touches this scanline's band: nothing
              * writes obj_prio this line and the compositor skips reading it
              * (render_obj_scanline returns false -> scanline_has_obj false), so
-             * stale contents are never observed. Conservative — an occupied band
+             * stale contents are never observed. Conservative, an occupied band
              * with no exact-scanline overlap still clears, which is harmless.
              * The clear itself is span-limited: every nonzero entry lies inside
              * the dirty span render_obj_scanline recorded (see its definition),
@@ -1674,7 +1674,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
         PROF_END(clear, prof_clear);
 
         /* SNES-space scanline for scenes using explicit viewport fill.
-         * bg_win_y_offset, not sprite_y_offset -- see the field comment in
+         * bg_win_y_offset, not sprite_y_offset, see the field comment in
          * ppu.h for why the two must stay decoupled (overworld entities vs.
          * its non-filling text/window BG layer). */
         int snes_scanline = scanline - ppu.bg_win_y_offset;
@@ -1696,7 +1696,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
 
         /* Compute window masks BEFORE BG rendering so emit_tile_run can
          * apply them during the merge.  eff_tm_line / eff_ts_line are always
-         * valid — filled with base_tm/base_ts when no windows, so the inner
+         * valid, filled with base_tm/base_ts when no windows, so the inner
          * loop never needs a NULL-pointer check.  The fill uses base_tm/ts
          * (not 0xFF) because layers not in TM must not write to main screen,
          * and layers not in TS must not write to sub screen. */
@@ -1709,7 +1709,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
             memset(eff_ts_line, base_ts, render_width);
         }
         if (!has_layer_windows && !has_cm_windows) {
-            /* No layer windows and no color math windows — skip entirely */
+            /* No layer windows and no color math windows, skip entirely */
         } else {
             uint8_t w1l = ppu.window_hdma_active ? ppu.wh0_table[scanline] : ppu.wh0;
             uint8_t w1r = ppu.window_hdma_active ? ppu.wh1_table[scanline] : ppu.wh1;
@@ -1728,7 +1728,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
         }
         PROF_END(win, prof_win);
 
-        /* Render BG layers — merge directly into priority buffers */
+        /* Render BG layers, merge directly into priority buffers */
         PROF_SECTION(bg);
         BGC_INC(scanlines);
         /* best_bg_* enters each scanline all-zero (compositor store-back), so
@@ -1785,7 +1785,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
             ctx.layer_bit = layer_bit;
             /* eff_tm_line/eff_ts_line are uniform (= base_tm/base_ts) when
              * no windows are active, so the per-pixel window mask reduces to
-             * these constants — enables the window-mask-free emit variant. */
+             * these constants, enables the window-mask-free emit variant. */
             ctx.no_window = no_layer_windows;
             ctx.main_on = (base_tm & layer_bit) != 0;
             ctx.sub_on  = (base_ts & layer_bit) != 0;
@@ -1825,7 +1825,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
                 uint8_t *temp_sub_gp = temp_sub_gp_ctx[ctx_id];
                 uint8_t *temp_tm_all = temp_tm_all_ctx[ctx_id];
                 /* temp_main is NOT cleared here: like best_bg it enters
-                 * every use all-zero — the once-per-frame clear above
+                 * every use all-zero, the once-per-frame clear above
                  * establishes the invariant and the merge loop below maintains
                  * it by zeroing each non-zero entry as it consumes it
                  * (store-back), plus head/tail guards for the span the merge
@@ -1834,13 +1834,13 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
                 /* temp_tm_all is NOT cleared: the temp render always uses the
                  * uncond emit variant (uncond=1, main_on=1 below), which never
                  * reads tm_line/ts_line, and the merge below reads the *main*
-                 * eff_tm_line — so temp_tm_all is write-only dead work here
+                 * eff_tm_line, so temp_tm_all is write-only dead work here
                  * (~3% of the overworld frame was this memset). If the emit
                  * dispatch ever stops taking EMIT_PIXELS_UNCOND for temp, restore
                  * `memset(temp_tm_all, 0xFF, SNES_WIDTH);` */
                 /* temp_sub_gp is NOT cleared for the same reason: the uncond
                  * emit writes it without reading, and the merge gates the sub
-                 * screen on `gp` from temp_gp_lm — temp_sub_gp is never read
+                 * screen on `gp` from temp_gp_lm, temp_sub_gp is never read
                  * anywhere, so its clear was dead work too. */
 
                 /* Temp context pointing to temp buffers */
@@ -1848,7 +1848,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
                 temp_ctx.main = temp_main;
                 temp_ctx.sub_color = need_sub ? temp_sub_color : NULL;
                 temp_ctx.sub_gp = need_sub ? temp_sub_gp : NULL;
-                /* No window masking in temp — apply when merging. temp_tm_all
+                /* No window masking in temp, apply when merging. temp_tm_all
                  * is all-0xFF, so the layer always writes both screens here;
                  * use the window-mask-free emit variant. */
                 temp_ctx.tm_line = temp_tm_all;
@@ -1914,7 +1914,7 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
                     if (gp == 0) continue;
                     /* Store-back clear: consume the entry so the buffer
                      * re-enters the next layer/scanline all-zero (replaces the
-                     * per-layer memset). Zero entries need no store — they are
+                     * per-layer memset). Zero entries need no store, they are
                      * already zero. */
                     temp_main[sx] = 0;
                     /* Apply window mask during merge */
@@ -1933,11 +1933,11 @@ void PPU_HOT_FUNC(ppu_render_frame_ex)(int ctx_id, int y_start, int y_end,
 merge_done:
                 /* The store-back only covers the merged span; re-zero any
                  * head/tail the temp render wrote but the merge didn't visit.
-                 * Empty on G&W (src_start == 0, count == SNES_WIDTH) — only a
+                 * Empty on G&W (src_start == 0, count == SNES_WIDTH), only a
                  * viewport narrower than SNES_WIDTH + pad produces one.
                  * (Entries inside the window but outside [i_lo, i_hi) were
-                 * never written this scanline — the emit span bounds all
-                 * writes — so they are still zero and need no re-clear.) */
+                 * never written this scanline, the emit span bounds all
+                 * writes, so they are still zero and need no re-clear.) */
                 {
                     int merged_lo = src_start;
                     int merged_hi = src_start + count;
@@ -1972,7 +1972,7 @@ merge_done:
              * merged_empty true for the next real layer.) */
             merged_empty = false;
 
-            /* Mosaic: horizontal — replicate leftmost pixel in each block.
+            /* Mosaic: horizontal, replicate leftmost pixel in each block.
              * Operates on the merged buffer for this layer's pixels. */
             if (bg_mosaic) {
                 int block = mosaic_size + 1;
@@ -2003,7 +2003,7 @@ merge_done:
         }
         PROF_END(obj, prof_obj);
 
-        /* --- Compositing: OBJ vs merged BG --- */
+        /* Compositing: OBJ vs merged BG */
         PROF_SECTION(comp);
         {
             /* Pre-compute valid pixel range to eliminate per-pixel bounds check.
@@ -2015,7 +2015,7 @@ merge_done:
 
             /* Hoist loop-invariant OBJ enable check. When no sprite overlapped
              * this scanline (obj_prio all-0), drop the per-pixel obj_prio load
-             * entirely — scanline_has_obj folds into the enable flags. */
+             * entirely, scanline_has_obj folds into the enable flags. */
             bool obj_main_en = scanline_has_obj && (no_layer_windows ? (base_tm & LAYER_OBJ) != 0 : false);
             bool obj_sub_en = scanline_has_obj && (no_layer_windows ? (base_ts & LAYER_OBJ) != 0 : false);
 
@@ -2031,7 +2031,7 @@ merge_done:
              * generic loop below evaluates four per-pixel conditionals that
              * are all frame-constant false here (math eligibility, gutter
              * fill, color-math apply, brightness), plus computes main_layer
-             * solely to feed them — and it is too big for GCC to unswitch,
+             * solely to feed them, and it is too big for GCC to unswitch,
              * so the dead flags are re-loaded from spill slots every pixel.
              * This specialized loop is just: pick OBJ vs BG vs backdrop,
              * store-back-clear, store. Same store-back invariant as the
@@ -2079,7 +2079,7 @@ merge_done:
 
                 uint32_t bg_w = best_bg[x];
                 /* Store-back clear: leave the entry zero for the next scanline
-                 * (replaces the per-scanline memset — see the clear phase). */
+                 * (replaces the per-scanline memset, see the clear phase). */
                 best_bg[x] = 0;
                 uint8_t bg_gp_val = GP_LM_GP(bg_w);
 
@@ -2151,7 +2151,7 @@ composite_tail:
             /* The store-back clear above only covers [x_start, x_end); re-zero
              * any head/tail the compositor didn't visit so the next scanline's
              * all-zero invariant holds. Both ranges are empty unless the
-             * viewport is narrower than the render width (never on G&W) —
+             * viewport is narrower than the render width (never on G&W), 
              * frame-constant conditions, predicted away. */
             if (x_start > 0)
                 memset(best_bg, 0, x_start * sizeof(uint32_t));
@@ -2179,7 +2179,7 @@ composite_tail:
     ppu_profile.ready = true;
 #endif
 
-    /* Borders are handled by the unified output Y loop above — no
+    /* Borders are handled by the unified output Y loop above, no
      * separate top/bottom border code needed. */
 }
 
@@ -2188,7 +2188,7 @@ void ppu_render_frame(scanline_callback_t send_scanline) {
     ppu_render_frame_ex(0, 0, EB_VIEWPORT_HEIGHT, 1, send_scanline);
 
 #ifdef EB_PPU_PROFILE
-    /* Periodic BG work report — averaged over BG_PROF_FRAMES frames, with the
+    /* Periodic BG work report, averaged over BG_PROF_FRAMES frames, with the
      * last frame's phase timings folded in (0.1 ms units, same scale as the
      * on-screen overlay) so the monitor line is self-contained. Diagnostic only. */
     if (++g_bgc.frames >= BG_PROF_FRAMES) {

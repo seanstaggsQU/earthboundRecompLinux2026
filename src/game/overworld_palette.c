@@ -2,18 +2,18 @@
  * Overworld palette, damage, and game-over/comeback functions.
  *
  * Ported from:
- *   ADJUST_SINGLE_COLOUR            — asm/overworld/adjust_single_colour.asm
- *   UPDATE_OVERWORLD_DAMAGE         — asm/overworld/update_overworld_damage.asm
- *   SPAWN                           — asm/overworld/spawn.asm
- *   INITIALIZE_GAME_OVER_SCREEN     — asm/misc/initialize_game_over_screen.asm
- *   PLAY_COMEBACK_SEQUENCE          — asm/misc/play_comeback_sequence.asm
- *   SKIPPABLE_PAUSE                 — asm/text/skippable_pause.asm
- *   LOAD_MAP_PALETTE_ANIMATION_FRAME — asm/system/palette/load_map_palette_animation_frame.asm
- *   INITIALIZE_MAP_PALETTE_FADE     — asm/overworld/initialize_map_palette_fade.asm
- *   UPDATE_MAP_PALETTE_FADE         — asm/system/palette/update_map_palette_fade.asm
- *   ANIMATE_MAP_PALETTE_CHANGE      — asm/system/palette/animate_map_palette_change.asm
- *   FADE_PALETTE_TO_WHITE           — asm/system/palette/fade_palette_to_white.asm
- *   ANIMATE_PALETTE_FADE_WITH_RENDERING — asm/system/palette/animate_palette_fade_with_rendering.asm
+ *   ADJUST_SINGLE_COLOUR: asm/overworld/adjust_single_colour.asm
+ *   UPDATE_OVERWORLD_DAMAGE: asm/overworld/update_overworld_damage.asm
+ *   SPAWN: asm/overworld/spawn.asm
+ *   INITIALIZE_GAME_OVER_SCREEN: asm/misc/initialize_game_over_screen.asm
+ *   PLAY_COMEBACK_SEQUENCE: asm/misc/play_comeback_sequence.asm
+ *   SKIPPABLE_PAUSE: asm/text/skippable_pause.asm
+ *   LOAD_MAP_PALETTE_ANIMATION_FRAME, asm/system/palette/load_map_palette_animation_frame.asm
+ *   INITIALIZE_MAP_PALETTE_FADE: asm/overworld/initialize_map_palette_fade.asm
+ *   UPDATE_MAP_PALETTE_FADE: asm/system/palette/update_map_palette_fade.asm
+ *   ANIMATE_MAP_PALETTE_CHANGE: asm/system/palette/animate_map_palette_change.asm
+ *   FADE_PALETTE_TO_WHITE: asm/system/palette/fade_palette_to_white.asm
+ *   ANIMATE_PALETTE_FADE_WITH_RENDERING, asm/system/palette/animate_palette_fade_with_rendering.asm
  */
 
 #include "game/overworld_internal.h"
@@ -60,26 +60,26 @@ uint16_t adjust_single_colour(uint16_t colour1, uint16_t colour2) {
         /* colour1 > colour2: approaching from above */
         uint16_t diff = colour1 - colour2;
         if (diff <= 6) {
-            return colour2;  /* Close enough — snap to target */
+            return colour2;  /* Close enough, snap to target */
         }
-        /* Too far — return colour1 - 6 (clamp approach) */
+        /* Too far, return colour1 - 6 (clamp approach) */
         return colour1 - 6;
     } else {
         /* colour1 < colour2: approaching from below */
         uint16_t diff = colour2 - colour1;
         if (diff <= 6) {
-            return colour2;  /* Close enough — snap to target */
+            return colour2;  /* Close enough, snap to target */
         }
-        /* Too far — return colour1 + 6 (clamp approach) */
+        /* Too far, return colour1 + 6 (clamp approach) */
         return colour1 + 6;
     }
 }
 
-/* ---- Enemy touch flash helpers ---- */
+/* Enemy touch flash helpers */
 static uint16_t background_colour_backup_ow;
 static uint8_t tm_backup_ow;
 
-/* ---- Savestate snapshot (see OwPaletteBackupSaveState in overworld.h) ---- */
+/* Savestate snapshot (see OwPaletteBackupSaveState in overworld.h) */
 void ow_palette_backup_savestate_pack(void *out) {
     OwPaletteBackupSaveState *s = (OwPaletteBackupSaveState *)out;
     s->background_colour_backup_ow = background_colour_backup_ow;
@@ -111,7 +111,7 @@ void start_enemy_touch_flash(void) {
  *
  * Checks whether a party member's HP has fallen below 20% of max. Returns true
  * if the "[name]'s HP is very low!" warning should be shown now (it had not been
- * shown yet) — the caller (the damage loop) shows GAME_MODE_HP_ALERT, either via
+ * shown yet), the caller (the damage loop) shows GAME_MODE_HP_ALERT, either via
  * a pump (blocking wrapper) or a STEP_PUSH (the overworld root mode). The
  * already-shown latch (ow.hp_alert_shown) is set here so a resume does not
  * re-show, matching the assembly which set it after the message returned.
@@ -125,13 +125,13 @@ static bool ow_check_low_hp(uint16_t party_index) {
     /* Threshold = 20% of max HP = max_hp * 20 / 100 */
     uint16_t threshold = (uint16_t)((uint32_t)cs->max_hp * 20 / 100);
     if (cs->current_hp < threshold) {
-        /* HP is low — show alert if not already shown */
+        /* HP is low, show alert if not already shown */
         if (!ow.hp_alert_shown[party_index]) {
             ow.hp_alert_shown[party_index] = 1;
             return true;
         }
     } else {
-        /* HP is OK — clear the alert flag */
+        /* HP is OK, clear the alert flag */
         ow.hp_alert_shown[party_index] = 0;
     }
     return false;
@@ -250,12 +250,12 @@ OwDamageStatus ow_damage_step(OwDamageState *s) {
 
             bool need_alert = false;
             if (affliction == 5) {
-                /* --- Poison damage: 10 HP every 120 frames --- */
+                /* Poison damage: 10 HP every 120 frames */
                 if (ow.overworld_damage_countdown_frames[i] > 0) {
                     ow.overworld_damage_countdown_frames[i]--;
                     if (ow.overworld_damage_countdown_frames[i] != 0)
                         goto after_damage;  /* no damage this frame */
-                    /* Timer expired — apply damage */
+                    /* Timer expired, apply damage */
                     s->damage_events++;
                     cs->current_hp -= 10;
                     cs->current_hp_target -= 10;
@@ -265,7 +265,7 @@ OwDamageStatus ow_damage_step(OwDamageState *s) {
                     ow.overworld_damage_countdown_frames[i] = 120;
                 }
             } else {
-                /* --- Environmental/sunstroke damage --- */
+                /* Environmental/sunstroke damage */
                 bool apply_env = false;
                 if (affliction >= 4 && affliction <= 7) {
                     apply_env = true;
@@ -279,7 +279,7 @@ OwDamageStatus ow_damage_step(OwDamageState *s) {
                         ow.overworld_damage_countdown_frames[i]--;
                         if (ow.overworld_damage_countdown_frames[i] != 0)
                             goto after_damage;  /* no damage this frame */
-                        /* Timer expired — apply damage */
+                        /* Timer expired, apply damage */
                         s->damage_events++;
                         if (affliction == 4) {
                             /* Sunstroke: 10 HP damage */
@@ -355,18 +355,18 @@ after_damage:
  * GAME_MODE_HP_ALERT on OW_DMG_ALERT. */
 
 /* ====================================================================
- * SPAWN system — Game Over / Comeback sequence
+ * SPAWN system, Game Over / Comeback sequence
  * Port of:
- *   SPAWN                              — asm/overworld/spawn.asm
- *   INITIALIZE_GAME_OVER_SCREEN        — asm/misc/initialize_game_over_screen.asm
- *   PLAY_COMEBACK_SEQUENCE             — asm/misc/play_comeback_sequence.asm
- *   SKIPPABLE_PAUSE                    — asm/text/skippable_pause.asm
- *   LOAD_MAP_PALETTE_ANIMATION_FRAME   — asm/system/palette/load_map_palette_animation_frame.asm
- *   INITIALIZE_MAP_PALETTE_FADE        — asm/overworld/initialize_map_palette_fade.asm
- *   UPDATE_MAP_PALETTE_FADE            — asm/system/palette/update_map_palette_fade.asm
- *   ANIMATE_MAP_PALETTE_CHANGE         — asm/system/palette/animate_map_palette_change.asm
- *   FADE_PALETTE_TO_WHITE              — asm/system/palette/fade_palette_to_white.asm
- *   ANIMATE_PALETTE_FADE_WITH_RENDERING — asm/system/palette/animate_palette_fade_with_rendering.asm
+ *   SPAWN: asm/overworld/spawn.asm
+ *   INITIALIZE_GAME_OVER_SCREEN: asm/misc/initialize_game_over_screen.asm
+ *   PLAY_COMEBACK_SEQUENCE: asm/misc/play_comeback_sequence.asm
+ *   SKIPPABLE_PAUSE: asm/text/skippable_pause.asm
+ *   LOAD_MAP_PALETTE_ANIMATION_FRAME: asm/system/palette/load_map_palette_animation_frame.asm
+ *   INITIALIZE_MAP_PALETTE_FADE: asm/overworld/initialize_map_palette_fade.asm
+ *   UPDATE_MAP_PALETTE_FADE: asm/system/palette/update_map_palette_fade.asm
+ *   ANIMATE_MAP_PALETTE_CHANGE: asm/system/palette/animate_map_palette_change.asm
+ *   FADE_PALETTE_TO_WHITE: asm/system/palette/fade_palette_to_white.asm
+ *   ANIMATE_PALETTE_FADE_WITH_RENDERING, asm/system/palette/animate_palette_fade_with_rendering.asm
  * ==================================================================== */
 
 /* VRAM word addresses for game over screen (from include/enums.asm) */
@@ -391,7 +391,7 @@ after_damage:
 
 /* Map palette fade constants from buffer_layout.h (BUF_MAP_FADE_*) */
 
-/* ---- Helper: 8.8 fixed-point fade slope per color channel ---- */
+/* Helper: 8.8 fixed-point fade slope per color channel */
 static int16_t get_map_colour_fade_slope(int16_t current, int16_t target,
                                          int16_t frames) {
     if (frames <= 0) return 0;
@@ -413,7 +413,7 @@ StepResult mode_step_palette_fade(ModeState *st) {
 
     if (s->phase == 2) {
         /* PF_WITH_RENDERING: resume after a parked actionscript frame's child
-         * popped — run the post-render work, then continue the fade loop. */
+         * popped, run the post-render work, then continue the fade loop. */
         s->phase = 0;
         update_screen();
         s->remaining--;
@@ -640,7 +640,7 @@ static void game_over_screen_setup(void) {
      * whatever the battle/overworld scene beforehand left them as (the same
      * "inherits stale state" bug class as the Starman/Frank battle-menu fix
      * in battle_ui.c's load_battle_bg()). BG1 (VRAM_GAME_OVER_L1_TILEMAP,
-     * $5800) is the game-over character art -- but its tilemap is decompressed
+     * $5800) is the game-over character art, but its tilemap is decompressed
      * from a 2048-byte asset (E1D5E8.arr.lzhal, see below), i.e. 1024 tile
      * entries, i.e. a NORMAL-size 32x32 tilemap (256x256px). It isn't wide
      * enough to genuinely FILL a widescreen/zoomed canvas: BG_VIEWPORT_FILL
@@ -649,7 +649,7 @@ static void game_over_screen_setup(void) {
      * revealed columns once the canvas is wider than roughly
      * EB_VIEWPORT_PAD_LEFT + 256. CLAMP (render at native width centered,
      * edge-extend the border pixels instead of wrapping) is the correct
-     * mode here -- same technique already used for the title screen logo
+     * mode here, same technique already used for the title screen logo
      * (title_screen.c) for the identical "art doesn't tile" reason. BG3
      * (VRAM_GAME_OVER_L2_TILEMAP, $7C00) is the text/window layer (same
      * fixed VRAM_TEXT_LAYER_TILEMAP address the window system always writes
@@ -739,7 +739,7 @@ static void game_over_screen_setup(void) {
 
     /* Clear state.
      * Assembly clears BG2 and BG1 scroll (lines 98-101, note: line 101 is a
-     * duplicate STZ BG1_X_POS — likely intended as BG1_Y_POS).
+     * duplicate STZ BG1_X_POS, likely intended as BG1_Y_POS).
      * Also clear BG3 scroll: BG3 is the text layer (TM=$05 = BG1+BG3), and
      * non-zero BG3 scroll from battle causes the dialogue window to wrap. */
     bt.party_members_alive_overworld = 0;
@@ -747,7 +747,7 @@ static void game_over_screen_setup(void) {
     ppu.bg_vofs[0] = 0;  /* BG1_Y_POS */
     ppu.bg_hofs[1] = 0;  /* BG2_X_POS */
     ppu.bg_vofs[1] = 0;  /* BG2_Y_POS */
-    ppu.bg_hofs[2] = 0;  /* BG3_X_POS — prevents text window horizontal wrapping */
+    ppu.bg_hofs[2] = 0;  /* BG3_X_POS, prevents text window horizontal wrapping */
     ppu.bg_vofs[2] = 0;  /* BG3_Y_POS */
 
     /* Fade in (step=1, delay=1); the caller waits for completion. */
@@ -912,20 +912,20 @@ StepResult mode_step_game_over(ModeState *mst) {
              * map/music caches; wipe palettes on next map load.
              *
              * Bug fix: this only invalidated ow.loaded_map_tile_combo, missing
-             * the other two caches reload_map() (battle.c) -- the existing
+             * the other two caches reload_map() (battle.c), the existing
              * canonical "restore the overworld map after a VRAM-clobbering
-             * screen" function -- always invalidates together: ow.loaded_map_palette
+             * screen" function, always invalidates together: ow.loaded_map_palette
              * and, critically, ml.loaded_tileset_combo via
              * invalidate_loaded_tileset_combo(). load_map_at_sector() only
              * reloads tileset GRAPHICS into VRAM (word $0000) when
-             * ml.loaded_tileset_combo differs from the sector's tileset --
+             * ml.loaded_tileset_combo differs from the sector's tileset,
              * respawning in the same sector you died in (the common case)
              * left that check believing the tileset was already loaded, so
              * it skipped the reload even though the game-over screen had
              * just decompressed its own character art over that exact VRAM
              * address (game_over_screen_setup(), VRAM_GAME_OVER_L1_TILES ==
              * $0000). Net effect: the tilemap arrangement reloads correctly,
-             * but points at stale/wrong tile graphics -- a mostly-black map
+             * but points at stale/wrong tile graphics, a mostly-black map
              * with only OBJ-layer sprites (loaded through an unrelated path)
              * visible, until something else forces a full reload (e.g.
              * opening and closing the town map). */
@@ -1003,6 +1003,6 @@ StepResult mode_step_game_over(ModeState *mst) {
 
 /* ---- SPAWN (port of asm/overworld/spawn.asm) ----
  * Game over / comeback sequence, run when the whole party is KO'd. The blocking
- * pump bridge is gone — the overworld root (OWP_LOOP_END, game_main.c) STEP_PUSHes
+ * pump bridge is gone, the overworld root (OWP_LOOP_END, game_main.c) STEP_PUSHes
  * GAME_MODE_GAME_OVER directly (mode_step_game_over, above) and reads the pop
  * result (-1 "Continue" -> reboot / 0 "No Continue" -> world reinitialised). */
