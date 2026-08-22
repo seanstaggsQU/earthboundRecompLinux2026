@@ -57,6 +57,32 @@ configure_file(
     ${CMAKE_CURRENT_BINARY_DIR}/generated/version.h
     @ONLY)
 
+# Optional: bake a prebuilt ebtools-setup binary for this exact platform
+# directly into the game executable, so a player never needs a second file
+# sitting next to the game to set itself up from a ROM -- and, critically,
+# the self-updater (which only ever fetches the one game binary/lib) always
+# carries a matching helper along automatically, with no separate download
+# step of its own. Not part of a normal dev build: PyInstaller can't
+# cross-compile and can't run as a CMake build step here (it has to run
+# natively per target platform, separately, first) -- so this stays opt-in,
+# wired up only by the release packaging process passing the path to an
+# already-built ebtools-setup for this platform. A build configured without
+# it falls back to looking for an ebtools-setup file on disk next to the
+# game binary, same as before (see main.c).
+set(EB_EMBED_SETUP_HELPER_PATH "" CACHE FILEPATH
+    "Prebuilt ebtools-setup binary for this platform to embed in the game executable (release packaging only)")
+if(EB_EMBED_SETUP_HELPER_PATH)
+    if(NOT EXISTS "${EB_EMBED_SETUP_HELPER_PATH}")
+        message(FATAL_ERROR "EB_EMBED_SETUP_HELPER_PATH set but file not found: ${EB_EMBED_SETUP_HELPER_PATH}")
+    endif()
+    set(EB_HAS_EMBEDDED_SETUP_HELPER ON)
+endif()
+set(EB_INCBIN_HEADER_PATH "${CMAKE_CURRENT_SOURCE_DIR}/../../src/vendor/incbin/incbin.h")
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/generated/embedded_helper.c.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/embedded_helper.c
+    @ONLY)
+
 # Build game library from src/
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../src
                  ${CMAKE_CURRENT_BINARY_DIR}/game_lib)
@@ -75,7 +101,8 @@ endif()
 # link. GLOB_RECURSE + CONFIGURE_DEPENDS works there and matches src/CMakeLists.txt.
 # platform/ has no subdirectories, so this is equivalent to a flat glob.
 file(GLOB_RECURSE PLATFORM_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/platform/*.c")
-add_executable(earthbound main.c ${PLATFORM_SOURCES})
+add_executable(earthbound main.c ${PLATFORM_SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/generated/embedded_helper.c)
+target_include_directories(earthbound PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(earthbound earthbound_game)
 

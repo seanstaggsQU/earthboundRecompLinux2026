@@ -29,6 +29,7 @@
 #endif
 
 #include "platform/platform.h"
+#include "embedded_helper.h"
 #include "game_main.h"
 #include "game/audio.h"
 #include "game/game_state.h"
@@ -559,7 +560,17 @@ int main(int argc, char *argv[]) {
      * authoritative pak builder, not a from-scratch reimplementation, so
      * it's guaranteed to match what a normal build produces (including
      * this project's own custom content, e.g. the naming screen's names).
-     * Only bother the player if that doesn't pan out. */
+     * Only bother the player if that doesn't pan out.
+     *
+     * found_rom_no_helper: set when a ROM was found but the helper wasn't --
+     * distinct from "nothing found at all" so the error message below can
+     * say exactly what's still missing instead of just "no ROM", which is
+     * actively misleading in this case (a tester who updated from a
+     * pre-runtime-assets build has a ROM-less folder AND no helper, since
+     * the old build never shipped one and the updater still doesn't fetch
+     * one -- telling them to add a ROM when they already have one, or when
+     * that alone won't fix it, just sends them in circles). */
+    bool found_rom_no_helper = false;
     if (assets_result == EB_ASSETS_MISSING) {
         char rom_path[4096];
         if (rom_extract_find_rom(".", rom_path, sizeof(rom_path))) {
@@ -573,7 +584,36 @@ int main(int argc, char *argv[]) {
                 "./ebtools-setup";
 #endif
             struct stat helper_st;
-            if (stat(helper_name, &helper_st) == 0) {
+            bool helper_ready = (stat(helper_name, &helper_st) == 0);
+            if (!helper_ready) {
+                /* No on-disk copy (the common case now -- the game
+                 * executable itself carries this, see
+                 * EB_EMBED_SETUP_HELPER_PATH in CMakeLists.txt) -- extract
+                 * it once to the same spot the stat() above just checked,
+                 * so every launch after this one finds it there directly
+                 * without going through this path again. A build with
+                 * nothing embedded (a plain dev build) gets NULL/0 back and
+                 * falls through to found_rom_no_helper below, same as
+                 * before this existed. */
+                size_t blob_size = 0;
+                const unsigned char *blob = eb_embedded_setup_helper_data(&blob_size);
+                if (blob && blob_size > 0) {
+                    FILE *out = fopen(helper_name, "wb");
+                    if (out) {
+                        size_t written = fwrite(blob, 1, blob_size, out);
+                        fclose(out);
+                        if (written == blob_size) {
+#ifndef _WIN32
+                            chmod(helper_name, 0755);
+#endif
+                            helper_ready = true;
+                        } else {
+                            remove(helper_name); /* partial write (disk full?) -- don't leave a broken file behind */
+                        }
+                    }
+                }
+            }
+            if (helper_ready) {
                 char cmd[8192];
                 /* system() on Windows runs the string via `cmd.exe /c`,
                  * which has a well-known quirk: if the command starts with
@@ -655,6 +695,8 @@ int main(int argc, char *argv[]) {
 
                     assets_result = eb_runtime_assets_load(assets_path);
                 }
+            } else {
+                found_rom_no_helper = true;
             }
         }
     }
@@ -679,12 +721,34 @@ int main(int argc, char *argv[]) {
          * else the game itself would need. */
         SDL_Init(SDL_INIT_VIDEO);
         char message[512];
-        snprintf(message, sizeof(message),
-            "EarthBound couldn't find your game data (%s).\n\n"
-            "Put your EarthBound (USA) ROM file in the same folder as this "
-            "program (any filename ending in .sfc or .smc works) and launch "
-            "it again -- it'll set itself up automatically, just this once.",
-            reason);
+        if (found_rom_no_helper) {
+            /* Distinct message: telling this player to add a ROM would be
+             * actively wrong, they already have one. What's missing is the
+             * setup helper -- typically a tester who updated in-app from a
+             * build old enough to predate it (the updater only replaces the
+             * game binary itself, never installs the helper alongside it,
+             * so anyone whose folder never had one still doesn't after
+             * updating). Names the exact file so there's no guessing. */
+            snprintf(message, sizeof(message),
+                "EarthBound found your ROM, but not its setup helper "
+                "(ebtools-setup%s).\n\n"
+                "Download that file from the same place you got this update "
+                "and put it in this same folder, then launch again -- it'll "
+                "set itself up automatically from here, just this once.",
+#ifdef _WIN32
+                ".exe"
+#else
+                ""
+#endif
+            );
+        } else {
+            snprintf(message, sizeof(message),
+                "EarthBound couldn't find your game data (%s).\n\n"
+                "Put your EarthBound (USA) ROM file in the same folder as this "
+                "program (any filename ending in .sfc or .smc works) and launch "
+                "it again -- it'll set itself up automatically, just this once.",
+                reason);
+        }
         SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_INFORMATION, "EarthBound - Setup Needed", message, NULL);
         return 1;
     }

@@ -1,0 +1,26 @@
+/* Generated at CMake configure time -- see port/unix/CMakeLists.txt's
+ * EB_EMBED_SETUP_HELPER_PATH option. Not hand edited. */
+#include "embedded_helper.h"
+
+#cmakedefine EB_HAS_EMBEDDED_SETUP_HELPER
+
+#ifdef EB_HAS_EMBEDDED_SETUP_HELPER
+
+#define INCBIN_PREFIX eb_
+#include "@EB_INCBIN_HEADER_PATH@"
+
+INCBIN(SetupHelper, "@EB_EMBED_SETUP_HELPER_PATH@");
+
+const unsigned char *eb_embedded_setup_helper_data(size_t *out_size) {
+    *out_size = (size_t)eb_SetupHelperSize;
+    return eb_SetupHelperData;
+}
+
+#else
+
+const unsigned char *eb_embedded_setup_helper_data(size_t *out_size) {
+    *out_size = 0;
+    return (const unsigned char *)0;
+}
+
+#endif
