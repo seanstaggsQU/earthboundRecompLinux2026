@@ -842,7 +842,7 @@ static int download_thread_fn(void *unused) {
     const char *found = scratch1 ? find_checksum(scratch1, EB_UPDATER_ASSET_NAME) : NULL;
     if (found) snprintf(expected_hex, sizeof(expected_hex), "%s", found);
     free(scratch1);
-#if defined(__APPLE__) || defined(_WIN32)
+#if (defined(__APPLE__) || defined(_WIN32)) && !defined(EB_SDL2_STATIC)
     char expected_lib_hex[65];
 #if defined(__APPLE__)
 #define EB_UPDATER_LIB_NAME EB_UPDATER_DYLIB_NAME
@@ -857,7 +857,7 @@ static int download_thread_fn(void *unused) {
     free(checksums_pristine);
 
     if (!found) { set_error("Checksum manifest incomplete"); return 0; }
-#if defined(__APPLE__) || defined(_WIN32)
+#if (defined(__APPLE__) || defined(_WIN32)) && !defined(EB_SDL2_STATIC)
     if (!found_lib) { set_error("Checksum manifest incomplete"); return 0; }
 #endif
 
@@ -877,12 +877,21 @@ static int download_thread_fn(void *unused) {
         return 0;
     }
 
-#if defined(__APPLE__) || defined(_WIN32)
+#if (defined(__APPLE__) || defined(_WIN32)) && !defined(EB_SDL2_STATIC)
     /* 3. macOS/Windows also ship a paired shared library -- fetched the
      * same way, by re-resolving its asset url (the AVAILABLE check only
      * cached the platform binary + checksums URLs). Rarely changes
      * version-to-version, but verified+replaced every update regardless,
-     * for correctness. */
+     * for correctness. Skipped entirely for a statically-linked build
+     * (EB_SDL2_STATIC, set by CMake when EB_SDL2_STATIC_CONFIG_DIR is
+     * used): it has no paired library to begin with, nothing to fetch or
+     * swap. Note this only ever applies to what THIS binary (the one doing
+     * the checking) was built with, not the release being fetched --
+     * releases keep shipping the SDL2.dll/libSDL2 shim asset (with a real,
+     * working library inside, still actually swapped in below) for as
+     * long as any pre-static installs might still be updating through
+     * this exact code path and requiring it to exist. See the "EVERY
+     * release" rule in project memory. */
     char lib_asset_url[512] = {0};
     fetch_asset_url_by_name(EB_UPDATER_LIB_NAME, lib_asset_url, sizeof(lib_asset_url));
     if (!lib_asset_url[0]) { set_error("No library asset in release"); remove(new_exe_name); return 0; }
@@ -918,7 +927,7 @@ static int download_thread_fn(void *unused) {
         if (!eb_runtime_assets_default_path(pak_path, sizeof(pak_path)) || !pak_export_write(pak_path)) {
             set_error("Couldn't prepare game data for the update -- try again, or check disk space");
             remove(new_exe_name);
-#if defined(__APPLE__) || defined(_WIN32)
+#if (defined(__APPLE__) || defined(_WIN32)) && !defined(EB_SDL2_STATIC)
             remove(new_lib_name);
 #endif
             return 0;
@@ -933,7 +942,9 @@ static int download_thread_fn(void *unused) {
     if (!win32_launch_relaunch_helper(err, sizeof(err))) {
         set_error(err[0] ? err : "Couldn't stage install");
         remove(new_exe_name);
+#ifndef EB_SDL2_STATIC
         remove(new_lib_name);
+#endif
         return 0;
     }
     EbUpdateProgress p = {0};
@@ -953,7 +964,7 @@ static int download_thread_fn(void *unused) {
         set_error(msg);
         return 0;
     }
-#ifdef __APPLE__
+#if defined(__APPLE__) && !defined(EB_SDL2_STATIC)
     if (rename(new_lib_name, EB_UPDATER_LIB_NAME) != 0) {
         /* The main binary already swapped -- this is a genuinely bad state
          * (mismatched binary/dylib pair), but there's no safe rollback of

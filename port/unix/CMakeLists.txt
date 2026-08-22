@@ -105,6 +105,10 @@ set(EB_SDL2_STATIC_CONFIG_DIR "" CACHE PATH
 if(EB_SDL2_STATIC_CONFIG_DIR)
     find_package(SDL2 REQUIRED CONFIG PATHS "${EB_SDL2_STATIC_CONFIG_DIR}" NO_DEFAULT_PATH)
     set(EB_SDL2_TARGET SDL2::SDL2-static)
+    # Lets sdl2_updater.c know this binary has no paired SDL2.dll/libSDL2
+    # dylib to fetch/verify on update -- see its EB_SDL2_STATIC #ifdef.
+    # Applied to the target below, once add_executable() has defined it.
+    set(EB_SDL2_IS_STATIC TRUE)
 else()
     find_package(SDL2 QUIET)
     if(NOT SDL2_FOUND)
@@ -125,6 +129,10 @@ add_executable(earthbound main.c ${PLATFORM_SOURCES} ${CMAKE_CURRENT_BINARY_DIR}
 target_include_directories(earthbound PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(earthbound earthbound_game)
+
+if(EB_SDL2_IS_STATIC)
+    target_compile_definitions(earthbound PRIVATE EB_SDL2_STATIC)
+endif()
 
 if(TARGET ${EB_SDL2_TARGET})
     target_link_libraries(earthbound ${EB_SDL2_TARGET})
