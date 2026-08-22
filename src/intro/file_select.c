@@ -1634,18 +1634,26 @@ StepResult mode_step_new_game_naming(ModeState *ms) {
         for (int j = 0; j < 10; j++) {
             uint8_t item = entry[10 + j];
             if (item == 0) continue;
-            /* Key items (Key Items pool feature, not in the original
-             * assembly) never occupy a character's regular inventory --
-             * route them to the global pool instead. Vanilla starting
-             * items aren't key items today, but don't assume that holds
-             * for modded/rebalanced data. */
-            if (is_key_item_type(item)) {
-                key_items_give(item);
-            } else {
-                party_characters[c].items[j] = item;
-            }
+            /* Deliberately NOT routing key-item-typed starting items
+             * (e.g. Poo's Tiny Ruby) to the global pool here, even though
+             * every other give-item path does (see is_key_item_type()'s
+             * doc comment). All 4 characters' stats/items are seeded up
+             * front to match the original SRAM layout, but Paula/Jeff/Poo
+             * haven't actually joined the party at this point -- their
+             * key items would otherwise leak into the shared pool before
+             * the player has even met them. They stay here as inert data
+             * until migrate_key_items_to_pool() surfaces them, called for
+             * Ness below (he's active immediately) and from
+             * add_char_to_party() for everyone else when they actually
+             * join. */
+            party_characters[c].items[j] = item;
         }
     }
+
+    /* Ness is playable from the very first frame and never passes through
+     * add_char_to_party() (party_members[0] is set directly, below), so
+     * migrate his starting key items into the pool here instead. */
+    migrate_key_items_to_pool(1);
 
     /* Sync current HP/PP = max for all characters (assembly lines 538-555) */
     for (int i = 0; i < 4; i++) {

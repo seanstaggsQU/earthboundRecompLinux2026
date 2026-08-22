@@ -718,6 +718,13 @@ void add_char_to_party(uint16_t char_id) {
     /* Store the character at the insertion point */
     game_state.party_members[insert_pos] = (uint8_t)char_id;
 
+    /* Not part of the original assembly: this character may be joining
+     * for the first time with new-game starting items still sitting in
+     * their regular inventory (see migrate_key_items_to_pool()'s doc
+     * comment) -- surface any key items into the shared pool now that
+     * they're actually part of the party. */
+    migrate_key_items_to_pool(char_id);
+
     uint16_t entity_slot = add_party_member(char_id);
 
     /* Assembly: after ADD_PARTY_MEMBER, set OBJECT_TICK_DISABLED | OBJECT_MOVE_DISABLED */
@@ -1363,6 +1370,49 @@ bool is_key_item_type(uint16_t item_id) {
     if (!entry) return false;
     uint8_t t = entry->type & ITEM_TYPE_MASK;
     return t == ITEM_TYPE_KEY_ITEM || t == ITEM_TYPE_KEY_AREA || t == ITEM_TYPE_KEY_SOMEONE;
+}
+
+/* MIGRATE_KEY_ITEMS_TO_POOL: not a ROM/assembly port. New-game setup
+ * (file_select.c) seeds all 4 characters' stats/inventory from
+ * INITIAL_STATS up front, matching the original SRAM layout, even though
+ * Paula/Jeff/Poo haven't actually joined the party yet -- they're just
+ * inert data at that point, same as in a real save file. Any of their
+ * starting items that classify as key items (e.g. Poo's Tiny Ruby) must
+ * NOT become visible in the shared Key Items pool until that character
+ * really joins, or the player sees another character's not-yet-met
+ * quest item sitting in their pool from the very first frame.
+ *
+ * So new-game setup writes those items into the character's regular
+ * items[] slots like any other item (bypassing the normal key-item
+ * redirect in give_item_to_specific_character/give_item_to_character),
+ * and this function is the deferred migration step: called once a
+ * character is actually active (Ness immediately at new-game start,
+ * everyone else from add_char_to_party() when they join), it sweeps
+ * that character's items[] for anything key-item-typed, moves it into
+ * key_items_pool, and clears the slot. Idempotent by construction: once
+ * migrated, the slot reads 0, so a second call (e.g. a character
+ * temporarily leaving and rejoining the party) finds nothing left to
+ * move.
+ *
+ * Also stamps char_id's bit into party_ever_joined_mask (game_state.h),
+ * unconditionally, every call -- this function running at all IS the
+ * definition of "this character has joined the party" that mask records,
+ * so folding the stamp in here (rather than at each of this function's
+ * call sites) makes it impossible for a future third call site to add a
+ * way for a character to become active without the mask noticing. See
+ * the mask's doc comment for what load_game()'s migration sweep uses it
+ * for. */
+void migrate_key_items_to_pool(uint16_t char_id) {
+    uint16_t char_idx = char_id - 1;
+    if (char_idx >= TOTAL_PARTY_COUNT) return;
+    party_ever_joined_mask |= (uint8_t)(1 << char_idx);
+    for (int slot = 0; slot < ITEM_INVENTORY_SIZE; slot++) {
+        uint8_t item = party_characters[char_idx].items[slot];
+        if (item != 0 && is_key_item_type(item)) {
+            key_items_give(item);
+            party_characters[char_idx].items[slot] = 0;
+        }
+    }
 }
 
 uint16_t key_items_give(uint16_t item_id) {

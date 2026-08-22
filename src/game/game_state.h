@@ -181,7 +181,29 @@ typedef struct {
      * See load_game()'s migration sweep for how pre-existing saves get
      * their key items moved here automatically. */
     uint8_t    key_items_pool[KEY_ITEMS_POOL_SIZE]; /* 1203: 48 bytes */
-    uint8_t    padding[1280 - 32 - 473 - 95*6 - 128 - KEY_ITEMS_POOL_SIZE]; /* remaining padding */
+    /* party_ever_joined_mask: bit (1 << (char_id-1)) set the first time that
+     * character ever joins the party (see migrate_key_items_to_pool()'s
+     * callers), never cleared again even if they're later benched. Also
+     * carved from what was unused padding, same zero-extends-old-saves
+     * trick as key_items_pool above.
+     *
+     * Exists so load_game()'s key-items migration sweep can tell apart two
+     * cases that look byte-identical otherwise -- a key item sitting in a
+     * character's regular items[] slot:
+     *   (a) a TRULY pre-Key-Items-pool save, where every item (key or not)
+     *       just lived in items[] and any character holding one had
+     *       definitely already received it through normal play, or
+     *   (b) new-game setup's deferred seeding (see file_select.c), where a
+     *       not-yet-joined character's starting key item (Poo's Tiny Ruby)
+     *       deliberately sits in items[] until they actually join, and must
+     *       NOT be swept into the pool early.
+     * The mask is 0 for every (a)-case save, since no save written before
+     * this field existed could have populated it; new code sets Ness's bit
+     * immediately at new-game start, so no (b)-case save can have an
+     * all-zero mask. load_game() uses "mask == 0" as the legacy-save
+     * discriminator: see its migration sweep for the full logic. */
+    uint8_t    party_ever_joined_mask; /* 1251: 1 byte */
+    uint8_t    padding[1280 - 32 - 473 - 95*6 - 128 - KEY_ITEMS_POOL_SIZE - 1]; /* remaining padding */
 } SaveBlock;
 END_PACKED_STRUCT
 ASSERT_STRUCT_SIZE(SaveBlock, 1280);
@@ -194,6 +216,9 @@ extern GameState game_state;
 extern CharStruct party_characters[TOTAL_PARTY_COUNT];
 extern uint8_t event_flags[EVENT_FLAG_COUNT / 8];
 extern uint8_t key_items_pool[KEY_ITEMS_POOL_SIZE];
+/* See SaveBlock::party_ever_joined_mask's doc comment above. Bit (1 <<
+ * (char_id-1)) set the first time char_id ever joins the party. */
+extern uint8_t party_ever_joined_mask;
 
 /* Initialize game state to defaults */
 void game_state_init(void);

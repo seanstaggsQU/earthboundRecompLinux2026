@@ -218,6 +218,18 @@ uint16_t key_items_give(uint16_t item_id);
  * Returns item_id (truthy) if present, 0 if not. */
 uint16_t key_items_find(uint16_t item_id);
 
+/* MIGRATE_KEY_ITEMS_TO_POOL: not a ROM/assembly port. Sweeps char_id's
+ * regular items[] slots for anything key-item-typed, moves it into the
+ * shared pool, and clears the slot. Call once a character becomes
+ * actually active -- Ness at new-game start, everyone else from
+ * add_char_to_party() -- so a not-yet-joined character's starting key
+ * item (e.g. Poo's Tiny Ruby) never appears in the pool before the
+ * player has actually met them. Idempotent: a second call for the same
+ * character finds nothing left to migrate. Also stamps char_id's bit into
+ * party_ever_joined_mask (game_state.h) -- see that field's doc comment
+ * for what load_game()'s migration sweep uses it for. char_id: 1-indexed. */
+void migrate_key_items_to_pool(uint16_t char_id);
+
 /* Sentinel item_slot value mode_step_use_item() (text.c) uses for a
  * pool-sourced item, see get_character_item()'s doc comment (inventory.c)
  * for the full rationale. Never a real 1-14 inventory slot. */

@@ -13,6 +13,7 @@ GameState game_state;
 CharStruct party_characters[TOTAL_PARTY_COUNT];
 uint8_t event_flags[EVENT_FLAG_COUNT / 8];
 uint8_t key_items_pool[KEY_ITEMS_POOL_SIZE];
+uint8_t party_ever_joined_mask;
 uint8_t fastest_hppp_meter_speed;
 uint8_t current_save_slot;
 
@@ -21,6 +22,7 @@ void game_state_init(void) {
     memset(party_characters, 0, sizeof(party_characters));
     memset(event_flags, 0, sizeof(event_flags));
     memset(key_items_pool, 0, sizeof(key_items_pool));
+    party_ever_joined_mask = 0;
 
     /* Defaults */
     game_state.text_speed = 2; /* medium */
@@ -430,6 +432,7 @@ bool save_game(int slot) {
     memcpy(block->party_characters, party_characters, sizeof(party_characters));
     memcpy(block->event_flags, event_flags, sizeof(block->event_flags));
     memcpy(block->key_items_pool, key_items_pool, sizeof(key_items_pool));
+    block->party_ever_joined_mask = party_ever_joined_mask;
 
     /* Stamp the on-cartridge block signature so real EarthBound's
      * CHECK_BLOCK_SIGNATURE accepts the slot instead of erasing it. The checksums
@@ -491,22 +494,40 @@ bool load_game(int slot) {
     memcpy(party_characters, block->party_characters, sizeof(party_characters));
     memcpy(event_flags, block->event_flags, sizeof(event_flags));
     memcpy(key_items_pool, block->key_items_pool, sizeof(key_items_pool));
+    party_ever_joined_mask = block->party_ever_joined_mask;
 
     /* Port of load_game_slot.asm lines 92-93: game_state.timer → TIMER */
     core.play_timer = game_state.timer;
 
     /* Key Items migration sweep (not part of the original ROM/assembly --
-     * added for the Key Items pool feature). A save written before that
-     * feature existed still has its key items sitting in the relevant
-     * character's regular items[] slots (key_items_pool just loaded as
-     * all-zero, since those bytes used to be unused padding). Move any
-     * key-item-typed entries found there into the pool now, freeing their
-     * inventory slots. Runs unconditionally on every load and is
-     * idempotent, an already-migrated save has no key items left in any
-     * items[] to find, so this is a no-op for it. Uses
-     * remove_item_from_inventory() (not a hand-rolled shift) so equipment
-     * indices for that character's other items stay correct. */
+     * added for the Key Items pool feature). Moves any key-item-typed
+     * entries still sitting in a character's regular items[] slots into
+     * the pool, freeing the slot. Idempotent (an already-migrated save has
+     * nothing left to find). Uses remove_item_from_inventory() (not a
+     * hand-rolled shift) so equipment indices for that character's other
+     * items stay correct.
+     *
+     * party_ever_joined_mask == 0 gates which characters this sweep
+     * touches -- see the field's doc comment (game_state.h) for the full
+     * rationale. Two cases produce a key item sitting in items[]:
+     *   (a) a save written before the Key Items pool feature existed at
+     *       all: no version marker distinguishes it, but the mask being
+     *       entirely 0 does (new code always sets Ness's bit at new-game
+     *       start, so no save this code wrote can have an all-zero mask).
+     *       Sweep every character unconditionally, matching this sweep's
+     *       original (pre-mask) behavior for such a save.
+     *   (b) a new-format save where a character hasn't joined the party
+     *       yet: new-game setup deliberately leaves their INITIAL_STATS
+     *       starting key item (e.g. Poo's Tiny Ruby) sitting in items[]
+     *       until they actually join (see file_select.c/add_char_to_party()
+     *       doc comments) -- sweeping it here would leak it into the pool
+     *       before the player has met them. Only sweep characters whose
+     *       bit is already set (they've joined at least once); a
+     *       not-yet-joined character's items[] is left untouched. */
+    bool legacy_save = (party_ever_joined_mask == 0);
     for (uint16_t char_id = 1; char_id <= TOTAL_PARTY_COUNT; char_id++) {
+        if (!legacy_save && !(party_ever_joined_mask & (1 << (char_id - 1))))
+            continue; /* not-yet-joined in a new-format save: leave as-is */
         CharStruct *ch = &party_characters[char_id - 1];
         for (uint16_t slot = 0; slot < ITEM_INVENTORY_SIZE; ) {
             uint8_t item_id = ch->items[slot];
@@ -519,6 +540,21 @@ bool load_game(int slot) {
                 continue;
             }
             slot++;
+        }
+    }
+
+    /* A legacy save has no usable party_ever_joined_mask of its own (that's
+     * exactly what marks it as legacy) -- reconstruct one from its actual
+     * party_members[] before returning, matching new-code semantics, or
+     * this same load_game() call's caller would still see an all-zero mask
+     * and this save would keep re-running the full unconditional sweep
+     * (harmlessly idempotent, but not the "new-format" behavior a save
+     * written from here on out should have). */
+    if (legacy_save) {
+        for (uint16_t i = 0; i < TOTAL_PARTY_COUNT; i++) {
+            uint8_t member = game_state.party_members[i];
+            if (member >= 1 && member <= TOTAL_PARTY_COUNT)
+                party_ever_joined_mask |= (uint8_t)(1 << (member - 1));
         }
     }
 
@@ -699,6 +735,120 @@ bool key_items_selftest(void) {
     if (get_character_item(1, KEY_ITEMS_POOL_USE_SLOT_SENTINEL) != 0) {
         fprintf(stderr, "key_items_selftest: FAIL -- get_character_item() still "
                         "returns a pool item after key_items_set_use_in_progress(0)\n");
+        ok = false;
+    }
+
+    /* --- 7. Not-yet-joined character's starting key item must not leak into
+     * the pool early. Regression for the real Poo/Tiny Ruby bug: new-game
+     * setup seeds all 4 characters' items[] up front (matching the original
+     * SRAM layout), but Poo hasn't actually joined the party at that point
+     * -- his key item must stay invisible until something actually surfaces
+     * it, not appear in the pool from the first frame.
+     *
+     * Exercises migrate_key_items_to_pool() directly rather than going
+     * through add_char_to_party() (its real caller on a genuine join):
+     * that function also drives entity/position-buffer setup meant for a
+     * live, fully-initialized game world, which this synthetic
+     * game_state_init()-only harness never provides -- calling it here
+     * hung the self-test outright rather than just failing the assertion. */
+    game_state_init();
+    const uint16_t POO = 4; /* char_id 4 = Poo (1-indexed) */
+    const uint16_t POO_ITEM = 208; /* Tiny Ruby (ITEM_TYPE_KEY_SOMEONE) */
+    party_characters[POO - 1].items[0] = (uint8_t)POO_ITEM;
+    /* Poo not yet in party_members: game_state_init() leaves it that way. */
+
+    if (key_items_find(POO_ITEM) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- not-yet-joined Poo's starting "
+                        "key item is already visible in the pool before he's "
+                        "joined the party\n");
+        ok = false;
+    }
+
+    migrate_key_items_to_pool(POO);
+
+    if (party_characters[POO - 1].items[0] != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- Poo's item still in items[0] "
+                        "after migrate_key_items_to_pool() (didn't clear it)\n");
+        ok = false;
+    }
+    if (key_items_find(POO_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- Poo's key item not found in "
+                        "the pool after migrate_key_items_to_pool()\n");
+        ok = false;
+    }
+
+    /* Idempotency: a second call (e.g. Poo temporarily leaving and
+     * rejoining the party) must be a harmless no-op, not re-add/duplicate. */
+    migrate_key_items_to_pool(POO);
+    if (key_items_find(POO_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- item vanished from the pool "
+                        "after a second migrate_key_items_to_pool() call\n");
+        ok = false;
+    }
+
+    /* --- 8. The actual real-game scenario: a normal SRAM save/load
+     * (save_game()/load_game(), NOT the F6/F7 savestate) taken while Poo
+     * hasn't joined yet must not leak his key item on load. This is the
+     * live bug load_game()'s OLD unconditional migration sweep had: it
+     * couldn't tell "a genuinely pre-feature save" apart from "a new-format
+     * save where a character just hasn't joined yet", and migrated both
+     * the same way. party_ever_joined_mask (game_state.h) is what now
+     * lets it tell them apart -- exercise that discrimination directly,
+     * simulating a real new game: Ness already active (his mask bit set,
+     * matching what file_select.c does at new-game start), Poo seeded but
+     * not yet joined. */
+    game_state_init();
+    const uint16_t NESS_ITEM = 177; /* ATM Card (ITEM_TYPE_KEY_SOMEONE) */
+    party_characters[0].items[0] = (uint8_t)NESS_ITEM;
+    migrate_key_items_to_pool(1); /* Ness: matches file_select.c's new-game call */
+    game_state.party_members[0] = 1; /* Ness active, matching a real new game */
+    party_characters[POO - 1].items[0] = (uint8_t)POO_ITEM; /* Poo: seeded, NOT joined */
+
+    if (!save_game(0)) {
+        fprintf(stderr, "key_items_selftest: save_game(Poo not yet joined) failed\n");
+        return false;
+    }
+    game_state_init(); /* wipe live state so load_game() must reconstruct it */
+    if (!load_game(0)) {
+        fprintf(stderr, "key_items_selftest: load_game(Poo not yet joined) failed\n");
+        return false;
+    }
+
+    if (key_items_find(POO_ITEM) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- a normal save/load while Poo "
+                        "hasn't joined leaked his key item into the pool (the real "
+                        "bug this whole mask exists to prevent)\n");
+        ok = false;
+    }
+    if (party_characters[POO - 1].items[0] != (uint8_t)POO_ITEM) {
+        fprintf(stderr, "key_items_selftest: FAIL -- Poo's not-yet-joined item was "
+                        "disturbed by save/load (should be untouched in items[0])\n");
+        ok = false;
+    }
+    if (key_items_find(NESS_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- Ness's already-migrated key "
+                        "item didn't survive the save/load round-trip\n");
+        ok = false;
+    }
+
+    /* Now Poo actually joins (mid-session, same save slot) -- his item must
+     * finally surface, and a SECOND save/load round-trip must keep it
+     * migrated (not re-defer it). */
+    migrate_key_items_to_pool(POO);
+    game_state.party_members[1] = (uint8_t)POO;
+
+    if (!save_game(0)) {
+        fprintf(stderr, "key_items_selftest: save_game(Poo just joined) failed\n");
+        return false;
+    }
+    game_state_init();
+    if (!load_game(0)) {
+        fprintf(stderr, "key_items_selftest: load_game(Poo just joined) failed\n");
+        return false;
+    }
+    if (key_items_find(POO_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- Poo's key item, already "
+                        "migrated before this save, was lost across save/load\n");
         ok = false;
     }
 

@@ -126,6 +126,20 @@ enum {
     /* Key Items pool feature (not part of the original ROM/assembly), a
      * new top-level global, see game_state.h's key_items_pool doc comment. */
     SECTION_KEY_ITEMS_POOL       = 0x002B,
+    /* Also not part of the original ROM/assembly, see game_state.h's
+     * party_ever_joined_mask doc comment. Without this section, F7-loading
+     * a savestate taken before some character had joined would correctly
+     * roll SECTION_PARTY_CHARACTERS back to that earlier state but leave
+     * the live party_ever_joined_mask at whatever (newer, more-joined)
+     * value it already had -- stale and now too permissive for the
+     * rolled-back party. A later normal SRAM save_game() in that same
+     * session would persist that stale mask alongside the correctly
+     * rolled-back items[], and a subsequent load_game() of it would then
+     * wrongly treat that not-yet-joined character as already-joined,
+     * sweeping their still-deferred starting key item into the pool
+     * early -- reintroducing the exact bug this mask exists to prevent,
+     * just via a save-anywhere round-trip instead of new-game setup. */
+    SECTION_PARTY_EVER_JOINED    = 0x002C,
     SECTION_TERMINATOR       = 0xFFFF,
 };
 
@@ -205,7 +219,7 @@ typedef struct {
     void (*unpack)(const void *scratch); /* NULL for direct sections */
 } StateSection;
 
-#define MAX_SECTIONS 44
+#define MAX_SECTIONS 45
 
 /* Populate `t` with every serialized section in write order; return the count.
  * AUDIO is conditional, so the count is computed here rather than fixed. */
@@ -246,6 +260,7 @@ static int build_section_table(StateSection *t) {
     ADD(SECTION_PARTY_CHARACTERS, party_characters,     sizeof(party_characters));
     ADD(SECTION_EVENT_FLAGS,      event_flags,          sizeof(event_flags));
     ADD(SECTION_KEY_ITEMS_POOL,   key_items_pool,       sizeof(key_items_pool));
+    ADD(SECTION_PARTY_EVER_JOINED, &party_ever_joined_mask, sizeof(party_ever_joined_mask));
     ADD(SECTION_OVERWORLD,        &ow,                  sizeof(ow));
     ADD(SECTION_BATTLE,           &bt,                  sizeof(bt));
     ADD(SECTION_DISPLAY_TEXT,     &dt,                  sizeof(dt));
