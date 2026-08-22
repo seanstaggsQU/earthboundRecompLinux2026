@@ -202,6 +202,14 @@ void platform_audio_unlock(void);
 bool platform_audio_msu_play(uint16_t track_id);  /* true if this track is covered by the loaded pack */
 void platform_audio_msu_stop(void);               /* stop any currently-streaming MSU track */
 
+/* True once platform_audio_msu_load() has been called with a real pack
+ * (main.c only calls it when autodetection actually found one -- see its
+ * own comment). Used by the settings menu to show whether the "HQ Audio"
+ * toggle actually does anything right now, since with no pack loaded it's
+ * a no-op that otherwise looks identical to it working. Always false on
+ * ports that never call platform_audio_msu_load() at all. */
+bool platform_audio_msu_is_loaded(void);
+
 /*
  * Save data, persistent storage
  *

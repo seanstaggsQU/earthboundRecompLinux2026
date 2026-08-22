@@ -156,6 +156,10 @@ bool platform_audio_msu_autodetect_name(const char *dir, char *out_name, size_t 
     return found;
 }
 
+bool platform_audio_msu_is_loaded(void) {
+    return msu_pack_loaded;
+}
+
 bool platform_audio_msu_play(uint16_t track_id) {
     if (!msu_pack_loaded) return false;
 

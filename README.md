@@ -54,7 +54,7 @@ cp path/to/your/rom.sfc port/unix/build/
 ./port/unix/build/earthbound
 ```
 
-The first launch sets itself up automatically (no prompts) and every launch after that just plays. See [docs/get-your-own-assets.md](docs/get-your-own-assets.md) for the full rundown, including adding an MSU audio pack.
+The first launch sets itself up automatically, showing a small "Setting Up" window while it works, and every launch after that just plays. See [docs/get-your-own-assets.md](docs/get-your-own-assets.md) for the full rundown, including adding an MSU audio pack.
 
 If any dependencies are missing, `make unix` will tell you exactly what to install.
 

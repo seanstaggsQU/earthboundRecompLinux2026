@@ -3530,6 +3530,12 @@ static const char *hq_audio_labels[HQ_AUDIO_COUNT] = {
     [HQ_AUDIO_OFF] = "HQ Audio: Off",
     [HQ_AUDIO_ON]  = "HQ Audio: On",
 };
+/* No MSU pack found: the row still shows (so a returning player's saved
+ * On/Off preference isn't lost, it just doesn't do anything right now,
+ * see platform_audio_msu_play()'s no-op-with-no-pack behavior), but
+ * confirming it does nothing instead of silently toggling a setting that
+ * has no audible effect either way. */
+static const char *hq_audio_label_no_pack = "HQ Audio: N/A";
 static const char *alt_controls_labels[ALT_CONTROLS_COUNT] = {
     [ALT_CONTROLS_OFF] = "Alt Controls: Off",
     [ALT_CONTROLS_ON]  = "Alt Controls: On",
@@ -3555,7 +3561,7 @@ StepResult mode_step_settings_menu(ModeState *ms) {
     case SET_BUILD: {
         create_window(WINDOW_SETTINGS_MENU);
         add_menu_item(sprint_speed_labels[engine_sprint_speed], 1, 0, 0);
-        add_menu_item(hq_audio_labels[engine_hq_audio], 2, 0, 1);
+        add_menu_item(platform_audio_msu_is_loaded() ? hq_audio_labels[engine_hq_audio] : hq_audio_label_no_pack, 2, 0, 1);
         add_menu_item(alt_controls_labels[engine_alt_controls], 3, 0, 2);
         add_menu_item(alternative_visuals_labels[engine_alternative_visuals], 4, 0, 3);
         add_menu_item(logging_labels[engine_logging], 5, 0, 4);
@@ -3581,10 +3587,16 @@ StepResult mode_step_settings_menu(ModeState *ms) {
              * is audible immediately, not just on the next track change.
              * audio_resync_after_load() already does exactly this "force
              * change_music() to fully re-evaluate the current track" dance
-             * for savestate loads; reusing it here needs no new logic. */
-            engine_hq_audio = (uint8_t)((engine_hq_audio + 1) % HQ_AUDIO_COUNT);
-            settings_save();
-            audio_resync_after_load();
+             * for savestate loads; reusing it here needs no new logic.
+             * No pack loaded: leave the saved preference untouched (so it
+             * still applies the moment a pack shows up on a future launch)
+             * and just re-open the menu instead of toggling something with
+             * no audible effect either way. */
+            if (platform_audio_msu_is_loaded()) {
+                engine_hq_audio = (uint8_t)((engine_hq_audio + 1) % HQ_AUDIO_COUNT);
+                settings_save();
+                audio_resync_after_load();
+            }
             play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
             st->phase = SET_BUILD;
             return STEP_RESULT_CONTINUE();

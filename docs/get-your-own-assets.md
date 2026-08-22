@@ -14,10 +14,10 @@ that, plus adding an MSU audio pack if you want higher-quality music.
    ending in `.sfc` or `.smc` works.
 3. Launch the game.
 
-That's it. The first launch quietly checks your ROM, builds what it needs
-(might take a few seconds), and starts playing — no popup, no progress bar,
-nothing to click through. Every launch after that just works, since it only
-needs to do this once.
+That's it. The first launch checks your ROM, then shows a small "Setting Up"
+window while it builds what it needs (usually well under a minute) — nothing
+to click through, it closes on its own. Every launch after that goes straight
+to the title screen, since it only needs to do this once.
 
 If something's off — no ROM found, or the file doesn't check out as a real
 EarthBound ROM — you'll get a small popup telling you so, and the game will
