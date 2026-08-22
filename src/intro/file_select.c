@@ -248,6 +248,18 @@ static int fm_file_select_build(void) {
     if (platform_update_supported())
         add_menu_item("Check for Updates", 5, 0, 4);
 
+    /* This port's own addition, not in the original ROM menu. Same
+     * confirm-then-quit shape as the pause menu's "Quit" item (text.c's
+     * case 9 / PM_QUIT_CONFIRM_RESULT), minus that item's "Quit how?"
+     * Close Game/Title Screen submenu -- there's no meaningfully different
+     * "Title Screen" state to return to from file select itself, so a Yes
+     * always means platform_request_quit(). userdata 6 is handled as a
+     * special case in FM_SELECT_RESULT, same pattern as Config/Check for
+     * Updates above. Row position (below Check for Updates when present,
+     * directly below Config otherwise) follows naturally from insertion
+     * order here. */
+    add_menu_item("Quit", 6, 0, platform_update_supported() ? 5 : 4);
+
     /* Assembly (file_select_menu.asm:111): OPEN_WINDOW_AND_PRINT_MENU(columns=1)
      * lays out and prints menu item labels BEFORE slot details. */
     open_window_and_print_menu(1, 0);
@@ -1821,6 +1833,11 @@ StepResult mode_step_file_menu(ModeState *ms) {
                 st->phase = FM_UPDATE_CHECK;
                 continue;
             }
+            if (selected == 6) {
+                /* "Quit" -- same guard reasoning as Config above. */
+                st->phase = FM_QUIT_CONFIRM;
+                continue;
+            }
             st->selected = selected;
             current_save_slot = (uint8_t)selected;   /* file_select_menu() did this */
             if (selected == 0) { st->phase = FM_SELECT; continue; }
@@ -1851,6 +1868,35 @@ StepResult mode_step_file_menu(ModeState *ms) {
             close_focus_window();
             st->phase = FM_SELECT;
             continue;
+
+        case FM_QUIT_CONFIRM: {
+            /* This port's own addition, see the "Quit" add_menu_item call
+             * above for the full rationale. Same WINDOW_QUIT_CONFIRM /
+             * "Really quit?" Yes/No shape as the pause menu's Quit item
+             * (text.c's case 9), reused here rather than duplicated. */
+            create_window(WINDOW_QUIT_CONFIRM);
+            set_focus_text_cursor(0, 0);
+            print_string("Really quit?");
+            add_menu_item("Yes", 1, 0, 2);
+            add_menu_item("No", 0, 5, 2);
+            print_menu_items();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            return fm_push_selection(st, FM_QUIT_CONFIRM_RESULT, 1);
+        }
+
+        case FM_QUIT_CONFIRM_RESULT: {
+            uint16_t quit_confirm = fm_take_result(st);
+            close_window(WINDOW_QUIT_CONFIRM);
+            if (quit_confirm == 1) {
+                /* Yes -> platform_input_quit_requested() takes over next
+                 * frame, same as the pause menu's "Close Game" (harmless
+                 * that FM_SELECT below still runs first, same reasoning as
+                 * text.c's PM_QUIT_METHOD_RESULT comment). */
+                platform_request_quit();
+            }
+            st->phase = FM_SELECT;
+            continue;
+        }
 
         case FM_UPDATE_CHECK: {
             fm_child_init = (ModeState){0};

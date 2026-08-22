@@ -2115,6 +2115,8 @@ typedef enum {
     FM_UPDATE_CHECK_RESULT, /* update screen popped (no update / cancelled / error) -> back to FM_SELECT */
     FM_CONFIG,               /* "Config" row chosen: push GAME_MODE_SETTINGS_MENU */
     FM_CONFIG_RESULT,        /* settings menu popped -> back to FM_SELECT */
+    FM_QUIT_CONFIRM,         /* "Quit" row chosen: "Really quit?" Yes/No, WINDOW_QUIT_CONFIRM */
+    FM_QUIT_CONFIRM_RESULT,  /* Yes -> platform_request_quit(); No -> back to FM_SELECT */
 } FileMenuPhase;
 
 typedef struct {
