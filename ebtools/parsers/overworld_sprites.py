@@ -37,6 +37,11 @@ _NUM_PALETTES = 8
 _SPRITE_BANK_FIRST = 0x11
 _SPRITE_BANK_COUNT = 5
 
+# JSON files that live alongside the per-sprite sidecars in the same
+# directory but aren't sprite sidecars themselves -- each has its own
+# dedicated bin<->json pack step in pack_all.py, see _pack_all_generic_json.
+_NON_SPRITE_JSON_NAMES = {"entity_overlay_data.json", "spritemap_config.json"}
+
 # Direction labels for JSON metadata (memory pointer order)
 _DIR_LABELS_4 = ["up", "right", "down", "left"]
 _DIR_LABELS_8 = [
@@ -450,8 +455,13 @@ def pack_sprites(
     # Parse groupings from original data
     groupings = parse_sprite_groupings(ptr_table, bytes(grouping_data))
 
-    # Find all PNG files with matching JSON
-    json_files = sorted(png_dir.glob("*.json"))
+    # Find all PNG files with matching JSON. png_dir also holds two
+    # unrelated metadata files (entity_overlay_data.json,
+    # spritemap_config.json) with their own dedicated pack step in
+    # pack_all.py -- they were never meant to have a matching PNG, so
+    # skip them here instead of letting them flag as errors below and
+    # fail the whole sprite pack.
+    json_files = sorted(p for p in png_dir.glob("*.json") if p.name not in _NON_SPRITE_JSON_NAMES)
     if not json_files:
         print("No sprite JSON files found in", png_dir)
         return

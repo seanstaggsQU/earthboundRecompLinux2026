@@ -526,10 +526,25 @@ static bool fetch_release_asset(const char *asset_api_url, MemBuf *mem, FileWrit
 /* ------------------------------------------------------------------------
  * Check thread
  * ---------------------------------------------------------------------- */
+/* Maintainer-only test hook: EB_UPDATER_TEST_TAG, if set, points every
+ * "what's the latest release" lookup at that specific tag instead of the
+ * real /releases/latest -- lets a controlled test (e.g. an unpublished
+ * pre-release, which /releases/latest itself always skips) exercise the
+ * real download/verify/install path without a real tester's app ever
+ * seeing it. Unset in normal play; not documented in --help. */
+static void build_releases_url(char *out, size_t out_size) {
+    const char *test_tag = getenv("EB_UPDATER_TEST_TAG");
+    if (test_tag && test_tag[0]) {
+        snprintf(out, out_size, "https://api.github.com/repos/%s/releases/tags/%s", EB_UPDATER_REPO_STRING, test_tag);
+    } else {
+        snprintf(out, out_size, "https://api.github.com/repos/%s/releases/latest", EB_UPDATER_REPO_STRING);
+    }
+}
+
 static int check_thread_fn(void *unused) {
     (void)unused;
     char url[256];
-    snprintf(url, sizeof(url), "https://api.github.com/repos/%s/releases/latest", EB_UPDATER_REPO_STRING);
+    build_releases_url(url, sizeof(url));
 
     MemBuf body = {0};
     char err[128] = {0};
@@ -707,7 +722,7 @@ static bool download_and_verify(const char *asset_url, const char *dest_path,
  * paired-library asset at all, so this whole helper is unused there. */
 static bool fetch_asset_url_by_name(const char *asset_name, char *out_url, size_t out_url_size) {
     char url[256];
-    snprintf(url, sizeof(url), "https://api.github.com/repos/%s/releases/latest", EB_UPDATER_REPO_STRING);
+    build_releases_url(url, sizeof(url));
     MemBuf body = {0};
     char err[128] = {0};
     long code = http_get(url, true, "application/vnd.github+json", &body, NULL, err, sizeof(err));
@@ -887,17 +902,26 @@ static int download_thread_fn(void *unused) {
      * compile-time-embedded build to this project's current
      * EB_RUNTIME_ASSETS build needs no ROM and no bundled setup helper --
      * the new binary just finds a ready-made, already-correct pak waiting
-     * for it on first launch. A no-op (empty function body) in an
-     * EB_RUNTIME_ASSETS=ON build, since that binary never had real data to
-     * export in the first place. Best-effort: if this fails or the
-     * platform data dir can't be resolved, the new binary's own ROM-scan
-     * fallback still applies (see main.c), so don't block the update over
-     * it either way. */
+     * for it on first launch. A no-op (empty function body, returns true)
+     * in an EB_RUNTIME_ASSETS=ON build, since that binary never had real
+     * data to export in the first place, so this branch only ever runs in
+     * a real compile-time-embedded build. This is NOT best-effort: unlike
+     * a ROM-only install, a tester on an embedded build has no ROM sitting
+     * next to it by definition (they never needed one), so main.c's
+     * ROM-scan fallback doesn't apply to them -- if this export fails,
+     * there is no other path to correct assets, and swapping the binary
+     * anyway would strand them on a build with no data at all. Abort the
+     * update instead, leaving the working old binary in place. */
 #ifndef EB_RUNTIME_ASSETS
     {
         char pak_path[1024];
-        if (eb_runtime_assets_default_path(pak_path, sizeof(pak_path))) {
-            pak_export_write(pak_path);
+        if (!eb_runtime_assets_default_path(pak_path, sizeof(pak_path)) || !pak_export_write(pak_path)) {
+            set_error("Couldn't prepare game data for the update -- try again, or check disk space");
+            remove(new_exe_name);
+#if defined(__APPLE__) || defined(_WIN32)
+            remove(new_lib_name);
+#endif
+            return 0;
         }
     }
 #endif

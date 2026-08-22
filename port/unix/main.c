@@ -188,6 +188,107 @@ static void maybe_relaunch_atexit(void) {
             g_relaunch_exe_path, strerror(errno));
 }
 
+/* Everything below, down to draw_text5x7(), backs the first-launch setup
+ * helper's progress window -- only reachable from the #ifdef
+ * EB_RUNTIME_ASSETS block further down, so guard the definitions
+ * themselves too rather than leaving them as dead code in an
+ * EB_RUNTIME_ASSETS=OFF (compile-time-embedded) build. */
+#ifdef EB_RUNTIME_ASSETS
+
+/* Runs the bundled setup helper (a real, possibly multi-minute ebtools
+ * extract/pack-all/pack-assets pass) on a background thread so the main
+ * thread can keep the OS's "still alive" window pump going instead of
+ * looking hung -- see the SDL_CreateThread call below. system()'s exit
+ * status isn't checked (never was, in the previous synchronous call
+ * either): a failed helper just leaves assets_result as EB_ASSETS_MISSING,
+ * caught by the existing error path right after. */
+static SDL_atomic_t g_setup_helper_done;
+
+static int run_setup_helper_thread_fn(void *cmd_ptr) {
+    system((const char *)cmd_ptr);
+    SDL_AtomicSet(&g_setup_helper_done, 1);
+    return 0;
+}
+
+/* Tiny built-in 5x7 pixel font (this project's own, not derived from the
+ * ROM or any external font file) for the setup-progress window's message
+ * below -- the game's real font is itself one of the assets being
+ * generated at this point, so nothing else is available yet. Covers only
+ * what that message actually uses: A-Z, space, '.', ','. Each row is the
+ * low 5 bits of the byte, MSB-of-those-5 = leftmost column. */
+typedef struct {
+    char c;
+    uint8_t rows[7];
+} Glyph5x7;
+
+static const Glyph5x7 g_font5x7[] = {
+    {' ', {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}},
+    {'.', {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04}},
+    {',', {0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x08}},
+    {'A', {0x0E, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11}},
+    {'B', {0x1E, 0x11, 0x11, 0x1E, 0x11, 0x11, 0x1E}},
+    {'C', {0x0F, 0x10, 0x10, 0x10, 0x10, 0x10, 0x0F}},
+    {'D', {0x1E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1E}},
+    {'E', {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x1F}},
+    {'F', {0x1F, 0x10, 0x10, 0x1E, 0x10, 0x10, 0x10}},
+    {'G', {0x0F, 0x10, 0x10, 0x13, 0x11, 0x11, 0x0F}},
+    {'H', {0x11, 0x11, 0x11, 0x1F, 0x11, 0x11, 0x11}},
+    {'I', {0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x1F}},
+    {'J', {0x07, 0x02, 0x02, 0x02, 0x02, 0x12, 0x0C}},
+    {'K', {0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11}},
+    {'L', {0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1F}},
+    {'M', {0x11, 0x1B, 0x15, 0x15, 0x11, 0x11, 0x11}},
+    {'N', {0x11, 0x19, 0x15, 0x15, 0x13, 0x11, 0x11}},
+    {'O', {0x0E, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E}},
+    {'P', {0x1E, 0x11, 0x11, 0x1E, 0x10, 0x10, 0x10}},
+    {'Q', {0x0E, 0x11, 0x11, 0x11, 0x15, 0x12, 0x0D}},
+    {'R', {0x1E, 0x11, 0x11, 0x1E, 0x14, 0x12, 0x11}},
+    {'S', {0x0F, 0x10, 0x10, 0x0E, 0x01, 0x01, 0x1E}},
+    {'T', {0x1F, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04}},
+    {'U', {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0E}},
+    {'V', {0x11, 0x11, 0x11, 0x11, 0x11, 0x0A, 0x04}},
+    {'W', {0x11, 0x11, 0x11, 0x15, 0x15, 0x15, 0x0A}},
+    {'X', {0x11, 0x11, 0x0A, 0x04, 0x0A, 0x11, 0x11}},
+    {'Y', {0x11, 0x11, 0x0A, 0x04, 0x04, 0x04, 0x04}},
+    {'Z', {0x1F, 0x01, 0x02, 0x04, 0x08, 0x10, 0x1F}},
+};
+
+static const uint8_t *find_glyph5x7(char c) {
+    if (c >= 'a' && c <= 'z') {
+        c = (char)(c - 'a' + 'A'); /* fold lowercase -- message is authored all-caps anyway */
+    }
+    for (size_t i = 0; i < sizeof(g_font5x7) / sizeof(g_font5x7[0]); i++) {
+        if (g_font5x7[i].c == c) {
+            return g_font5x7[i].rows;
+        }
+    }
+    return NULL; /* unsupported char -- drawn as a blank cell */
+}
+
+/* Draws one line of text at (x, y) in surf's own pixel format, each font
+ * pixel scaled up to a `scale`x`scale` filled square. Returns the pixel
+ * width consumed (6*scale per glyph cell, monospace). */
+static int draw_text5x7(SDL_Surface *surf, int x, int y, const char *text, int scale, Uint32 color) {
+    int cursor_x = x;
+    for (const char *p = text; *p; p++) {
+        const uint8_t *rows = find_glyph5x7(*p);
+        if (rows) {
+            for (int row = 0; row < 7; row++) {
+                for (int col = 0; col < 5; col++) {
+                    if (rows[row] & (1 << (4 - col))) {
+                        SDL_Rect px = { cursor_x + col * scale, y + row * scale, scale, scale };
+                        SDL_FillRect(surf, &px, color);
+                    }
+                }
+            }
+        }
+        cursor_x += 6 * scale;
+    }
+    return cursor_x - x;
+}
+
+#endif /* EB_RUNTIME_ASSETS */
+
 /* Unix-specific: called by the updater (sdl2_updater.c) once it has
  * verified and swapped the new binary into place, right before it requests
  * a quit. Mirrors platform_save_set_path()'s existing pattern of a
@@ -262,6 +363,7 @@ int main(int argc, char *argv[]) {
     const char *verify_rom_path = NULL;
     bool savestate_selftest = false;
     bool keyitems_selftest = false;
+    bool update_now = false; /* --update-now: drive a real check+download+install synchronously, then exit -- see its own comment below */
     bool load_state_at_boot = false; /* --load-state: resume from savestate.bin.0/.1 in CWD instead of a fresh boot */
     int dump_flags_frame = -1; /* --dump-flags N: print a hardcoded event-flag debug list on frame N */
     int dump_frame = -1; /* --dump-frame N: write screenshot.bmp (final windowed output) on frame N, then continue */
@@ -286,6 +388,9 @@ int main(int argc, char *argv[]) {
         } else if (strcmp(argv[i], "--export-pak") == 0 && i + 1 < argc) {
             export_pak_path = argv[++i];
 #endif
+        } else if (strcmp(argv[i], "--update-now") == 0) {
+            update_now = true;
+            platform_headless = true;
         } else if (strcmp(argv[i], "--selftest-savestate") == 0) {
             /* Run the savestate save->load->save round-trip self-test and exit.
              * Implies headless so it neither opens a window nor plays the game. */
@@ -360,6 +465,67 @@ int main(int argc, char *argv[]) {
     }
 #endif
 
+    /* Maintainer-only test hook: drives a real check -> download -> install
+     * synchronously (the normal path is GUI-triggered from the pause/
+     * file-select menu, async, polled once per frame) and exits, so the
+     * real update flow can be exercised headlessly -- e.g. against a
+     * pre-release via EB_UPDATER_TEST_TAG (see sdl2_updater.c), without a
+     * real tester's app ever seeing it. Not documented in --help. */
+    if (update_now) {
+        if (!platform_update_supported()) {
+            fprintf(stderr, "Updater not supported in this build.\n");
+            return 1;
+        }
+        /* SDL_CreateThread/SDL_Delay below don't strictly require a prior
+         * SDL_Init on most platforms, but every other SDL_Thread use in this
+         * codebase runs after SDL_Init -- match that instead of relying on
+         * an unenforced platform quirk. SDL_Init(0) initializes no
+         * subsystems, just SDL's internal bookkeeping. */
+        SDL_Init(0);
+        EbUpdateProgress p = {0};
+        platform_update_check_start();
+        do {
+            SDL_Delay(200);
+            platform_update_poll(&p);
+        } while (p.status == EB_UPDATE_IDLE || p.status == EB_UPDATE_CHECKING);
+
+        if (p.status == EB_UPDATE_UP_TO_DATE) {
+            fprintf(stderr, "Already up to date (%s).\n", p.latest_version);
+            return 0;
+        }
+        if (p.status != EB_UPDATE_AVAILABLE) {
+            fprintf(stderr, "Check failed: %s\n", p.error_message);
+            return 1;
+        }
+        fprintf(stderr, "Update available: %s -- downloading...\n", p.latest_version);
+
+        platform_update_download_start();
+        int last_percent = -1;
+        do {
+            SDL_Delay(200);
+            platform_update_poll(&p);
+            if (p.status == EB_UPDATE_DOWNLOADING && p.progress_percent != last_percent) {
+                last_percent = p.progress_percent;
+                fprintf(stderr, "  %d%%\n", last_percent);
+            }
+        } while (p.status == EB_UPDATE_DOWNLOADING);
+
+        if (p.status == EB_UPDATE_DONE) {
+            fprintf(stderr, "Installed. Relaunching...\n");
+            /* The install step already staged the relaunch (see
+             * platform_update_stage_relaunch()), but it only actually fires
+             * from maybe_relaunch_atexit(), normally registered via atexit()
+             * much later in main() -- this early-exit path never reaches
+             * that registration. Call it directly instead; it's safe here
+             * because this test-driver path never initializes SDL/audio/
+             * video/input (no platform_cleanup() chain to skip). */
+            maybe_relaunch_atexit();
+            return 0;
+        }
+        fprintf(stderr, "Install failed: %s\n", p.error_message);
+        return 1;
+    }
+
     /* --log-file: redirect stdout+stderr to a file. Mainly for launches with
      * no attached terminal (desktop icon, Steam shortcut) -- without this,
      * crash/error output (including LOG_WARN/FATAL, core/log.h) has nowhere
@@ -422,7 +588,71 @@ int main(int argc, char *argv[]) {
                 int n = snprintf(cmd, sizeof(cmd), "\"%s\" \"%s\" --out \"%s\"", helper_name, rom_path, assets_path);
 #endif
                 if (n > 0 && (size_t)n < sizeof(cmd)) {
-                    system(cmd); /* blocking -- retry the load right after */
+                    /* This is a real multi-step pipeline (extract, pack-all,
+                     * pack-assets) against a ~3MB ROM -- observed 30-60s on
+                     * an SSD, longer on slower disks/first-run antivirus
+                     * scanning on Windows. With no window up yet, the OS
+                     * would otherwise flag the process as unresponsive
+                     * within seconds. Show a small window with the message
+                     * drawn via the built-in 5x7 font below (the OS window
+                     * chrome truncates long title-bar text, so the title
+                     * alone isn't enough -- the game's own font can't be
+                     * used here since it's itself one of the assets being
+                     * generated) and pump events on the background
+                     * thread's behalf so it stays responsive throughout. */
+                    SDL_Init(SDL_INIT_VIDEO);
+                    /* Two lines, drawn with the built-in 5x7 font below (the
+                     * window title alone gets truncated by the OS chrome on
+                     * most platforms, so the real message needs to live in
+                     * the window body). Window width sized to fit the
+                     * longer line (48 chars * 6px/cell * 2x scale = 576px)
+                     * with margin, rather than shrinking the text further. */
+                    const char *line1 = "GENERATING GAME ASSETS...";
+                    const char *line2 = "THIS ONLY HAPPENS ONCE, MAY TAKE A MINUTE OR TWO";
+                    int scale1 = 3, scale2 = 2;
+                    SDL_Window *setup_win = SDL_CreateWindow(
+                        "EarthBound - Setting Up",
+                        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 640, 160, SDL_WINDOW_SHOWN);
+                    SDL_Surface *setup_surf = setup_win ? SDL_GetWindowSurface(setup_win) : NULL;
+
+                    int width1 = (int)strlen(line1) * 6 * scale1;
+                    int width2 = (int)strlen(line2) * 6 * scale2;
+
+                    SDL_AtomicSet(&g_setup_helper_done, 0);
+                    SDL_Thread *helper_thread = SDL_CreateThread(run_setup_helper_thread_fn, "eb_setup_helper", cmd);
+                    if (helper_thread == NULL) {
+                        /* Thread creation failed (very unlikely) -- fall back
+                         * to the original blocking call rather than silently
+                         * skipping setup. */
+                        system(cmd);
+                    } else {
+                        Uint32 pulse_start = SDL_GetTicks();
+                        while (!SDL_AtomicGet(&g_setup_helper_done)) {
+                            SDL_Event ev;
+                            while (SDL_PollEvent(&ev)) { /* swallow input, keep the OS's event pump happy */
+                            }
+                            if (setup_surf) {
+                                /* Simple back-and-forth grey background pulse
+                                 * behind the text so the window visibly isn't
+                                 * frozen even during a long silent stretch. */
+                                Uint32 phase = (SDL_GetTicks() - pulse_start) % 1000;
+                                Uint8 v = (Uint8)(phase < 500 ? 30 + phase / 20 : 55 - (phase - 500) / 20);
+                                SDL_FillRect(setup_surf, NULL, SDL_MapRGB(setup_surf->format, v, v, v));
+                                Uint32 white = SDL_MapRGB(setup_surf->format, 255, 255, 255);
+                                draw_text5x7(setup_surf, (setup_surf->w - width1) / 2, 55, line1, scale1, white);
+                                draw_text5x7(setup_surf, (setup_surf->w - width2) / 2, 95, line2, scale2, white);
+                                SDL_UpdateWindowSurface(setup_win);
+                            }
+                            SDL_Delay(30);
+                        }
+                        SDL_WaitThread(helper_thread, NULL);
+                    }
+
+                    if (setup_win) {
+                        SDL_DestroyWindow(setup_win);
+                    }
+                    SDL_QuitSubSystem(SDL_INIT_VIDEO);
+
                     assets_result = eb_runtime_assets_load(assets_path);
                 }
             }
