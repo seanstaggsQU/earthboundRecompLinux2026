@@ -93,6 +93,28 @@ target_include_directories(earthbound PRIVATE
     ${CMAKE_CURRENT_BINARY_DIR}/generated
 )
 
+if(APPLE)
+    # The linked libSDL2 dylib's own install_name is whatever absolute path
+    # it was built with (e.g. Homebrew's /opt/homebrew/opt/sdl2-compat/lib/
+    # libSDL2-2.0.0.dylib) -- fine for local dev on the machine that has it
+    # installed, but this binary also ships as a public release asset
+    # alongside its own libSDL2-2.0.0.dylib copy (see the release process),
+    # meant to be dropped in the same folder as the executable on someone
+    # else's Mac. Without this rewrite, the binary would only ever look at
+    # the original absolute Homebrew path and fail to launch (dyld: image
+    # not found) for anyone who doesn't happen to have that exact package
+    # installed, regardless of the dylib sitting right next to it. Rewrite
+    # the load command to @executable_path so it finds the shipped copy.
+    find_program(INSTALL_NAME_TOOL install_name_tool)
+    if(INSTALL_NAME_TOOL)
+        add_custom_command(TARGET earthbound POST_BUILD
+            COMMAND bash -c "for lib in $(otool -L $<TARGET_FILE:earthbound> | grep -o '/[^ ]*libSDL2[^ ]*dylib' || true); do ${INSTALL_NAME_TOOL} -change \"$lib\" @executable_path/libSDL2-2.0.0.dylib $<TARGET_FILE:earthbound>; done"
+            COMMENT "Rewriting libSDL2 load path to @executable_path for redistribution"
+            VERBATIM
+        )
+    endif()
+endif()
+
 if(MSVC)
     target_compile_options(earthbound PRIVATE /W4)
 else()
