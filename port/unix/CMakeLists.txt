@@ -87,11 +87,31 @@ configure_file(
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../../src
                  ${CMAKE_CURRENT_BINARY_DIR}/game_lib)
 
-# Find SDL2
-find_package(SDL2 QUIET)
-if(NOT SDL2_FOUND)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(SDL2 REQUIRED sdl2)
+# Find SDL2. Normal dev builds link dynamically against whatever SDL2 the
+# system already has (fast, no extra build step). Release packaging instead
+# points EB_SDL2_STATIC_CONFIG_DIR at a from-source SDL2 build configured
+# with -DSDL_SHARED=OFF -DSDL_STATIC=ON (Homebrew's sdl2-compat package,
+# the normal macOS dev dependency, only ships a dynamic library -- there's
+# no static option to just find), so the release binary needs nothing
+# alongside it at all, not even a bundled dylib/dll (this matters more on
+# macOS/Windows; Linux has never needed a bundled SDL2 to begin with, since
+# linking against the distro's own system library is the normal, expected
+# thing there). The static SDL2 build's own generated CMake package already
+# knows every macOS framework (CoreAudio, Cocoa, IOKit, etc.) it needs to
+# pull in, so this just point find_package() at it instead of hand-listing
+# frameworks ourselves.
+set(EB_SDL2_STATIC_CONFIG_DIR "" CACHE PATH
+    "Directory holding a from-source SDL2Config.cmake (SDL_SHARED=OFF/SDL_STATIC=ON build) to statically link instead of the system SDL2 (release packaging only)")
+if(EB_SDL2_STATIC_CONFIG_DIR)
+    find_package(SDL2 REQUIRED CONFIG PATHS "${EB_SDL2_STATIC_CONFIG_DIR}" NO_DEFAULT_PATH)
+    set(EB_SDL2_TARGET SDL2::SDL2-static)
+else()
+    find_package(SDL2 QUIET)
+    if(NOT SDL2_FOUND)
+        find_package(PkgConfig REQUIRED)
+        pkg_check_modules(SDL2 REQUIRED sdl2)
+    endif()
+    set(EB_SDL2_TARGET SDL2::SDL2)
 endif()
 
 # Platform executable. Use GLOB_RECURSE (not plain GLOB): a non-recursive
@@ -106,8 +126,8 @@ target_include_directories(earthbound PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(earthbound earthbound_game)
 
-if(TARGET SDL2::SDL2)
-    target_link_libraries(earthbound SDL2::SDL2)
+if(TARGET ${EB_SDL2_TARGET})
+    target_link_libraries(earthbound ${EB_SDL2_TARGET})
 else()
     target_include_directories(earthbound PRIVATE ${SDL2_INCLUDE_DIRS})
     target_link_libraries(earthbound ${SDL2_LIBRARIES})
