@@ -30,9 +30,18 @@
  * just falling back to defaults, since collapsing an existing On/Off
  * preference into "reset to Off" would silently drop something the player
  * had actively chosen; the mapping is simple enough (old On -> Modern) to
- * be worth preserving. `auto_save` is new in this version too, it has no
- * old-byte position to migrate from, so it just defaults to Off for a
- * migrated v3 file, same as it would for a fresh install. */
+ * be worth preserving. Version 4 also added an `auto_save` byte at the
+ * position now named `reserved0` below -- the Auto Save feature itself
+ * was removed (it could silently save over a manually-curated state, and
+ * during the Onett police-gauntlet cutscene specifically, a mid-sequence
+ * auto-save could land the player in a state the game had no way to
+ * resume). The byte position is kept as reserved rather than removed, so
+ * an upgrader's existing version-4 settings.dat (with a real 0/1
+ * auto_save value already written into it) still matches this struct's
+ * size and version exactly, and every OTHER preference (sprint speed, HQ
+ * audio, alt controls, visuals, logging) loads correctly instead of
+ * silently resetting to defaults; the leftover byte is simply never
+ * read. */
 #define SETTINGS_VERSION 4
 
 typedef struct {
@@ -43,7 +52,7 @@ typedef struct {
     uint8_t  alt_controls;
     uint8_t  alternative_visuals; /* was `experimental_visuals` (Off/On) through version 3 */
     uint8_t  logging;
-    uint8_t  auto_save;           /* new in version 4 */
+    uint8_t  reserved0;           /* was `auto_save` (version 4); feature removed, see above */
 } EngineSettingsBlob;
 
 uint8_t engine_sprint_speed = SPRINT_SPEED_MEDIUM;             /* default until settings_load() runs */
@@ -51,7 +60,6 @@ uint8_t engine_hq_audio = HQ_AUDIO_ON;                         /* default until 
 uint8_t engine_alt_controls = ALT_CONTROLS_OFF;                /* default until settings_load() runs */
 uint8_t engine_alternative_visuals = ALT_VISUALS_OFF;          /* default until settings_load() runs */
 uint8_t engine_logging = LOGGING_OFF;                          /* default until settings_load() runs */
-uint8_t engine_auto_save = AUTO_SAVE_OFF;                      /* default until settings_load() runs */
 
 void settings_load(void) {
     EngineSettingsBlob blob;
@@ -61,7 +69,7 @@ void settings_load(void) {
      * so a pre-existing file's experimental_visuals On/Off preference can
      * be migrated below rather than discarded, see the SETTINGS_VERSION
      * comment above. Both versions currently happen to produce the same
-     * sizeof(EngineSettingsBlob) (the new auto_save byte fills what was
+     * sizeof(EngineSettingsBlob) (the reserved0 byte fills what was
      * trailing struct padding in the old layout), so the size check alone
      * can't distinguish them; blob.version does that instead. Any other
      * version (older still, or a future one this build doesn't know
@@ -77,14 +85,11 @@ void settings_load(void) {
         if (blob.version == SETTINGS_VERSION) {
             engine_alternative_visuals = (blob.alternative_visuals < ALT_VISUALS_COUNT)
                 ? blob.alternative_visuals : ALT_VISUALS_OFF;
-            engine_auto_save = (blob.auto_save < AUTO_SAVE_COUNT) ? blob.auto_save : AUTO_SAVE_OFF;
         } else {
             /* version == 3: blob.alternative_visuals actually holds the
              * old experimental_visuals byte at this same offset (0=Off,
-             * 1=On), map On to the closest new equivalent, Modern.
-             * auto_save didn't exist yet; defaults to Off. */
+             * 1=On), map On to the closest new equivalent, Modern. */
             engine_alternative_visuals = (blob.alternative_visuals == 1) ? ALT_VISUALS_MODERN : ALT_VISUALS_OFF;
-            engine_auto_save = AUTO_SAVE_OFF;
         }
     } else {
         /* No settings file, or unreadable/foreign/stale, fall back to
@@ -94,7 +99,6 @@ void settings_load(void) {
         engine_alt_controls = ALT_CONTROLS_OFF;
         engine_alternative_visuals = ALT_VISUALS_OFF;
         engine_logging = LOGGING_OFF;
-        engine_auto_save = AUTO_SAVE_OFF;
     }
 }
 
@@ -108,6 +112,5 @@ void settings_save(void) {
     blob.alt_controls = engine_alt_controls;
     blob.alternative_visuals = engine_alternative_visuals;
     blob.logging = engine_logging;
-    blob.auto_save = engine_auto_save;
     platform_settings_write(&blob, sizeof(blob));
 }

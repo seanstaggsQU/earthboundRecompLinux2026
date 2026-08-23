@@ -2978,8 +2978,21 @@ StepResult mode_step_pause_menu(ModeState *ms) {
 
             /* Save (this port's own addition, not in the original ROM menu) */
             case 7: {
-                if (current_save_slot >= 1 && save_game(current_save_slot - 1))
+                if (current_save_slot >= 1 && save_game(current_save_slot - 1)) {
                     play_sfx(94);  /* SFX::NAMING_CONFIRM, audible confirmation it worked */
+                    /* Also update the death/game-over respawn point, matching
+                     * the debug menu's own Save command (game_main.c's
+                     * DM_DISPATCH case 3) -- ow.respawn_x/y is a separate
+                     * field from the save file's position (see GO_ENTER,
+                     * overworld_palette.c), only otherwise updated by
+                     * new-game start and the Teleport PSI ability. Without
+                     * this, a manual save here never moved the respawn
+                     * point at all: dying always sent the player back to
+                     * wherever they started the game (or last Teleported
+                     * to), never to their actual last save location. */
+                    ow.respawn_x = game_state.leader_x_coord;
+                    ow.respawn_y = game_state.leader_y_coord;
+                }
                 st->phase = PM_MAIN;
                 continue;
             }
@@ -3549,11 +3562,6 @@ static const char *logging_labels[LOGGING_COUNT] = {
     [LOGGING_OFF] = "Logging: Off",
     [LOGGING_ON]  = "Logging: On",
 };
-static const char *auto_save_labels[AUTO_SAVE_COUNT] = {
-    [AUTO_SAVE_OFF] = "Auto Save: Off",
-    [AUTO_SAVE_ON]  = "Auto Save: On",
-};
-
 StepResult mode_step_settings_menu(ModeState *ms) {
     SettingsMenuState *st = &ms->settings_menu;
 
@@ -3565,7 +3573,6 @@ StepResult mode_step_settings_menu(ModeState *ms) {
         add_menu_item(alt_controls_labels[engine_alt_controls], 3, 0, 2);
         add_menu_item(alternative_visuals_labels[engine_alternative_visuals], 4, 0, 3);
         add_menu_item(logging_labels[engine_logging], 5, 0, 4);
-        add_menu_item(auto_save_labels[engine_auto_save], 6, 0, 5);
         open_window_and_print_menu(1, 0);
         st->phase = SET_RESULT;
         return menu_push_selection(&st->result_ready, &st->result, 1);
@@ -3653,17 +3660,6 @@ StepResult mode_step_settings_menu(ModeState *ms) {
             settings_save();
             if (engine_logging == LOGGING_ON)
                 platform_log_set_enabled(true);
-            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
-            st->phase = SET_BUILD;
-            return STEP_RESULT_CONTINUE();
-        }
-        if (selection == 6) {
-            /* Auto Save row confirmed: cycle Off <-> On. Purely a flag
-             * read fresh at each area-transition hook point (door.c,
-             * overworld_teleport.c, display_text_cc.c), no resync
-             * needed, takes effect on the very next transition. */
-            engine_auto_save = (uint8_t)((engine_auto_save + 1) % AUTO_SAVE_COUNT);
-            settings_save();
             play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
             st->phase = SET_BUILD;
             return STEP_RESULT_CONTINUE();

@@ -1239,7 +1239,6 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         set_leader_position_and_load_party(x, y, 4);  /* direction = DOWN */
         fade_in(1, 1);
         ow.stairs_direction = (uint16_t)-1;  /* Assembly: set AFTER fade_in (tree_1F.asm:324-325) */
-        auto_save_if_enabled(); /* Auto Save (game_state.h) -- new area entered */
         break;
     }
 

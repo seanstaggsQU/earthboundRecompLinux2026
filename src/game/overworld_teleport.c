@@ -991,7 +991,6 @@ StepResult mode_step_teleport(ModeState *st) {
             ow.psi_teleport_speed_int = 0;
             ow.player_intangibility_frames = 0;
             ow.psi_teleport_destination = 0;
-            auto_save_if_enabled(); /* Auto Save (game_state.h) -- new area entered */
             return STEP_RESULT_POP(0);
         }
     }

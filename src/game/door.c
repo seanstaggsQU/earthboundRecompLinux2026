@@ -1347,7 +1347,6 @@ StepResult mode_step_door_transition(ModeState *ms) {
         default:
             spawn_delivery_entities();
             dr.using_door = 0;
-            auto_save_if_enabled(); /* Auto Save (game_state.h) -- new area entered */
             return STEP_RESULT_POP(0);
         }
     }
@@ -1500,7 +1499,6 @@ StepResult mode_step_teleport_to(ModeState *ms) {
         default:
             spawn_delivery_entities();
             ow.overworld_status_suppression = st->saved_suppression;
-            auto_save_if_enabled(); /* Auto Save (game_state.h) -- new area entered */
             return STEP_RESULT_POP(0);
         }
     }

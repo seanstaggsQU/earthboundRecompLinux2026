@@ -125,25 +125,6 @@ typedef enum {
 
 extern uint8_t engine_alternative_visuals; /* current value, one of AlternativeVisualsSetting */
 
-/* Auto Save: when On, save_game() (game_state.c) is called automatically
- * whenever the player finishes a transition into a new area, door
- * transitions, PSI Teleport/Star Master, script/debug teleports, and Exit
- * Mouse/Escape Rope. See the call sites (door.c/overworld_teleport.c/
- * display_text_cc.c) for the exact hook points; deliberately excludes Game
- * Over respawn, the ending cutscene, post-battle same-map return, and
- * initial boot/new-game load, none of which are "entering a new area" in
- * the intended sense. Off by default: an unexpected automatic save could
- * overwrite a player's manually-curated save state before they intend it
- * to change. Silent -- no on-screen "Saving..." indicator in this first
- * pass. */
-typedef enum {
-    AUTO_SAVE_OFF = 0,
-    AUTO_SAVE_ON  = 1,
-    AUTO_SAVE_COUNT,
-} AutoSaveSetting;
-
-extern uint8_t engine_auto_save; /* current value, one of AutoSaveSetting */
-
 /* Logging: On redirects stdout/stderr to a log file (see
  * platform_log_set_enabled(), platform.h) so a tester who hits a bug can
  * enable it from the Config menu, reproduce the problem, and share the
