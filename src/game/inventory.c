@@ -680,6 +680,50 @@ void process_item_transformations(void) {
     }
 }
 
+/* Not part of the original assembly: scale Paula/Jeff/Poo's starting level
+ * to Ness's CURRENT level at the moment they actually join, instead of the
+ * fixed low vanilla level INITIAL_STATS seeded them with at new-game start
+ * (file_select.c). Paula joins at half Ness's level, Jeff at two-thirds,
+ * Poo matches Ness exactly -- keeps a character who joins very late from
+ * being drastically underleveled relative to the rest of the party.
+ * Re-running reset_char_level_one() here simply overwrites the
+ * INITIAL_STATS-seeded level/stats with a fresh regrowth to the new
+ * target, through the exact same incremental random stat-growth path
+ * normal leveling uses (no separate formula), so the result is exactly as
+ * faithful as any other level this character could have reached by
+ * leveling up normally. No-op for char_id outside 2-4 (Paula/Jeff/Poo).
+ *
+ * Factored out of add_char_to_party() so join_level_scaling_selftest()
+ * (game_state.c) can exercise it directly: add_char_to_party() itself
+ * drives live entity/position-buffer setup that hangs outright in a
+ * synthetic game_state_init()-only test harness (the same reason
+ * migrate_key_items_to_pool() is tested directly there too, see that
+ * function's doc comment). */
+void apply_join_level_scaling(uint16_t char_id) {
+    if (char_id != 2 && char_id != 3 && char_id != 4) return;
+
+    uint16_t ness_level = party_characters[CHARACTER_NESS].level;
+    uint16_t target_level;
+    switch (char_id) {
+    case 2: target_level = (ness_level + 1) / 2; break;       /* Paula: 1/2, rounded */
+    case 3: target_level = (ness_level * 2 + 1) / 3; break;   /* Jeff: 2/3, rounded */
+    default: target_level = ness_level; break;                /* Poo: matches Ness */
+    }
+    if (target_level < 1) target_level = 1;
+    reset_char_level_one(char_id, target_level, 1);
+    /* reset_char_level_one()/level_up_char_silent() grow max_hp/max_pp
+     * (and their _target mirrors) but never touch current_hp/current_pp
+     * themselves -- same reason file_select.c's new-game seeding syncs
+     * them separately afterward (see its own "Sync current HP/PP = max"
+     * comment). A newly-joining character should start at full health,
+     * not whatever stale value survived from their INITIAL_STATS seed. */
+    uint16_t char_idx = char_id - 1;
+    party_characters[char_idx].current_hp = party_characters[char_idx].max_hp;
+    party_characters[char_idx].current_hp_target = party_characters[char_idx].max_hp;
+    party_characters[char_idx].current_pp = party_characters[char_idx].max_pp;
+    party_characters[char_idx].current_pp_target = party_characters[char_idx].max_pp;
+}
+
 /* ADD_CHAR_TO_PARTY: Port of asm/misc/party_add_char.asm.
  * Adds a character to game_state.party_members[] in sorted order.
  * Calls ADD_PARTY_MEMBER for entity creation, then if char_id <= 4 (PC),
@@ -724,6 +768,13 @@ void add_char_to_party(uint16_t char_id) {
      * comment) -- surface any key items into the shared pool now that
      * they're actually part of the party. */
     migrate_key_items_to_pool(char_id);
+
+    /* Not part of the original assembly: see apply_join_level_scaling()'s
+     * doc comment. Applied before add_party_member() below so the party's
+     * HP/PP display reflects the real starting stats from the character's
+     * very first rendered frame, not one frame of stale INITIAL_STATS
+     * values. */
+    apply_join_level_scaling(char_id);
 
     uint16_t entity_slot = add_party_member(char_id);
 

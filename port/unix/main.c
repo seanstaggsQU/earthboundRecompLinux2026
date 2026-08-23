@@ -364,6 +364,7 @@ int main(int argc, char *argv[]) {
     const char *verify_rom_path = NULL;
     bool savestate_selftest = false;
     bool keyitems_selftest = false;
+    bool joinlevel_selftest = false;
     bool update_now = false; /* --update-now: drive a real check+download+install synchronously, then exit -- see its own comment below */
     bool load_state_at_boot = false; /* --load-state: resume from savestate.bin.0/.1 in CWD instead of a fresh boot */
     int dump_flags_frame = -1; /* --dump-flags N: print a hardcoded event-flag debug list on frame N */
@@ -403,6 +404,12 @@ int main(int argc, char *argv[]) {
              * load_game() (slot 0) via the .srm path, so run with a scratch
              * --save FILE. Implies headless. */
             keyitems_selftest = true;
+            platform_headless = true;
+        } else if (strcmp(argv[i], "--selftest-joinlevel") == 0) {
+            /* Join-level scaling (Paula/Jeff/Poo scaled to Ness's current
+             * level, see add_char_to_party()'s doc comment, inventory.c).
+             * Pure in-memory, no save file touched. Implies headless. */
+            joinlevel_selftest = true;
             platform_headless = true;
         } else if (strcmp(argv[i], "--headless") == 0) {
             platform_headless = true;
@@ -446,7 +453,7 @@ int main(int argc, char *argv[]) {
 #else
                             " [--export-pak FILE]"
 #endif
-                            " [--selftest-savestate] [--selftest-keyitems]\n",
+                            " [--selftest-savestate] [--selftest-keyitems] [--selftest-joinlevel]\n",
                     argv[0]);
             return 1;
         }
@@ -845,6 +852,12 @@ int main(int argc, char *argv[]) {
         bool ok_ki = key_items_selftest();
         fprintf(stderr, "key items pool self-test: %s\n", ok_ki ? "PASS" : "FAIL");
         exit(ok_ki ? 0 : 1);
+    }
+
+    if (joinlevel_selftest) {
+        bool ok_jl = join_level_scaling_selftest();
+        fprintf(stderr, "join-level scaling self-test: %s\n", ok_jl ? "PASS" : "FAIL");
+        exit(ok_jl ? 0 : 1);
     }
 
     /* Initialize audio (loads audio packs from embedded assets) */

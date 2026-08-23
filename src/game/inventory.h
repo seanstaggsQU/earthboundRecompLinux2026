@@ -390,6 +390,15 @@ uint16_t find_inventory_space2(uint16_t char_id);
 
 /* Party management */
 
+/* Not part of the original assembly: scales Paula/Jeff/Poo's starting
+ * level to Ness's current level at the moment they actually join (Paula
+ * 1/2, Jeff 2/3, Poo matches exactly). No-op for any other char_id. See
+ * the definition (inventory.c) for the full rationale. Exposed so
+ * join_level_scaling_selftest() (game_state.c) can exercise it without
+ * going through add_char_to_party()'s live entity/position-buffer setup,
+ * which hangs outright in a synthetic test harness. char_id: 1-indexed. */
+void apply_join_level_scaling(uint16_t char_id);
+
 /* ADD_CHAR_TO_PARTY: Port of asm/misc/party_add_char.asm.
  * Sorted insertion into game_state.party_members[].
  * If char_id <= 4 (PC), also calls UPDATE_TEDDY_BEAR_PARTY and

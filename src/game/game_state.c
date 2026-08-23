@@ -869,3 +869,86 @@ bool key_items_selftest(void) {
 
     return ok;
 }
+
+/* Regression test for apply_join_level_scaling() (not a ROM/assembly port --
+ * see that function's own doc comment, inventory.c, for the full
+ * rationale): Paula joins at half Ness's current level, Jeff at two-thirds,
+ * Poo matches Ness exactly, each rounded and re-grown through the normal
+ * incremental level-up path, with current HP/PP synced to the new max.
+ * Pure in-memory, no save_game()/load_game() involved, so no destructive-
+ * write guard needed. Calls apply_join_level_scaling() directly rather
+ * than going through add_char_to_party() (its real caller on a genuine
+ * join): that function also drives live entity/position-buffer setup this
+ * synthetic game_state_init()-only harness never provides -- same reason
+ * key_items_selftest() (above) exercises migrate_key_items_to_pool()
+ * directly instead of add_char_to_party() too. */
+bool join_level_scaling_selftest(void) {
+    bool ok = true;
+    game_state_init();
+
+    /* Ness never goes through add_char_to_party() -- simulate his
+     * already-active state directly, same as a real playthrough by the
+     * time anyone else could plausibly join. */
+    game_state.party_members[0] = 1;
+    game_state.party_count = 1;
+    game_state.player_controlled_party_count = 1;
+    party_characters[0].level = 10;
+
+    apply_join_level_scaling(2); /* Paula */
+    uint16_t paula_level = party_characters[1].level;
+    if (paula_level != 5) {
+        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Paula joined at level %u, "
+                        "expected 5 (half of Ness's level 10)\n", paula_level);
+        ok = false;
+    }
+    if (party_characters[1].current_hp != party_characters[1].max_hp ||
+        party_characters[1].current_pp != party_characters[1].max_pp) {
+        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Paula's current HP/PP "
+                        "not synced to max after joining\n");
+        ok = false;
+    }
+
+    apply_join_level_scaling(3); /* Jeff */
+    uint16_t jeff_level = party_characters[2].level;
+    if (jeff_level != 7) {
+        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Jeff joined at level %u, "
+                        "expected 7 (two-thirds of Ness's level 10, rounded)\n", jeff_level);
+        ok = false;
+    }
+    if (party_characters[2].current_hp != party_characters[2].max_hp) {
+        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Jeff's current HP "
+                        "not synced to max after joining\n");
+        ok = false;
+    }
+
+    apply_join_level_scaling(4); /* Poo */
+    uint16_t poo_level = party_characters[3].level;
+    if (poo_level != 10) {
+        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Poo joined at level %u, "
+                        "expected 10 (matches Ness exactly)\n", poo_level);
+        ok = false;
+    }
+    if (party_characters[3].current_hp != party_characters[3].max_hp ||
+        party_characters[3].current_pp != party_characters[3].max_pp) {
+        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Poo's current HP/PP "
+                        "not synced to max after joining\n");
+        ok = false;
+    }
+
+    /* Low-level edge case: Ness at level 1 must never compute a target
+     * level of 0 for anyone (reset_char_level_one(0, ...) would leave
+     * ch->level unset by its own loop, but the explicit clamp in
+     * apply_join_level_scaling() is what actually guarantees this, not
+     * reliance on that side effect). */
+    game_state_init();
+    game_state.party_members[0] = 1;
+    party_characters[0].level = 1;
+    apply_join_level_scaling(2);
+    if (party_characters[1].level < 1) {
+        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Paula joined at level %u "
+                        "with Ness at level 1, expected >= 1\n", party_characters[1].level);
+        ok = false;
+    }
+
+    return ok;
+}

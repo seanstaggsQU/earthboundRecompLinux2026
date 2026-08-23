@@ -340,4 +340,11 @@ void auto_save_if_enabled(void);
  * check passes; uses save slot 0, so run with a scratch --save path. */
 bool key_items_selftest(void);
 
+/* Regression test for add_char_to_party()'s join-level scaling (Paula/Jeff/
+ * Poo's starting level scaled to Ness's current level, not a ROM port --
+ * see that function's doc comment, inventory.c). Desktop-only diagnostic
+ * (the `--selftest-joinlevel` flag). Pure in-memory, no save file touched.
+ * Returns true iff every check passes. */
+bool join_level_scaling_selftest(void);
+
 #endif /* GAME_STATE_H */
