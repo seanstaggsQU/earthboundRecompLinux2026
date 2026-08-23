@@ -26,6 +26,10 @@
 #define EVENT_FLAG_DIS_2H_PAPA  775  /* FLG_SYS_DIS_2H_PAPA, disables dad phone */
 #define EVENT_FLAG_WIN_GIEGU     73  /* FLG_WIN_GIEGU, defeated Giygas */
 #define EVENT_FLAG_DISABLE_TELEPORT 754 /* FLG_SYS_DISTLPT, disable PSI Teleport */
+#define EVENT_FLAG_POLICE_5COP_APPEAR 38 /* FLG_POLICE_5COP_APPEAR, Onett 5-cop
+                                           * gauntlet in progress -- see
+                                           * auto_save_if_enabled()'s guard
+                                           * (game_state.c) */
 
 /* Party member NPCs (from include/enums.asm PARTY_MEMBER enum) */
 #define PARTY_NPC_DUNGEON_MAN  10

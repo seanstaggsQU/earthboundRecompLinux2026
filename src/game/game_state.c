@@ -460,10 +460,25 @@ bool save_game(int slot) {
 /* See game_state.h's doc comment for the call-site list and what's
  * deliberately excluded. current_save_slot is 1-indexed (1-3) here, same
  * as the manual Save menu item's guard (mode_step_pause_menu(), text.c) --
- * save_game() itself takes a 0-indexed slot. */
+ * save_game() itself takes a 0-indexed slot.
+ *
+ * Also skipped while the Onett 5-cop police gauntlet is in progress
+ * (EVENT_FLAG_POLICE_5COP_APPEAR). That whole sequence -- each cop's NPC
+ * only becomes battle-ready as a side effect of winning the previous
+ * fight, driven by sequential script execution, not by any flag-based
+ * state a fresh map load can reconstruct -- was only ever safe in the
+ * original ROM because manual saving was never physically possible
+ * mid-cutscene. A real report: losing partway through, auto-saving
+ * right after (the post-defeat "Continue" reload lands you back at
+ * whatever the current save is), and reloading into a state the game
+ * has no way to correctly resume, stuck. Rather than try to audit every
+ * other scripted sequence in the game for the same shape of risk, this
+ * narrowly closes the one confirmed case; see the Auto Save setting's
+ * own risk discussion (project memory) for the broader picture. */
 void auto_save_if_enabled(void) {
     if (engine_auto_save != AUTO_SAVE_ON) return;
     if (current_save_slot < 1) return;
+    if (event_flag_get(EVENT_FLAG_POLICE_5COP_APPEAR)) return;
     save_game(current_save_slot - 1);
 }
 
