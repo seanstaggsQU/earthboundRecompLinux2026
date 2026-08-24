@@ -13,6 +13,7 @@
 #include "game/inventory.h"
 #include "game/text.h"
 #include "game/window.h"
+#include "game/settings.h"
 
 #include "data/assets.h"
 #include "data/text_refs.h"
@@ -754,8 +755,20 @@ void load_battle_bg(uint16_t layer1_id, uint16_t layer2_id, uint16_t letterbox_s
     bt.vertical_shake_hold_duration = 0;
     bt.vertical_shake_duration = 0;
 
-    /* Letterbox setup (assembly lines 31-63) */
-    uint16_t lb = letterbox_style & 0x0003;
+    /* Letterbox setup (assembly lines 31-63). A genuine original-ROM
+     * presentation choice, not a display/aspect-ratio artifact: certain
+     * enemy battle backgrounds (BG_DATA_TABLE, keyed by letterbox_style)
+     * are authored with a cinematic HDMA letterbox bar (LARGE/MEDIUM/SMALL)
+     * and others aren't, entirely per-encounter -- reported live as "black
+     * bars during battle" appearing for some enemies and not others (e.g.
+     * present for a routine enemy, absent for Carpainter), which is
+     * exactly this working as designed. Suppressed under Modern
+     * Alternative Visuals per feedback that it reads as an unwanted bar
+     * rather than a deliberate cinematic effect once the wider Modern FOV
+     * is already in play; Off and Classic keep the original per-encounter
+     * behavior unchanged. */
+    uint16_t lb = (engine_alternative_visuals == ALT_VISUALS_MODERN)
+        ? 0 : (letterbox_style & 0x0003);
     if (lb == 0) {
         bt.letterbox_top_end = 0;
         bt.letterbox_bottom_start = SNES_HEIGHT;

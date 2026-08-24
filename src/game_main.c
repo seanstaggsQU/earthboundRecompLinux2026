@@ -618,10 +618,42 @@ void host_process_frame(void) {
          * is a no-op while Classic is active (see settings.h's doc
          * comment). Left as a no-op rather than resetting ow.zoom_mode to
          * OFF on every frame here, so a player's zoom choice from Off/
-         * Modern is preserved if they switch back later. */
-        if ((aux_new & AUX_ZOOM_TOGGLE) && engine_alternative_visuals != ALT_VISUALS_CLASSIC) {
-            /* Cycle EB_ZOOM_OFF -> EB_ZOOM_OUT -> EB_ZOOM_IN -> EB_ZOOM_OFF. */
-            ow.zoom_mode = (ow.zoom_mode + 1) % 3;
+         * Modern is preserved if they switch back later.
+         *
+         * Off and Modern each get a 2-way toggle instead of one shared
+         * 3-way cycle, per feedback that a 3-state R3 press was confusing
+         * (which of Off/Wide/Zoom In you'd land on next wasn't obvious).
+         * Modern already defaults to EB_ZOOM_OUT (Wide) the moment the
+         * player leaves title/file-select (below), and its "true" baseline
+         * is the wide crop, not the original 4:3 window, so its pair is
+         * Wide<->Zoom In, never Off. Off (no Alternative Visuals) never
+         * defaults to a non-OFF zoom anywhere, so its pair is
+         * Off<->Zoom In, never Wide -- Wide's "reveal more of the canvas"
+         * framing (platform.h) is specifically tied to Modern's wider
+         * viewport, not something Off ever offers on its own.
+         *
+         * Both toggle off the current value against a "primary" state for
+         * the pair (Wide for Modern, Standard/Off for Off) rather than a
+         * plain "is it Zoom In" flip: needs_zoom_reset above (battle/
+         * Town Map/title/file-select) force-persists EB_ZOOM_OFF on exit
+         * from those screens regardless of which pair is active, and
+         * battles alone happen constantly. A plain flip landed the very
+         * next R3 press on Zoom In instead of Wide whenever the stored
+         * value was that forced OFF (or any other value outside the
+         * active pair, e.g. Wide left over from Modern after switching to
+         * Off) -- reported live as "Wide keeps turning itself off",
+         * really "the first post-battle R3 press doesn't restore Wide,
+         * it jumps to Zoom In, so Wide needs an extra press to get back
+         * to and looks like it vanished". Checking against the primary
+         * state instead means ANY foreign value snaps straight back to
+         * that pair's primary on the very next press, matching what the
+         * player actually wants, and still alternates normally afterward. */
+        if (aux_new & AUX_ZOOM_TOGGLE) {
+            if (engine_alternative_visuals == ALT_VISUALS_MODERN) {
+                ow.zoom_mode = (ow.zoom_mode == EB_ZOOM_OUT) ? EB_ZOOM_IN : EB_ZOOM_OUT;
+            } else if (engine_alternative_visuals != ALT_VISUALS_CLASSIC) {
+                ow.zoom_mode = (ow.zoom_mode == EB_ZOOM_OFF) ? EB_ZOOM_IN : EB_ZOOM_OFF;
+            }
         }
     } else if (ow.zoom_mode != EB_ZOOM_OFF) {
         ow.zoom_mode = EB_ZOOM_OFF;

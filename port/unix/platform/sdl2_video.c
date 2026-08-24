@@ -234,9 +234,15 @@ static inline uint8_t fx_clamp_byte(float v) {
  * though the comment never matched it. Set directly to that effective
  * value instead of re-deriving it through a stale "75%" framing --
  * restores the exact shipped behavior, just without the self-
- * contradicting math. If this ever needs retuning, treat 0.375 as the
- * current baseline "how much of the height stays sharp", not 0.75. */
-#define DOF_FOCUS_BAND_FRACTION 0.375
+ * contradicting math. 0.375 was that baseline "how much of the height
+ * stays sharp" for a while; bumped to 0.6875 below per later feedback
+ * that the effect still covered too much of the screen -- the affected
+ * (tapering) region is `1 - DOF_FOCUS_BAND_FRACTION` of the height, so
+ * this halves that region (0.625 -> 0.3125). */
+#define DOF_FOCUS_BAND_FRACTION 0.6875 /* was 0.375; halves the affected
+                                        * (tapering) region -- see doc
+                                        * comment above -- by growing the
+                                        * untouched sharp band to match */
 #define DOF_BLUR_RADIUS  3             /* fixed blur kernel radius -- only
                                         * the blend amount ramps, not this
                                         * (was 2 -- bumped for a moderate
@@ -312,9 +318,13 @@ static void apply_dof(pixel_t *pixels, int pitch, float intensity) {
         } else {
             double t = (dist - sharp_threshold) / (1.0 - sharp_threshold);
             if (t > 1.0) t = 1.0;
-            t = t * t * (3.0 - 2.0 * t); /* smoothstep: eased in AND out --
-                                           * this is what actually removes
-                                           * the seam, not just the lerp. */
+            /* Smootherstep (Perlin's quintic ease, 6t^5-15t^4+10t^3): zero
+             * first AND second derivative at both t=0 and t=1, vs plain
+             * smoothstep's zero first derivative only. Same "no seam at the
+             * band edge" property smoothstep already gave, but the ramp
+             * itself reads more gradual end to end, per feedback that the
+             * fade should be even softer -- was `t*t*(3.0-2.0*t)`. */
+            t = t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
             dof_blend_row[y] = (float)(t * DOF_MAX_BLEND) * intensity;
         }
     }
@@ -917,8 +927,59 @@ void platform_video_end_frame(void) {
         break;
     case EB_ZOOM_OFF:
     default:
-        content_w = EB_DEFAULT_WIDTH;
-        content_h = SNES_HEIGHT;
+        if (want_modern) {
+            /* game_main.c's needs_zoom_reset (battle/Town Map/title/file-
+             * select) force-persists EB_ZOOM_OFF regardless of Alternative
+             * Visuals, but since the R3 toggle itself never lets Modern
+             * land on EB_ZOOM_OFF by choice anymore (it only cycles
+             * Wide<->Zoom In, see game_main.c), landing here with
+             * want_modern true unambiguously means "forced off", not a
+             * genuine user selection -- Off's own real content_w/h (the
+             * fixed 400x224 branch below) is never reachable under Modern
+             * at all. That distinction matters here specifically for
+             * battle: unlike EB_ZOOM_OUT above, the fixed 400x224 default
+             * crop's aspect ratio (1.786:1) is NOT adapted to the actual
+             * display, and battle's own renderer culls sprite/BG content
+             * beyond the native SNES_HEIGHT (224) row window regardless of
+             * crop (battle_ui.c sets sprite_y_offset = EB_VIEWPORT_PAD_TOP,
+             * gating render_obj_scanline's off-native-range cull) -- so
+             * whenever the display's actual aspect ratio isn't extremely
+             * close to 1.786:1 (most displays aren't), forcing the fixed
+             * crop during battle left a real, empty (nothing drawn, not a
+             * device-level letterbox) gap top/bottom that the aspect-
+             * preserving dst-rect math then ALSO padded with genuine
+             * letterbox bars on top of that -- reported live as "black
+             * bars during battle that go away after," worse specifically
+             * for anyone whose window is sized to Modern's usual Wide
+             * aspect rather than happening to match 1.786:1. Mirrors
+             * EB_ZOOM_OUT's own adaptive logic above so the battle crop's
+             * aspect matches the display as closely as the genuinely-
+             * drawn content allows -- same EB_ZOOM_OUT_WIDTH safety
+             * ceiling (proven not to hit the tile-fill margin issue that
+             * ceiling exists for), but height-capped at the real
+             * SNES_HEIGHT battle limit instead of EB_ZOOM_OUT_HEIGHT,
+             * since anything taller is empty content, not a safe zoom
+             * budget to spend. On the vast majority of displays (wider
+             * than SNES_HEIGHT/EB_ZOOM_OUT_WIDTH's own ~2.21:1), this
+             * lands width-constrained and still can't fill 100% of a very
+             * wide window without either genuinely-blank content or a
+             * (small, unavoidable) pillarbox -- letterbox specifically
+             * (the reported symptom) is eliminated on any display at or
+             * above that ratio, which covers essentially every real
+             * monitor/TV shape. */
+            double display_ar = (double)out_w / out_h;
+            double max_zoom_ar = (double)EB_ZOOM_OUT_WIDTH / SNES_HEIGHT;
+            if (display_ar <= max_zoom_ar) {
+                content_h = SNES_HEIGHT;
+                content_w = (int)(SNES_HEIGHT * display_ar);
+            } else {
+                content_w = EB_ZOOM_OUT_WIDTH;
+                content_h = SNES_HEIGHT;
+            }
+        } else {
+            content_w = EB_DEFAULT_WIDTH;
+            content_h = SNES_HEIGHT;
+        }
         break;
     }
     /* crop is expressed in whichever texture is about to be blitted:
