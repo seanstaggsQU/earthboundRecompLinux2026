@@ -18,6 +18,7 @@
 #include "game/overworld_internal.h"
 #include "game/position_buffer.h"
 #include "game/window.h"
+#include "entity/buffer_layout.h"
 #include "game/fade.h"
 #include "game/ending.h"
 #include "snes/ppu.h"
@@ -800,8 +801,28 @@ int16_t cr_movement_cmd_animate_pal_fade(int16_t entity_offset, int16_t script_o
         }
     }
 
-    /* Step 4: FINALIZE_PALETTE_FADE, copy ert.buffer[] (target) to ert.palettes[]. */
-    memcpy(ert.palettes, ert.buffer, 512);
+    /* Step 4: FINALIZE_PALETTE_FADE, snap each masked-in group to its exact
+     * target color (clears any fixed-point rounding residue left by the
+     * slope animation). Must respect `mask` the same way step 2 did --
+     * groups excluded from the fade (mask bit clear) were deliberately left
+     * unanimated by prepare_palette_fade_slopes/update_map_palette_animation
+     * so their current color (e.g. a text window's palette, kept visible
+     * against a fade-to-black background) survives untouched. A blind
+     * memcpy of the whole target buffer here would stomp those excluded
+     * groups back to the fade target regardless of mask, which is exactly
+     * what caused dialogue text to become invisible during masked fades
+     * (e.g. EVENT_766's mask $DFFC fade-to-black in the Threed/Paula
+     * telepathy scene). */
+    {
+        PaletteFadeBuffer *fade = buf_palette_fade(ert.buffer);
+        uint16_t group_mask = mask;
+        for (int group = 0; group < 16; group++) {
+            if (group_mask & 1) {
+                memcpy(&ert.palettes[group * 16], &fade->target[group * 16], 32);
+            }
+            group_mask >>= 1;
+        }
+    }
     ert.palette_upload_mode = PALETTE_UPLOAD_FULL;
     return 0;
 }
