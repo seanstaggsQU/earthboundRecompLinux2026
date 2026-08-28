@@ -1176,17 +1176,34 @@ static void fill_tilemaps(int16_t view_x_tile, int16_t view_y_tile) {
             uint16_t block_id = 0;
             bool render_empty = false;
             if (world_tx < 0 || world_ty < 0) {
-                /* Off the top/left edge of the map */
+                /* Off the top/left edge of the map -- matches LOAD_MAP_ROW's
+                 * @OUT_OF_BOUNDS_CLEAR path (row index fails its $0140 bounds
+                 * check), which really does store a literal blank entry with
+                 * no arrangement lookup at all. */
                 render_empty = true;
             } else if (tilesetpalette_data) {
                 uint32_t tp_index = (uint32_t)((uint16_t)world_ty >> 4) * 32 + ((uint16_t)world_tx >> 5);
                 if (tp_index < tilesetpalette_size &&
                     (tilesetpalette_data[tp_index] >> 3) == (uint8_t)ml.loaded_tileset_combo) {
                     block_id = get_block_id(bx, by);
-                } else {
-                    /* Beyond the map, or an adjacent sector with a different
-                     * tileset (not part of the loaded area) */
+                } else if (tp_index >= tilesetpalette_size) {
+                    /* Genuinely beyond the map's tileset-palette table. */
                     render_empty = true;
+                } else {
+                    /* In-bounds but governed by a different tileset combo
+                     * than the one currently loaded (e.g. an adjacent
+                     * sector reached by walking, not a teleport, so its
+                     * combo was never loaded). LOAD_MAP_ROW's @STORE_EMPTY_TILE
+                     * does NOT blank the tile here -- it caches block ID 0
+                     * into LOADED_MAP_BLOCKS the same as a real lookup would,
+                     * and that ID still goes through the normal arrangement
+                     * table for the CURRENTLY loaded tileset, same as any
+                     * other tile. Forcing a literal blank tilemap entry
+                     * instead (as this code previously did) skips that
+                     * lookup and renders solid black -- reported live as
+                     * the Winters bubble-monkey rope-climb cave going
+                     * half-black when the climb crosses such a boundary. */
+                    block_id = 0;
                 }
             }
 
@@ -1653,13 +1670,22 @@ void load_map_at_sector(uint16_t sector_x, uint16_t sector_y) {
     load_map_block_event_changes(tileset_id);
 
     /* Load tileset GFX if changed.
-     * Assembly decompresses into BUFFER then DMA's the first 0x7000 bytes
-     * to VRAM $0000. We decompress directly to ppu.vram, the first 0x7000
-     * bytes land at the correct position, and any overflow into higher VRAM
-     * is harmless (overwritten by tilemaps). Intentional divergence from
-     * assembly to avoid ert.buffer dependency. */
+     * Assembly decompresses into BUFFER then DMA's only the first 0x7000
+     * bytes to VRAM $0000, discarding anything past that in the source data.
+     * We decompress directly to ppu.vram to avoid an ert.buffer dependency,
+     * but MUST cap dst_max at 0x7000 to match: decomp() is a streaming
+     * decoder that stops exactly at dst_max, so this reproduces the
+     * original's crop faithfully. Passing sizeof(ppu.vram) here instead let
+     * a decompressed stream larger than 0x7000 bytes (some tilesets' real
+     * graphics data is bigger than that) overwrite live VRAM past the
+     * tilemaps -- including another BG layer's actual tile graphics -- with
+     * garbage tail data from this same stream, corrupting the background
+     * the moment a map/sector reload lands on such a tileset (reported live
+     * as the Winters bubble-monkey rope-climb cave going half-black/
+     * half-corrupted mid-scene, which crosses a tileset-combo sector
+     * boundary partway up the climb). */
     if (tileset_combo != ml.loaded_tileset_combo) {
-        load_and_decompress(ASSET_MAPS_GFX(tileset_id), ppu.vram, sizeof(ppu.vram));
+        load_and_decompress(ASSET_MAPS_GFX(tileset_id), ppu.vram, 0x7000);
         /* Clear collision grid when switching tilesets. Fill with 0x40 (wall)
          * so any cell not overwritten by fill_collision_tiles() blocks movement.
          * This prevents walking into out-of-bounds areas at map edges. */
@@ -2327,16 +2353,44 @@ void reload_map_at_position(uint16_t x_pixels, uint16_t y_pixels) {
 /* --- LOAD_INITIAL_MAP_DATA ---
  * Port of asm/overworld/map/load_initial_map_data.asm.
  *
- * Invalidates column/row streaming state and refills the full 64×64
- * tilemap and collision grids from the current camera position.
+ * Invalidates column/row streaming state and rebuilds the CPU-side
+ * LOADED_MAP_BLOCKS/collision caches from the current camera position.
  *
- * Assembly calculates view start as (BG_SCROLL - 128) / 8, which
- * centers the 64-tile grid on the player. */
+ * IMPORTANT: the real assembly (LDA BG1_X_POS; SEC; SBC #128; LSR×3, same
+ * for Y) never touches BG VRAM here at all -- it calls LOAD_MAP_ROW/
+ * LOAD_COLLISION_ROW 60 times each, both of which only populate CPU-side
+ * caches (LOADED_MAP_BLOCKS), not the tilemap. Only LOAD_MAP_ROW_TO_VRAM
+ * (called from LOAD_MAP_ROW_AT_SCROLL_POS, a different routine entirely)
+ * writes VRAM tilemap entries. This port previously called fill_tilemaps()
+ * here, which DOES write VRAM directly (this port's fill_tilemaps() folds
+ * the LOAD_MAP_ROW cache-build and LOAD_MAP_ROW_TO_VRAM tilemap-write
+ * steps together, unlike the original's two separate functions) -- an
+ * extra VRAM write the original never performs in this function.
+ *
+ * That extra write also used the wrong origin: the assembly's hardcoded
+ * #128 is HALF THE FIXED 256px SNES SCREEN WIDTH (a hardware-fixed
+ * caching-window constant, independent of viewport width), but this port
+ * substituted EB_VIEWPORT_CENTER_X/Y (half of THIS build's viewport,
+ * 512x256 -- see port/unix/CMakeLists.txt's EB_VIEWPORT_WIDTH cache
+ * default, which wins over src/CMakeLists.txt's 256 default via CMake's
+ * first-set-wins cache semantics). Since ppu.bg_hofs/vofs already ARE
+ * viewport-top-left scroll values (not a center), subtracting any center
+ * offset from them at all double-subtracts; the correct origin is simply
+ * the scroll value's own tile coordinate.
+ *
+ * Together these produced a full VRAM tilemap refill, offset by a wrong
+ * amount, immediately after EVENT_263's 10 correct row-by-row updates for
+ * the Winters bubble-monkey rope-climb scene (which calls
+ * EVENT_LOAD_INITIAL_MAP_DATA_FAR right after streaming the rope's rows
+ * into VRAM) -- reported live as the cave going half-black/half-wrong
+ * immediately after the rope switch. Fixed to match the assembly: no BG
+ * VRAM write, and the viewport's own top-left tile (no extra center
+ * subtraction) for the collision-cache rebuild that still belongs here. */
 void load_initial_map_data(void) {
-    /* BG1_X_POS = ppu.bg_hofs[0], BG1_Y_POS = ppu.bg_vofs[0] */
-    uint16_t view_x_tile = (uint16_t)((int16_t)ppu.bg_hofs[0] - EB_VIEWPORT_CENTER_X) >> 3;
-    uint16_t view_y_tile = (uint16_t)((int16_t)ppu.bg_vofs[0] - EB_VIEWPORT_CENTER_Y) >> 3;
-    fill_tilemaps(view_x_tile, view_y_tile);
+    /* BG1_X_POS = ppu.bg_hofs[0], BG1_Y_POS = ppu.bg_vofs[0] -- these are
+     * already viewport-top-left scroll values, so no center subtraction. */
+    int16_t view_x_tile = ((int16_t)ppu.bg_hofs[0]) >> 3;
+    int16_t view_y_tile = ((int16_t)ppu.bg_vofs[0]) >> 3;
     fill_collision_tiles(view_x_tile, view_y_tile);
     /* Every other fill_collision_tiles() caller (load_map_at_position,
      * reload_map_at_position, the incremental scroll path) syncs
