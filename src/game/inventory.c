@@ -680,18 +680,23 @@ void process_item_transformations(void) {
     }
 }
 
-/* Not part of the original assembly: scale Paula/Jeff/Poo's starting level
- * to Ness's CURRENT level at the moment they actually join, instead of the
+/* Not part of the original assembly: scale Paula/Poo's starting level to
+ * Ness's CURRENT level at the moment they actually join, instead of the
  * fixed low vanilla level INITIAL_STATS seeded them with at new-game start
- * (file_select.c). Paula joins at half Ness's level, Jeff at two-thirds,
- * Poo matches Ness exactly -- keeps a character who joins very late from
- * being drastically underleveled relative to the rest of the party.
- * Re-running reset_char_level_one() here simply overwrites the
- * INITIAL_STATS-seeded level/stats with a fresh regrowth to the new
+ * (file_select.c). Paula joins at 25% of Ness's level, Poo at 20% -- keeps
+ * a character who joins very late from being drastically underleveled
+ * relative to the rest of the party, without overshooting (an earlier
+ * version of this scaled Paula to 50%, Jeff to 2/3, and Poo to 100% of
+ * Ness's level; per live playtesting feedback that balance didn't work,
+ * particularly for Jeff, so he's now excluded from scaling entirely and
+ * joins at his default vanilla starting level instead -- see the char_id
+ * filter below). Re-running reset_char_level_one() here simply overwrites
+ * the INITIAL_STATS-seeded level/stats with a fresh regrowth to the new
  * target, through the exact same incremental random stat-growth path
  * normal leveling uses (no separate formula), so the result is exactly as
  * faithful as any other level this character could have reached by
- * leveling up normally. No-op for char_id outside 2-4 (Paula/Jeff/Poo).
+ * leveling up normally. No-op for char_id outside 2/4 (Paula/Poo) --
+ * Jeff (3) is deliberately excluded, not just unhandled.
  *
  * Factored out of add_char_to_party() so join_level_scaling_selftest()
  * (game_state.c) can exercise it directly: add_char_to_party() itself
@@ -700,14 +705,13 @@ void process_item_transformations(void) {
  * migrate_key_items_to_pool() is tested directly there too, see that
  * function's doc comment). */
 void apply_join_level_scaling(uint16_t char_id) {
-    if (char_id != 2 && char_id != 3 && char_id != 4) return;
+    if (char_id != 2 && char_id != 4) return;
 
     uint16_t ness_level = party_characters[CHARACTER_NESS].level;
     uint16_t target_level;
     switch (char_id) {
-    case 2: target_level = (ness_level + 1) / 2; break;       /* Paula: 1/2, rounded */
-    case 3: target_level = (ness_level * 2 + 1) / 3; break;   /* Jeff: 2/3, rounded */
-    default: target_level = ness_level; break;                /* Poo: matches Ness */
+    case 2: target_level = (ness_level + 2) / 4; break; /* Paula: 25% of Ness's level, rounded */
+    default: target_level = (ness_level + 2) / 5; break; /* Poo: 20% of Ness's level, rounded */
     }
     if (target_level < 1) target_level = 1;
     reset_char_level_one(char_id, target_level, 1);
@@ -923,8 +927,18 @@ uint16_t give_item_to_specific_character(uint16_t char_id, uint16_t item_id) {
         FATAL("give_item_to_specific_character: invalid char_id=%u\n", char_id);
 
     /* Key items route to the global pool instead of this character's
-     * regular inventory, see the Key Items pool section above. */
-    if (is_key_item_type(item_id)) {
+     * regular inventory, see the Key Items pool section above -- but only
+     * once char_id has actually joined the main party. Before that (Paula/
+     * Jeff/Poo's solo sections), a key item they pick up is exactly like
+     * Poo's seeded starting Tiny Ruby (file_select.c): it must not appear
+     * in the shared pool before the player has even met that character, or
+     * e.g. Jeff's Pencil Eraser becomes usable against an obstacle that's
+     * meant to stay until he actually joins Ness. Falls through to the
+     * normal items[] slot search below instead, exactly like any regular
+     * item; migrate_key_items_to_pool() (called from add_char_to_party())
+     * sweeps it into the shared pool the moment they join. */
+    if (is_key_item_type(item_id) &&
+        (party_ever_joined_mask & (1 << char_idx))) {
         return key_items_give(item_id) ? char_id : 0;
     }
 
@@ -960,14 +974,31 @@ uint16_t give_item_to_specific_character(uint16_t char_id, uint16_t item_id) {
  *
  * Assembly: FAR function. First param A=char_id, second param X=item_id. */
 uint16_t give_item_to_character(uint16_t char_id, uint16_t item_id) {
-    /* Key items route to the global pool regardless of char_id (specific or
-     * CHAR_ID_ANY), handled once here, before the CHAR_ID_ANY loop below,
-     * so that loop can't call key_items_give() once per party member and
-     * insert the same item repeatedly. give_item_to_specific_character()
-     * has its own equivalent redirect for any caller that reaches it
-     * directly instead of through here. */
+    /* Key items normally route to the global pool regardless of char_id
+     * (specific or CHAR_ID_ANY), handled once here, before the CHAR_ID_ANY
+     * loop below, so that loop can't call key_items_give() once per party
+     * member and insert the same item repeatedly.
+     *
+     * The one exception: CHAR_ID_ANY while the active party's leader hasn't
+     * joined the main party yet (solo Paula/Jeff/Poo) -- give_item_to_
+     * specific_character() itself defers a not-yet-joined character's key
+     * items into their own items[] instead of the pool (see its doc
+     * comment), and that decision needs the actual char_id, so resolve
+     * CHAR_ID_ANY to the current leader and route through it instead of
+     * inserting into the pool directly here. Once the leader has joined,
+     * a single direct pool insert still covers every active party member
+     * (they all share the one pool), so the duplicate-avoidance shortcut
+     * stays for that case. */
     if (is_key_item_type(item_id)) {
-        return key_items_give(item_id) ? char_id : 0;
+        if (char_id == 0xFF) {
+            uint8_t leader = game_state.party_members[0];
+            if (leader >= 1 && leader <= TOTAL_PARTY_COUNT &&
+                !(party_ever_joined_mask & (1 << (leader - 1)))) {
+                return give_item_to_specific_character(leader, item_id);
+            }
+            return key_items_give(item_id) ? char_id : 0;
+        }
+        return give_item_to_specific_character(char_id, item_id);
     }
 
     if (char_id != 0xFF) {
@@ -1255,10 +1286,14 @@ void swap_item_into_equipment(uint16_t source_char_id, uint16_t item_slot,
 uint16_t take_item_from_specific_character(uint16_t char_id, uint16_t item_id) {
     uint16_t char_idx = char_id - 1;
 
-    /* Key items are removed from the global pool, not this character's
-     * items[] (they were never placed there in the first place). */
+    /* Key items are normally removed from the global pool, not this
+     * character's items[] -- except a not-yet-joined character's key item
+     * (see give_item_to_specific_character()'s doc comment), which sits in
+     * their own items[] until they join. Check the pool first (the common
+     * case); if it's not there, fall through to the normal items[] search
+     * below instead of reporting not-found. */
     if (is_key_item_type(item_id)) {
-        return key_items_remove(item_id) ? char_id : 0;
+        if (key_items_remove(item_id)) return char_id;
     }
 
     for (uint16_t slot = 0; slot < ITEM_INVENTORY_SIZE; slot++) {
@@ -1322,11 +1357,15 @@ uint16_t find_item_in_inventory(uint16_t char_id, uint16_t item_id) {
     uint16_t char_idx = char_id - 1;
     if (char_idx >= TOTAL_PARTY_COUNT) return 0; /* invalid → not found */
 
-    /* Key items live in the global pool, not any character's items[] --
-     * report present/absent the same regardless of which character is
-     * asked, since the pool has no per-character association. */
+    /* Key items normally live in the global pool -- report present/absent
+     * the same regardless of which character is asked, since the pool has
+     * no per-character association -- except a not-yet-joined character's
+     * key item (see give_item_to_specific_character()'s doc comment),
+     * which sits in their own items[] until they join. Check the pool
+     * first; if it's not there, fall through to the normal items[] search
+     * below instead of reporting not-found. */
     if (is_key_item_type(item_id)) {
-        return key_items_find(item_id) ? char_id : 0;
+        if (key_items_find(item_id)) return char_id;
     }
 
     for (uint16_t slot = 0; slot < ITEM_INVENTORY_SIZE; slot++) {
@@ -1353,9 +1392,15 @@ uint16_t find_item_in_inventory2(uint16_t char_id, uint16_t item_id) {
      * bug (lookups there only scan the currently-controlled party via
      * CHAR_ID_ANY, so benching the character "holding" a key item makes it
      * disappear from checks). The pool has no such dependency: a key item
-     * given while Jeff was in the party is still found after he's benched. */
+     * given while Jeff was in the party is still found after he's benched.
+     *
+     * A pool miss falls through instead of reporting not-found, though: a
+     * not-yet-joined character's key item (see give_item_to_specific_
+     * character()'s doc comment) sits in their own items[] until they
+     * join, not in the pool yet, and the per-member search below (or the
+     * single-target call just after) still needs to find it there. */
     if (is_key_item_type(item_id)) {
-        return key_items_find(item_id) ? char_id : 0;
+        if (key_items_find(item_id)) return char_id;
     }
 
     if (char_id != 0xFF) {
@@ -1386,9 +1431,14 @@ uint16_t take_item_from_character(uint16_t char_id, uint16_t item_id) {
      * (specific or CHAR_ID_ANY), handled here so the CHAR_ID_ANY loop
      * below doesn't call key_items_remove() once per party member (harmless
      * since it's idempotent after the first hit, but wasted work and an
-     * ambiguous return value otherwise). */
+     * ambiguous return value otherwise).
+     *
+     * A pool miss falls through instead of reporting not-found: a
+     * not-yet-joined character's key item (see give_item_to_specific_
+     * character()'s doc comment) sits in their own items[] until they
+     * join, and take_item_from_specific_character() knows to look there. */
     if (is_key_item_type(item_id)) {
-        return key_items_remove(item_id) ? char_id : 0;
+        if (key_items_remove(item_id)) return char_id;
     }
 
     if (char_id != 0xFF) {

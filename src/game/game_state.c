@@ -843,6 +843,69 @@ bool key_items_selftest(void) {
         ok = false;
     }
 
+    /* --- 9. The same deferral, but for a key item PICKED UP during a
+     * not-yet-joined character's solo section (e.g. Jeff's Pencil Eraser
+     * in Winters), not just a new-game-seeded starting item. Live bug:
+     * give_item_to_specific_character()/give_item_to_character() used to
+     * route ALL key items straight into the shared pool unconditionally,
+     * so a not-yet-joined character's item was visible/usable by every
+     * other character immediately -- reported live as Jeff being able to
+     * use Ness's already-pooled Pencil Eraser on an obstacle meant to stay
+     * until Jeff actually joins. Both give paths route through
+     * give_item_to_specific_character() eventually, so exercising it
+     * directly covers give_item_to_character() too. */
+    game_state_init();
+    /* JEFF (char_id 3) already declared above. */
+    const uint16_t JEFF_ITEM = 184; /* Pencil Eraser (ITEM_TYPE_KEY_SOMEONE) */
+    /* Jeff not yet in party_members, not yet migrated: matches solo play. */
+
+    uint16_t give_result = give_item_to_specific_character(JEFF, JEFF_ITEM);
+    if (give_result != JEFF) {
+        fprintf(stderr, "key_items_selftest: FAIL -- give_item_to_specific_character() "
+                        "for not-yet-joined Jeff returned %u, expected %u (success)\n",
+                        give_result, JEFF);
+        ok = false;
+    }
+    if (party_characters[JEFF - 1].items[0] != (uint8_t)JEFF_ITEM) {
+        fprintf(stderr, "key_items_selftest: FAIL -- not-yet-joined Jeff's picked-up "
+                        "key item didn't land in his own items[0]\n");
+        ok = false;
+    }
+    if (key_items_find(JEFF_ITEM) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- not-yet-joined Jeff's picked-up "
+                        "key item is already visible in the shared pool -- other "
+                        "characters could use it before Jeff has even joined\n");
+        ok = false;
+    }
+    if (find_item_in_inventory2(JEFF, JEFF_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- find_item_in_inventory2() can't "
+                        "find Jeff's own not-yet-migrated key item (should fall "
+                        "through to items[] on a pool miss)\n");
+        ok = false;
+    }
+
+    /* Jeff joins: his item must migrate into the shared pool, same as any
+     * other character's, and become visible/removable through the normal
+     * pool-facing paths from then on. */
+    migrate_key_items_to_pool(JEFF);
+    game_state.party_members[0] = (uint8_t)JEFF;
+
+    if (party_characters[JEFF - 1].items[0] != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- Jeff's item still in items[0] "
+                        "after he joined and migrate_key_items_to_pool() ran\n");
+        ok = false;
+    }
+    if (key_items_find(JEFF_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- Jeff's key item not in the "
+                        "shared pool after he joined\n");
+        ok = false;
+    }
+    if (take_item_from_character(0xFF, JEFF_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- take_item_from_character() "
+                        "couldn't remove Jeff's now-pooled key item\n");
+        ok = false;
+    }
+
     return ok;
 }
 
@@ -872,9 +935,9 @@ bool join_level_scaling_selftest(void) {
 
     apply_join_level_scaling(2); /* Paula */
     uint16_t paula_level = party_characters[1].level;
-    if (paula_level != 5) {
+    if (paula_level != 3) {
         fprintf(stderr, "join_level_scaling_selftest: FAIL -- Paula joined at level %u, "
-                        "expected 5 (half of Ness's level 10)\n", paula_level);
+                        "expected 3 (25%% of Ness's level 10, rounded)\n", paula_level);
         ok = false;
     }
     if (party_characters[1].current_hp != party_characters[1].max_hp ||
@@ -884,24 +947,33 @@ bool join_level_scaling_selftest(void) {
         ok = false;
     }
 
+    /* Jeff is deliberately excluded from level scaling (per live playtesting
+     * feedback, an earlier 2/3-of-Ness's-level version didn't balance well)
+     * -- he joins at his own default vanilla starting level, untouched.
+     * Seed a sentinel level/HP/PP first (game_state_init() zeroed
+     * everything) so this can confirm apply_join_level_scaling() really is
+     * a complete no-op for him, not just "didn't crash". */
+    party_characters[2].level = 1;
+    party_characters[2].max_hp = 32;
+    party_characters[2].current_hp = 20; /* deliberately not synced to max yet */
+    party_characters[2].max_pp = 16;
+    party_characters[2].current_pp = 10;
     apply_join_level_scaling(3); /* Jeff */
-    uint16_t jeff_level = party_characters[2].level;
-    if (jeff_level != 7) {
-        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Jeff joined at level %u, "
-                        "expected 7 (two-thirds of Ness's level 10, rounded)\n", jeff_level);
-        ok = false;
-    }
-    if (party_characters[2].current_hp != party_characters[2].max_hp) {
-        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Jeff's current HP "
-                        "not synced to max after joining\n");
+    if (party_characters[2].level != 1 || party_characters[2].current_hp != 20 ||
+        party_characters[2].current_pp != 10) {
+        fprintf(stderr, "join_level_scaling_selftest: FAIL -- Jeff was modified by "
+                        "apply_join_level_scaling() (level=%u hp=%u pp=%u), expected "
+                        "no change at all -- he joins at his own default level\n",
+                        party_characters[2].level, party_characters[2].current_hp,
+                        party_characters[2].current_pp);
         ok = false;
     }
 
     apply_join_level_scaling(4); /* Poo */
     uint16_t poo_level = party_characters[3].level;
-    if (poo_level != 10) {
+    if (poo_level != 2) {
         fprintf(stderr, "join_level_scaling_selftest: FAIL -- Poo joined at level %u, "
-                        "expected 10 (matches Ness exactly)\n", poo_level);
+                        "expected 2 (20%% of Ness's level 10, rounded)\n", poo_level);
         ok = false;
     }
     if (party_characters[3].current_hp != party_characters[3].max_hp ||

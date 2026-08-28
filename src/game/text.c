@@ -2731,19 +2731,37 @@ StepResult mode_step_key_items_menu(ModeState *ms) {
         create_window(WINDOW_KEY_ITEMS);
         set_window_title(WINDOW_KEY_ITEMS, "Key Items", -1);
 
+        /* The pool is shared by every character who has actually joined the
+         * main party, but this browser is reachable from the pause menu at
+         * any time, including while playing a not-yet-joined character
+         * solo (Paula/Jeff/Poo before they meet up with Ness). Showing the
+         * full shared pool there would let them see and Use key items
+         * they haven't earned yet -- e.g. Jeff using Ness's already-pooled
+         * Pencil Eraser on an obstacle meant to stay until Jeff actually
+         * joins. give_item_to_specific_character() already keeps a
+         * not-yet-joined character's OWN key items out of the pool (in
+         * their regular items[] instead, reachable through the normal
+         * Item menu), so it's safe to just show nothing here for them --
+         * same as an empty pool. */
+        uint8_t leader = game_state.party_members[0];
+        bool leader_joined = (leader >= 1 && leader <= TOTAL_PARTY_COUNT) &&
+                              (party_ever_joined_mask & (1 << (leader - 1)));
+
         int seq = 1;
-        for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
-            uint8_t item_id = key_items_pool[i];
-            if (item_id == 0) continue;
+        if (leader_joined) {
+            for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+                uint8_t item_id = key_items_pool[i];
+                if (item_id == 0) continue;
 
-            const ItemConfig *item_entry = get_item_entry(item_id);
-            if (!item_entry) continue;
+                const ItemConfig *item_entry = get_item_entry(item_id);
+                if (!item_entry) continue;
 
-            char name_buf[ITEM_NAME_LEN + 1];
-            eb_to_ascii_buf(item_entry->name, ITEM_NAME_LEN, name_buf);
+                char name_buf[ITEM_NAME_LEN + 1];
+                eb_to_ascii_buf(item_entry->name, ITEM_NAME_LEN, name_buf);
 
-            key_items_menu_seq_ids[seq - 1] = item_id;
-            add_menu_item_no_position(name_buf, (uint16_t)seq++);
+                key_items_menu_seq_ids[seq - 1] = item_id;
+                add_menu_item_no_position(name_buf, (uint16_t)seq++);
+            }
         }
 
         open_window_and_print_menu(2, 0);
