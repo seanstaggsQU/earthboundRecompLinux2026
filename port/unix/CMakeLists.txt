@@ -128,6 +128,23 @@ file(GLOB_RECURSE PLATFORM_SOURCES CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR
 add_executable(earthbound main.c ${PLATFORM_SOURCES} ${CMAKE_CURRENT_BINARY_DIR}/generated/embedded_helper.c)
 target_include_directories(earthbound PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
+# incbin.h embeds EB_EMBED_SETUP_HELPER_PATH's bytes via an assembler
+# `.incbin` directive read directly from that file path at *compile* time,
+# not through a normal C #include -- so CMake's automatic header-dependency
+# scanning never sees it, and a rebuilt-but-same-named helper binary at that
+# path silently keeps the OLD bytes baked into the executable until someone
+# manually deletes the stale .o (bit us for real: a from-Aug-21 helper stayed
+# embedded through several later fixes, including this session's own
+# "Ass"->"Mario" rebuild, because nothing ever told CMake the input changed).
+# OBJECT_DEPENDS makes that dependency explicit, so `cmake --build` alone
+# (no manual .o deletion) recompiles embedded_helper.c whenever the prebuilt
+# helper it points at is newer.
+if(EB_HAS_EMBEDDED_SETUP_HELPER)
+    set_source_files_properties(
+        ${CMAKE_CURRENT_BINARY_DIR}/generated/embedded_helper.c
+        PROPERTIES OBJECT_DEPENDS "${EB_EMBED_SETUP_HELPER_PATH}")
+endif()
+
 target_link_libraries(earthbound earthbound_game)
 
 if(EB_SDL2_IS_STATIC)
