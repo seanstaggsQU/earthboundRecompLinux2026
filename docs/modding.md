@@ -1,6 +1,6 @@
 # Modding Support Roadmap
 
-This document tracks the state of our asset pipeline for modding, what works today, and remaining gaps.
+Haven't really gotten to this stuff yet but I want to have mod support eventually
 
 ## Current State
 
