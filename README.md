@@ -1,4 +1,4 @@
-# ebsrc
+# This is forked from BrianPugh's decomp and not really usable to the public but check my earthboundnativepublic repo for release # builds
 
 An open-source reimplementation of **EarthBound** (US) / **Mother 2** (Japan) for the Super Nintendo — written in C, playable on modern platforms.
 
