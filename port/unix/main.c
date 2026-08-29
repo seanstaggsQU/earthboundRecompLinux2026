@@ -199,14 +199,21 @@ static void maybe_relaunch_atexit(void) {
 /* Runs the bundled setup helper (a real, possibly multi-minute ebtools
  * extract/pack-all/pack-assets pass) on a background thread so the main
  * thread can keep the OS's "still alive" window pump going instead of
- * looking hung -- see the SDL_CreateThread call below. system()'s exit
- * status isn't checked (never was, in the previous synchronous call
- * either): a failed helper just leaves assets_result as EB_ASSETS_MISSING,
- * caught by the existing error path right after. */
+ * looking hung -- see the SDL_CreateThread call below. The helper's exit
+ * status IS captured (g_setup_helper_exit_status below) so a crash partway
+ * through -- confirmed live: a donor ROM whose dialogue hits a jump target
+ * outside every mapped text block makes the bundled Python helper's own
+ * text decoder throw and abort the whole run -- can be told apart from a
+ * clean run and trigger the native rom_extract_build_pak() fallback right
+ * after, instead of just leaving assets_result as EB_ASSETS_MISSING and
+ * telling a player who supplied a perfectly good ROM "couldn't find your
+ * game data". */
 static SDL_atomic_t g_setup_helper_done;
+static SDL_atomic_t g_setup_helper_exit_status;
 
 static int run_setup_helper_thread_fn(void *cmd_ptr) {
-    system((const char *)cmd_ptr);
+    int status = system((const char *)cmd_ptr);
+    SDL_AtomicSet(&g_setup_helper_exit_status, status);
     SDL_AtomicSet(&g_setup_helper_done, 1);
     return 0;
 }
@@ -580,7 +587,41 @@ int main(int argc, char *argv[]) {
     bool found_rom_no_helper = false;
     if (assets_result == EB_ASSETS_MISSING) {
         char rom_path[4096];
-        if (rom_extract_find_rom(".", rom_path, sizeof(rom_path))) {
+        bool rom_found = rom_extract_find_rom(".", rom_path, sizeof(rom_path));
+#ifdef __APPLE__
+        /* chdir_to_executable_dir() above put us inside the .app bundle
+         * itself (Contents/MacOS/, where the real binary lives -- see its
+         * own doc comment). Two other spots are worth trying beyond that:
+         *
+         *  - "..": Contents/ itself. A player who right-clicks the bundle
+         *    and chooses "Show Package Contents" lands here directly --
+         *    dropping the ROM (and the msu folder, see the mirrored search
+         *    below) right inside Contents/ keeps everything in one single
+         *    .app to move around, which is the cleaner option for anyone
+         *    willing to do that once. Tried before the bundle-exterior
+         *    fallback below since it's still "inside the .app", closer in
+         *    spirit to "." than to the visible-icon folder.
+         *  - "../../..": beside the .app icon itself (MacOS -> Contents ->
+         *    EarthBound.app -> its containing folder). "Put your ROM here.txt"
+         *    (the public zip's own instructions, right next to EarthBound.app,
+         *    not inside it) tells the player to drop their ROM here -- the
+         *    natural place to drag a file onto a visible Finder icon. A ROM
+         *    placed exactly where the instructions say was never actually
+         *    found by the "." search alone -- reported live as "can't find
+         *    my ROM" with a ROM genuinely sitting right there.
+         *
+         * Both are only tried after "." finds nothing, so a ROM someone
+         * deliberately placed in Contents/MacOS/ itself (matching every
+         * other platform's plain "beside the binary" convention) still
+         * takes priority over either bundle-relative fallback. */
+        if (!rom_found) {
+            rom_found = rom_extract_find_rom("..", rom_path, sizeof(rom_path));
+        }
+        if (!rom_found) {
+            rom_found = rom_extract_find_rom("../../..", rom_path, sizeof(rom_path));
+        }
+#endif
+        if (rom_found) {
             /* "./" prefix: POSIX shells (unlike Windows' CreateProcess-style
              * search) don't look in the current directory by default, and
              * system() always goes through a shell. */
@@ -666,12 +707,13 @@ int main(int argc, char *argv[]) {
                     int width2 = (int)strlen(line2) * 6 * scale2;
 
                     SDL_AtomicSet(&g_setup_helper_done, 0);
+                    SDL_AtomicSet(&g_setup_helper_exit_status, -1);
                     SDL_Thread *helper_thread = SDL_CreateThread(run_setup_helper_thread_fn, "eb_setup_helper", cmd);
                     if (helper_thread == NULL) {
                         /* Thread creation failed (very unlikely) -- fall back
                          * to the original blocking call rather than silently
                          * skipping setup. */
-                        system(cmd);
+                        SDL_AtomicSet(&g_setup_helper_exit_status, system(cmd));
                     } else {
                         Uint32 pulse_start = SDL_GetTicks();
                         while (!SDL_AtomicGet(&g_setup_helper_done)) {
@@ -701,6 +743,28 @@ int main(int argc, char *argv[]) {
                     SDL_QuitSubSystem(SDL_INIT_VIDEO);
 
                     assets_result = eb_runtime_assets_load(assets_path);
+
+                    if (assets_result != EB_ASSETS_OK) {
+                        /* The bundled helper ran but didn't leave a usable
+                         * pak behind -- either it exited non-zero (a crash
+                         * partway through, seen live on a real donor ROM)
+                         * or it exited clean but wrote something
+                         * eb_runtime_assets_load() still rejects. Either
+                         * way, the ROM itself is right here and already
+                         * confirmed readable (rom_found, above) -- fall
+                         * back to building the pak directly in C instead of
+                         * telling a player who supplied a perfectly good
+                         * ROM that their game data is missing. */
+                        fprintf(stderr,
+                            "Setup helper didn't produce usable game data "
+                            "(exit status %d) -- falling back to the built-in "
+                            "ROM extractor.\n",
+                            SDL_AtomicGet(&g_setup_helper_exit_status));
+                        EbRomExtractResult fallback = rom_extract_build_pak(rom_path, assets_path);
+                        if (fallback == EB_ROM_EXTRACT_OK) {
+                            assets_result = eb_runtime_assets_load(assets_path);
+                        }
+                    }
                 }
             } else {
                 found_rom_no_helper = true;
@@ -885,7 +949,32 @@ int main(int argc, char *argv[]) {
              * known ahead of time. */
             if (platform_audio_msu_autodetect_name(dir, detected_name, sizeof(detected_name))) {
                 name = detected_name;
-            } else if (msu_dir) {
+            }
+#ifdef __APPLE__
+            /* Same "beside the .app, not beside the real binary" gap as
+             * the ROM search above (see its doc comment) -- and the same
+             * two bundle-relative spots worth trying, in the same order:
+             * "../msu" (Contents/msu, for a player who opened "Show
+             * Package Contents" and dropped the msu folder straight into
+             * Contents/, right alongside a ROM placed the same way) before
+             * "../../../msu" (beside the .app icon itself, where "Put your
+             * ROM here.txt" tells everyone to drop it). Only tried when the
+             * plain "msu" lookup found nothing and no --msu-dir override
+             * was given (an explicit override is respected as-is, no
+             * bundle guessing). Reported live as HQ Audio showing N/A
+             * despite a pack genuinely being present. */
+            else if (!msu_dir &&
+                     platform_audio_msu_autodetect_name("../msu", detected_name, sizeof(detected_name))) {
+                dir = "../msu";
+                name = detected_name;
+            }
+            else if (!msu_dir &&
+                     platform_audio_msu_autodetect_name("../../../msu", detected_name, sizeof(detected_name))) {
+                dir = "../../../msu";
+                name = detected_name;
+            }
+#endif
+            else if (msu_dir) {
                 /* --msu-dir was explicit but has no recognizable pack in
                  * it -- likely a real misconfiguration, not "no pack here
                  * at all", so still attempt the load (per-track lookups
