@@ -1,9 +1,9 @@
-# PyInstaller spec for the standalone ebtools-setup helper. Build with:
+# PyInstaller spec for the standalone ebtools-setup helper. Build with the stuff
 #   pyinstaller ebtools_setup.spec
-# Produces a single self-contained executable (no Python install needed on
-# the machine that runs it) at dist/ebtools-setup[.exe], bundled alongside
-# the game binary in a release so it can build assets.pak from a player's
-# ROM with zero manual setup. See ebtools_setup_entry.py, ebtools/cli/setup.py.
+# makes a single self-contained executable (dont need Python install on
+# the machine that runs it) at dist/ebtools-setup[.exe], bundled with
+# the binary so it can build assets.pak from your
+# ROM with little setup. mostly so my sister can play it. See ebtools_setup_entry.py, ebtools/cli/setup.py.
 
 # -*- mode: python ; coding: utf-8 -*-
 
