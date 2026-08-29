@@ -21,6 +21,7 @@
 #include "game/text.h"
 #include "entity/sprite.h"
 #include "data/event_script_data.h"
+#include "data/text_refs.h"
 #include "game/game_state.h"
 #include "game/map_loader.h"
 #include "game/display_text.h"
@@ -1829,6 +1830,33 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         return 0;
     }
 
+    /* asm/data/timed_delivery_table.asm's PTR3 text pointers are raw,
+     * unmigrated SNES ROM addresses (e.g. entry 7/Zombie Paper's success
+     * points at $C7A542, the ORIGINAL ROM address of the old label
+     * MSG_THRK_MACH). Every other text reference in the port goes through
+     * the dialogue-compile migration pass and ends up in text_refs.h under
+     * its renamed US label (MSG_THRK_MACH -> MSG_EVT4_MACH_PIZZA_DELIVERS_
+     * ZOMBIE_PAPER); port/assets/data/timed_delivery.json was extracted as
+     * a raw byte round-trip (ebtools/parsers/simple_tables.py) and never
+     * got that remap applied, so resolve_text_addr() can't find any of
+     * these 20 pointers (10 entries x success+failure) -- confirmed live:
+     * the Zombie Paper delivery entity correctly reached and called
+     * QUEUE_DELIVERY_SUCCESS_INTERACTION, but its text pointer resolved to
+     * NULL, so nothing ever displayed and no item was ever given.
+     *
+     * This table patches the ones identified so far by cross-referencing
+     * asm/data/timed_delivery_table.asm's old labels against
+     * earthbound-1995-03-27.yml/mother2.yml (where those old names still
+     * exist) to find the renamed US label at the same position in
+     * earthbound.yml, then that label's migrated address in text_refs.h.
+     * Only entry 7 (Zombie Paper) is confirmed so far -- the same bug
+     * affects the other 9 entries' success/failure text, still open. */
+    static const struct { uint16_t index; uint32_t raw_success; uint32_t fixed_success;
+                           uint32_t raw_failure; uint32_t fixed_failure; } delivery_text_fixups[] = {
+        { 7, 0xC7A542, MSG_EVT4_MACH_PIZZA_DELIVERS_ZOMBIE_PAPER,
+             0xC7A7D9, MSG_EVT4_ZOMBIE_PAPER_RETRY_TIMER },
+    };
+
     case ROM_ADDR_QUEUE_DELIVERY_SUCCESS: {
         /* Port of EF0D8D QUEUE_DELIVERY_SUCCESS_INTERACTION.
          * Loads text_pointer_1 (PTR3 at offset +10) from delivery table,
@@ -1838,6 +1866,12 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         const DeliveryEntry *table = get_delivery_table();
         if (!table || var0 >= DELIVERY_TABLE_COUNT) return 0;
         uint32_t ptr = ((uint32_t)table[var0].success_bank << 16) | table[var0].success_addr;
+        for (size_t i = 0; i < sizeof(delivery_text_fixups) / sizeof(delivery_text_fixups[0]); i++) {
+            if (delivery_text_fixups[i].index == var0 && delivery_text_fixups[i].raw_success == ptr) {
+                ptr = delivery_text_fixups[i].fixed_success;
+                break;
+            }
+        }
         LOG_EVENT("delivery: index %u succeeded\n", var0);
         queue_interaction(8, ptr);
         return 0;
@@ -1852,6 +1886,12 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         const DeliveryEntry *table = get_delivery_table();
         if (!table || var0 >= DELIVERY_TABLE_COUNT) return 0;
         uint32_t ptr = ((uint32_t)table[var0].failure_bank << 16) | table[var0].failure_addr;
+        for (size_t i = 0; i < sizeof(delivery_text_fixups) / sizeof(delivery_text_fixups[0]); i++) {
+            if (delivery_text_fixups[i].index == var0 && delivery_text_fixups[i].raw_failure == ptr) {
+                ptr = delivery_text_fixups[i].fixed_failure;
+                break;
+            }
+        }
         LOG_EVENT("delivery: index %u failed permanently\n", var0);
         queue_interaction(10, ptr);
         return 0;
