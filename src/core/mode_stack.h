@@ -377,6 +377,9 @@ typedef enum {
     PM_DROP_RESUME,         /* after the drop text pops: close windows -> PM_MAIN */
     PM_EQUIP_RESUME,        /* after EQUIP_MENU pops: single-party sfx tail -> PM_MAIN */
     PM_PSI_RESUME,          /* after PSI_MENU pops: used->cleanup / single-PSI sfx tail */
+    PM_KEY_ITEMS_RESUME,    /* after KEY_ITEMS_MENU pops: used->PM_CLEANUP / cancel->PM_MAIN,
+                              * same shape as PM_USE_RESUME (this port's own addition, Key
+                              * Items pool feature) */
     PM_QUIT_CONFIRM_RESULT, /* after the "Really quit?" Yes/No -- this port's own addition */
     PM_QUIT_METHOD_RESULT,  /* after "Really quit?"->Yes: Close Game/Return to Title
                               *, this port's own addition */
@@ -708,16 +711,23 @@ typedef struct {
  * ITEM_FLAG_CANNOT_GIVE and were never meant to be given away or
  * discarded). KIM_ACTION_RESULT dispatches: Use STEP_PUSHes
  * GAME_MODE_USE_ITEM (from_key_items_pool=1, char_id = current leader);
- * Help STEP_PUSHes the item's help text (GAME_MODE_DISPLAY_TEXT). Both
- * resume phases rebuild the list (KIM_ENTER again) since Use may have
- * consumed the item. Pushed from the pause menu's "Keys" command
- * (PM_MAIN_RESULT case 10, text.c). Always pops 0. */
+ * Help STEP_PUSHes the item's help text (GAME_MODE_DISPLAY_TEXT).
+ * KIM_HELP_RESUME rebuilds the list (KIM_ENTER again), view-only, no side
+ * effect to report. KIM_USE_RESUME instead pops out immediately with a
+ * used-vs-cancelled result (see below) rather than rebuilding the list
+ * itself -- the pause menu (PM_KEY_ITEMS_RESUME, text.c) needs that
+ * signal to close the whole pause menu on a real Use, matching the Goods
+ * menu's PM_USE_RESUME/PM_ACTION_MENU pattern; this was reported live as
+ * the Key Items menu staying open after using an item. Pushed from the
+ * pause menu's "Keys" command (PM_MAIN_RESULT case 10, text.c). Pops 1 if
+ * an item was actually used (message shown), 0 otherwise (cancelled, or
+ * closed after Help). */
 typedef enum {
     KIM_ENTER = 0,     /* build the key items menu; push SELECTION_MENU */
     KIM_ITEM_RESULT,   /* item chosen or cancelled; build Use/Help menu */
     KIM_ACTION_MENU,   /* print the Use/Help menu; push SELECTION_MENU */
     KIM_ACTION_RESULT, /* Use -> push USE_ITEM; Help -> push text; cancel -> KIM_ENTER */
-    KIM_USE_RESUME,    /* USE_ITEM popped; rebuild the list (KIM_ENTER) */
+    KIM_USE_RESUME,    /* USE_ITEM popped; pop out: used->1 / cancelled->KIM_ENTER */
     KIM_HELP_RESUME,   /* help text popped; rebuild the list (KIM_ENTER) */
 } KeyItemsMenuPhase;
 

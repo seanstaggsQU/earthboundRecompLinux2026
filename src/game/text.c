@@ -2871,9 +2871,16 @@ StepResult mode_step_key_items_menu(ModeState *ms) {
     }
 
     case KIM_USE_RESUME:
-        /* USE_ITEM popped (used, shown a message, or targeting cancelled
-         *, all the same from here: just rebuild the list, since Use may
-         * have consumed the item either way). */
+        /* USE_ITEM popped 1 (used, message shown) or 0 (targeting
+         * cancelled) -- same convention as the Goods menu's USE_ITEM/
+         * PM_USE_RESUME pair. On an actual use, pop out immediately
+         * instead of rebuilding the list: the pause menu
+         * (PM_KEY_ITEMS_RESUME) needs to see that to close the whole
+         * pause menu, matching Goods' PM_USE_RESUME->PM_CLEANUP behavior.
+         * Reported live as the Key Items menu staying open after use. */
+        if (mode_child_result() != 0) {
+            return STEP_RESULT_POP(1);
+        }
         st->phase = KIM_ENTER;
         continue;
 
@@ -3037,12 +3044,17 @@ StepResult mode_step_pause_menu(ModeState *ms) {
             /* Key Items (this port's own addition, Key Items pool
              * feature, not part of the original ROM/assembly) */
             case 10:
-                /* View/Help only, no side effects to unwind afterward --
-                 * same shape as Status (case 6): push and return straight
-                 * to PM_MAIN, no separate resume phase needed. */
+                /* Key Items menu pops 1 if an item was actually used
+                 * (KIM_USE_RESUME), 0 otherwise (cancelled, or closed
+                 * after just Help/browsing) -- resume in
+                 * PM_KEY_ITEMS_RESUME to branch on that, same shape as
+                 * Goods' USE_ITEM/PM_USE_RESUME pair. Previously returned
+                 * straight to PM_MAIN unconditionally, which left the
+                 * pause menu open after using a key item (reported
+                 * live). */
                 pm_child_init = (ModeState){0};
                 pm_child_init.key_items_menu.phase = KIM_ENTER;
-                st->phase = PM_MAIN;
+                st->phase = PM_KEY_ITEMS_RESUME;
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_KEY_ITEMS_MENU, &pm_child_init);
 
             /* Cancel (B/Select) or unknown → cleanup */
@@ -3290,6 +3302,18 @@ StepResult mode_step_pause_menu(ModeState *ms) {
             }
             st->reprint_inventory = 0;
             st->phase = PM_ACTION_MENU;
+            continue;
+
+        case PM_KEY_ITEMS_RESUME:
+            /* KEY_ITEMS_MENU popped 1 (an item was actually used,
+             * KIM_USE_RESUME) or 0 (cancelled, or closed after just
+             * Help/browsing) -- same branch shape as PM_USE_RESUME
+             * above. */
+            if (mode_child_result() != 0) {
+                st->phase = PM_CLEANUP;
+                continue;
+            }
+            st->phase = PM_MAIN;
             continue;
 
         case PM_HELP_RESUME:

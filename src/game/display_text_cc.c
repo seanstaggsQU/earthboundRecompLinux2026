@@ -2570,9 +2570,21 @@ bool cc_1c_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode) {
          * Port of CC_1C_05 (asm/text/ccs/print_item_name.asm) →
          * PRINT_ITEM_TYPE (asm/text/print_item_type.asm).
          * arg==0 → use argument_memory. Looks up item name (25 bytes,
-         * EB-encoded) from ITEM_CONFIGURATION_TABLE and prints it. */
+         * EB-encoded) from ITEM_CONFIGURATION_TABLE and prints it.
+         *
+         * Key Items pool Use fix: when arg==0, argument_memory can hold
+         * KEY_ITEMS_POOL_USE_SLOT_SENTINEL itself rather than a real
+         * item_id (mode_step_use_item()'s UI_SETUP sets argument_memory =
+         * st->item_slot, which for a pool item IS the sentinel). Looking
+         * that up directly produced the live-reported "Ness used the
+         * Null" bug. Peek (non-consuming) the latched real item_id
+         * instead -- see key_items_peek_use_in_progress()'s doc comment
+         * for why this can't just go through get_character_item(). */
         uint8_t arg = script_read_byte(r);
         uint16_t item_id = arg ? (uint16_t)arg : (uint16_t)(get_argument_memory() & 0xFFFF);
+        if (!arg && item_id == KEY_ITEMS_POOL_USE_SLOT_SENTINEL) {
+            item_id = key_items_peek_use_in_progress();
+        }
         const ItemConfig *entry = get_item_entry(item_id);
         if (entry) {
             print_text_with_word_splitting(entry->name, ITEM_NAME_LEN);

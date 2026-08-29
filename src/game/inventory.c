@@ -855,6 +855,25 @@ void key_items_set_use_in_progress(uint16_t item_id) {
     key_items_pool_use_item_id = item_id;
 }
 
+/* Non-consuming read of the same latch get_character_item() below
+ * consumes on read. Added for print_item_name (display_text_cc.c CC
+ * 0x1C 0x05): its arg==0 case treats argument_memory as an item_id
+ * directly (no character/slot involved at all, unlike
+ * GET_CHARACTER_ITEM-based callers), so it can't go through
+ * get_character_item()'s consuming sentinel path -- that would
+ * (depending on script opcode order) either show the right name here
+ * and then break "Key to the Cabin"'s own later possession re-check, or
+ * the reverse, since only one read would ever see a real value. A
+ * pool-item Use message needs BOTH: the name printed via this opcode
+ * (reported live as literally "Ness used the Null" -- argument_memory
+ * held KEY_ITEMS_POOL_USE_SLOT_SENTINEL itself, not a real item_id, and
+ * nothing translated it) and, later in the same script, the possession
+ * re-check. Peeking here leaves the one-shot latch untouched for that
+ * later, real consumer. */
+uint16_t key_items_peek_use_in_progress(void) {
+    return key_items_pool_use_item_id;
+}
+
 /* GET_CHARACTER_ITEM: Port of asm/misc/get_character_item.asm.
  * Assembly calling convention: A=char_id, X=slot (both 1-indexed).
  * Returns the item ID at items[slot-1] for party_characters[char_id-1].

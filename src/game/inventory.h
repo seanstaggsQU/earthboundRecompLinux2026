@@ -247,6 +247,11 @@ uint16_t key_items_remove(uint16_t item_id);
  * UseItemState.from_key_items_pool is set; pass 0 to clear. */
 void key_items_set_use_in_progress(uint16_t item_id);
 
+/* Non-consuming read of the same latch -- see its doc comment
+ * (inventory.c) for why print_item_name needs this instead of
+ * get_character_item()'s consuming version. */
+uint16_t key_items_peek_use_in_progress(void);
+
 /* Escargo Express functions */
 
 /* ESCARGO_EXPRESS_STORE: Port of asm/misc/escargo_express_store.asm.
