@@ -1,7 +1,7 @@
 """PyInstaller entry point for the standalone ebtools-setup helper.
 
-Bundled alongside the game binary in a release so the game can shell out to
-it silently on first launch (see src/data/rom_extract.c). Behaves exactly
+Bundled in so the game can extract and stuff
+silently on first launch (see src/data/rom_extract.c). pretty much exactly
 like `ebtools setup <rom> [--out PATH]` -- this file just gives PyInstaller
 a plain script to build from, since the bundle's whole purpose is *being*
 the setup command (no other subcommands needed here).
