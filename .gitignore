@@ -46,9 +46,5 @@ docs/plans/
 *.srm
 *.srm.*
 
-# Self-update backend's generated PAT header (port/unix/CMakeLists.txt
-# configure_file()'s output). Already covered by the build-dir patterns
-# above in the normal case; listed explicitly too as defense-in-depth in
-# case CMAKE_CURRENT_BINARY_DIR is ever pointed somewhere those don't
-# match -- this file is the one place a real secret could land on disk.
+# dont be a meatloaf, its really just not a good thing to be a meatloaf.
 updater_secret.h
