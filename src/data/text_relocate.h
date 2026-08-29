@@ -65,4 +65,24 @@ bool text_relocate_message(const uint8_t *data, size_t length,
                             TextRelocAddrResolver resolve_addr, void *user,
                             uint8_t *out, size_t *out_size);
 
+/* Finds the length of one message when its end ISN'T already known from a
+ * checked-in label-offset table (unlike dialogue.bin's messages -- this
+ * is for standalone inline text like item/PSI/battle-action help text,
+ * which has no such table, just a single ROM address per record and a
+ * scan-until-end_block convention, same as any other text bytecode
+ * block). Walks [data, data+max_length) exactly like
+ * text_relocate_message() does (same opcode widths, so this correctly
+ * skips over compressed-text refs, arguments, etc. without misreading a
+ * literal text byte as end_block), stopping right after it consumes an
+ * `end_block` (0x02) opcode. *out_length is the raw byte count consumed,
+ * including the end_block byte itself -- pass that span straight to
+ * text_relocate_message().
+ *
+ * Returns false if it runs out of data before finding end_block, or hits
+ * a malformed argument -- both should be treated as a real error for
+ * this use case (unlike dialogue.bin's checked-in spans, there's no
+ * table to double check against, so a truncation here means something's
+ * actually wrong, not just this scanner's own doing). */
+bool text_find_message_end(const uint8_t *data, size_t max_length, size_t *out_length);
+
 #endif /* TEXT_RELOCATE_H */

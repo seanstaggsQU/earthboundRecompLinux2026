@@ -172,4 +172,68 @@ bool text_relocate_message(const uint8_t *data, size_t length,
     return true;
 }
 
+static uint32_t noop_resolve_addr(void *user, uint32_t original_value) {
+    (void)user;
+    return original_value;
+}
+
+bool text_find_message_end(const uint8_t *data, size_t max_length, size_t *out_length) {
+    size_t pos = 0;
+    size_t discard_out_pos; /* relocate_arg still wants somewhere to track a
+                              * would-be output position; out=NULL means it
+                              * never actually writes through it, but it must
+                              * NOT be aliased to `pos` itself (relocate_arg
+                              * advances both independently -- aliasing them
+                              * would double-advance `pos`). Reset it to 0
+                              * before each call since only the *delta*
+                              * relocate_arg would apply matters, not any
+                              * absolute value, and nothing here ever reads it. */
+
+    while (pos < max_length) {
+        uint8_t b = data[pos];
+
+        if (is_compressed_prefix(b)) {
+            if (max_length - pos < 2) return false;
+            pos += 2;
+            continue;
+        }
+
+        if (b >= 0x18 && b <= 0x1F) {
+            if (max_length - pos < 2) return false;
+            uint8_t bytes2[2] = { b, data[pos + 1] };
+            const TextOpcodeSpec *op = text_opcode_find_by_bytes(bytes2, 2);
+            pos += 2;
+            if (op == NULL) continue;
+            for (uint8_t i = 0; i < op->arg_count; i++) {
+                discard_out_pos = 0;
+                if (!relocate_arg(data, max_length, &pos, op->args[i].type, noop_resolve_addr, NULL, NULL, &discard_out_pos))
+                    return false;
+            }
+            continue;
+        }
+
+        /* end_block (0x02): single byte, no args -- this is where a
+         * standalone message (item/PSI/battle-action help text, with no
+         * pre-known end offset the way dialogue.bin's labeled messages
+         * have) actually ends. Matches decoder.py's own primary-opcode
+         * table (OpcodeSpec("end_block", (0x02,))). */
+        if (b == 0x02) {
+            *out_length = pos + 1;
+            return true;
+        }
+
+        uint8_t bytes1[1] = { b };
+        const TextOpcodeSpec *op = text_opcode_find_by_bytes(bytes1, 1);
+        pos += 1;
+        if (op == NULL) continue;
+        for (uint8_t i = 0; i < op->arg_count; i++) {
+            discard_out_pos = 0;
+            if (!relocate_arg(data, max_length, &pos, op->args[i].type, noop_resolve_addr, NULL, NULL, &discard_out_pos))
+                return false;
+        }
+    }
+
+    return false; /* ran out of data without finding end_block */
+}
+
 #endif /* EB_RUNTIME_ASSETS */
