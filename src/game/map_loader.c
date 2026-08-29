@@ -439,7 +439,12 @@ static void load_tile_collision(uint16_t tileset_id) {
 static void replace_block(uint16_t dest_block, uint16_t src_block) {
     uint32_t dest_off = (uint32_t)dest_block * 32;
     uint32_t src_off = (uint32_t)src_block * 32;
-    if (dest_off + 32 > SHARED_SCRATCH_SIZE || src_off + 32 > SHARED_SCRATCH_SIZE)
+    /* Bound against arrangement_size (the actual decompressed data), not
+     * SHARED_SCRATCH_SIZE (the buffer's full allocation) -- a block ID past
+     * the end of the real arrangement data but still inside the buffer's
+     * unused tail would otherwise pass this check and copy garbage/stale
+     * scratch bytes into a live block instead of being rejected. */
+    if (dest_off + 32 > arrangement_size || src_off + 32 > arrangement_size)
         return;
     memcpy(arrangement_buffer + dest_off, arrangement_buffer + src_off, 32);
     if (dest_block < 960 && src_block < 960) {
@@ -466,6 +471,12 @@ static void load_map_block_event_changes(uint16_t tileset_id) {
      * so we use it as the base to convert bank offsets to blob offsets. */
     uint16_t entry_ptr = read_u16_le(event_control_ptr_table_data + tileset_id * 2);
     uint16_t base_ptr = read_u16_le(event_control_ptr_table_data);
+    /* entry_ptr is expected >= base_ptr (ptr_table[0] is the start of the
+     * whole table); a corrupt/malformed asset pack could violate that, and
+     * entry_ptr - base_ptr as plain int subtraction would go negative, then
+     * wrap to a huge size_t on assignment to idx below. Reject that instead
+     * of walking off into an enormous bogus offset. */
+    if (entry_ptr < base_ptr) return;
     size_t idx = (size_t)(entry_ptr - base_ptr);
 
     while (idx + 4 <= tile_event_data_size) {
