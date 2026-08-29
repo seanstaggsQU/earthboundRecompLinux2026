@@ -2934,6 +2934,30 @@ static int16_t test_collision_diagonal(int16_t direction) {
     return direction;  /* clear */
 }
 
+/* Corner-nudge anti-oscillation memory, this port's own addition (not in
+ * the original ROM). Reported live: holding a single cardinal direction
+ * into a wall corner made the leader (and, since followers just replay
+ * the leader's recorded position history, every party member behind
+ * them) visibly hunt back and forth by 1px every frame -- confirmed via
+ * a temporary per-frame position/scroll log showing bg_hofs/vofs
+ * genuinely reversing frame to frame while the held input never
+ * changed. Root cause: TEST_COLLISION_NORTH/SOUTH/WEST/EAST below (all
+ * literal ROM ports, e.g. C057E8) each independently re-decide, fresh
+ * every frame, which diagonal to nudge toward based on which corner of
+ * the hitbox currently clips the wall -- nudging right can make the
+ * *other* corner clip next frame, nudging left, forever, for as long as
+ * the corner is held into. This is very likely faithful to the real ROM
+ * (ported 1:1 from its own collision routines), just never visible
+ * under a CRT's blur. Fix: once a nudge is applied for a given requested
+ * cardinal direction, keep applying that SAME nudge direction across
+ * subsequent frames of the same held direction, rather than re-deciding
+ * every frame -- only a genuine "clear" or "fully blocked" result (not
+ * just the opposite nudge) breaks the stickiness. This changes the
+ * visible corner-slide from a hunt to a single settle, without touching
+ * the underlying per-frame collision sampling at all. */
+static int16_t corner_nudge_requested_dir = -1;
+static int16_t corner_nudge_applied_dir = -1;
+
 /*
  * check_directional_collision, main directional collision dispatcher.
  *
@@ -3031,11 +3055,34 @@ process_result:
 
     /* Interpret test result */
     if (test_result == -1 || (uint16_t)test_result == 0xFF00) {
-        /* No collision, or fully blocked, return surface flags as-is */
+        /* No collision, or fully blocked -- corner cleared or fully
+         * stopped, either way the sticky nudge memory no longer applies. */
+        corner_nudge_requested_dir = -1;
+        corner_nudge_applied_dir = -1;
         return temp_entity_surface_flags;
     }
 
-    /* Collision with nudge direction */
+    /* Collision with nudge direction. Only cardinal directions (0/2/4/6)
+     * ever produce a genuine nudge (test_result != direction) here --
+     * the diagonal case above already forces test_result = direction
+     * when clear, so this anti-oscillation memory never affects true
+     * diagonal input, matching what the log showed (reversals only ever
+     * happened on held-cardinal frames). */
+    if (test_result != direction) {
+        if (corner_nudge_requested_dir == direction && corner_nudge_applied_dir != -1
+            && test_result != corner_nudge_applied_dir) {
+            /* Same held direction as last frame, already nudging, and
+             * this frame wants to flip to the opposite corner -- stay
+             * put on the previous nudge instead of hunting. */
+            test_result = corner_nudge_applied_dir;
+        }
+        corner_nudge_requested_dir = direction;
+        corner_nudge_applied_dir = test_result;
+    } else {
+        corner_nudge_requested_dir = -1;
+        corner_nudge_applied_dir = -1;
+    }
+
     ow.not_moving_in_same_direction_faced = (test_result != direction) ? 1 : 0;
     ow.final_movement_direction = test_result;
     return temp_entity_surface_flags & 0x003F;

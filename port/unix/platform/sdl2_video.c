@@ -44,16 +44,17 @@
 #define EB_ZOOM_OUT_WIDTH  (EB_VIEWPORT_WIDTH  - 16)
 #define EB_ZOOM_OUT_HEIGHT (EB_VIEWPORT_HEIGHT - 16)
 
-/* EB_ZOOM_IN display size -- roughly 1.5x magnification (crop ~2/3 of the
+/* EB_ZOOM_IN display size -- roughly 1.25x magnification (crop ~80% of the
  * default footprint's linear dimensions, matching its exact aspect ratio
  * so it needs no display-aspect adaptation the way EB_ZOOM_OUT does).
- * Unlike zoom-out, zoom-in has no VRAM/tile-fill safety-margin concern at
- * all: this crop sits entirely INSIDE the already-safe, already-centered
- * default 400x224 region (itself well inside the fill's 512x256 budget),
- * so there's no edge to approach in the first place -- just a smaller
- * source rect scaled up further than default. */
-#define EB_ZOOM_IN_WIDTH  266
-#define EB_ZOOM_IN_HEIGHT 149
+ * Widened 20% (from a ~1.5x/266x149 crop) per live feedback that Zoom In
+ * felt too tight. Unlike zoom-out, zoom-in has no VRAM/tile-fill safety-
+ * margin concern at all: this crop sits entirely INSIDE the already-safe,
+ * already-centered default 400x224 region (itself well inside the fill's
+ * 512x256 budget), so there's no edge to approach in the first place --
+ * just a smaller source rect scaled up further than default. */
+#define EB_ZOOM_IN_WIDTH  319
+#define EB_ZOOM_IN_HEIGHT 179
 
 static SDL_Window *window;
 static SDL_Renderer *renderer;
@@ -102,6 +103,48 @@ static char pending_screenshot_path[256];
 
 void platform_video_request_screenshot(const char *path) {
     snprintf(pending_screenshot_path, sizeof(pending_screenshot_path), "%s", path);
+}
+
+/* Motion-dump burst state (L3/F8/R3-hold, AUX_MOTION_DUMP, game_main.c).
+ * Deliberately driven from INSIDE platform_video_end_frame() below, at the
+ * one point locked_pixels is guaranteed valid, rather than game_main.c
+ * calling platform_video_get_framebuffer() after platform_render_frame()
+ * returns -- that pointer is ALWAYS NULL by then, since
+ * platform_render_frame() (platform_render.c) calls this very function
+ * internally, which unlocks the texture and nulls locked_pixels at its own
+ * end. Confirmed live via a temporary diagnostic log during the "vibrating
+ * road" investigation: fb=NULL on every single attempted dump, for this
+ * same structural reason -- the F1/F2/F4 developer dumps
+ * (platform_debug_dump_ppu / platform_debug_dump_vram_image /
+ * platform_debug_mark_screenshot) were hit by exactly this bug too and are
+ * now routed through the same request-flag mechanism just below. */
+static int pending_motion_dump_frames = 0;
+static int motion_dump_seq = 0;
+
+void platform_video_request_motion_dump(int frames) {
+    pending_motion_dump_frames = frames;
+    motion_dump_seq = 0;
+}
+
+bool platform_video_motion_dump_active(void) {
+    return pending_motion_dump_frames > 0;
+}
+
+/* F1/F2 (developer PPU/VRAM dump) and F4 (bug-report screenshot marker):
+ * same story as the motion-dump burst above -- game_main.c requests these
+ * with a one-shot flag and platform_video_end_frame() performs the actual
+ * dump from the still-valid locked_pixels buffer, before any post-process
+ * pass mutates it. game_main.c requests BEFORE calling platform_render_frame()
+ * so the flag is consumed in that same frame's end_frame. */
+static bool pending_ppu_dump = false;
+static bool pending_mark_screenshot = false;
+
+void platform_video_request_ppu_dump(void) {
+    pending_ppu_dump = true;
+}
+
+void platform_video_request_mark_screenshot(void) {
+    pending_mark_screenshot = true;
 }
 
 static void write_window_screenshot(const char *path) {
@@ -429,37 +472,23 @@ static void apply_dof(pixel_t *pixels, int pitch, float intensity) {
 }
 
 /* ---- Color Grading: a mild global contrast/saturation/warmth adjustment,
- * applied after DoF (Modern) or scanlines (Classic) so it grades the whole
- * post-blur/post-scanline composited look rather than just the base scene.
- * Two tunings share this one function rather than duplicating it:
- *   - Modern: the original Experimental Visuals constants. All four knobs
- *     dialed back once already after feedback that it looked too
- *     saturated, then further per "make it more subtle" -- the current
- *     values are meant to be barely perceptible on their own, only
- *     additive over a whole scene.
- *   - Classic: a lower-saturation, slightly warmer "phosphor" tuning for
- *     the CRT-style look -- old CRT/phosphor displays characteristically
- *     ran a touch warm and never reproduced fully saturated color, so this
- *     leans the opposite direction from Modern's saturation boost. */
-typedef enum {
-    GRADE_PROFILE_MODERN,
-    GRADE_PROFILE_CLASSIC,
-} GradeProfile;
-
-static void apply_color_grade(pixel_t *pixels, int pitch, GradeProfile profile) {
-    float contrast, saturation, warm_r, warm_b;
-    if (profile == GRADE_PROFILE_CLASSIC) {
-        contrast   = 1.02f;  /* barely more contrast */
-        saturation = 0.94f;  /* CRT phosphor: noticeably less saturated than source */
-        warm_r     = 1.015f; /* slightly warmer than Modern's push */
-        warm_b     = 0.985f;
-    } else {
-        contrast   = 1.03f;  /* >1 = more contrast around mid-gray (was 1.06) */
-        saturation = 1.015f; /* >1 = more saturated (was 1.08, then 1.03 --
-                               * reported too saturated both times) */
-        warm_r     = 1.01f;  /* slight warm push: a touch more red... (was 1.02) */
-        warm_b     = 0.99f;  /* ...and a touch less blue (was 0.98) */
-    }
+ * applied after DoF/scanlines (whichever else are on) so it grades the
+ * whole post-blur/post-scanline composited look rather than just the base
+ * scene. Now its own independent toggle (settings.h's FxToggleSetting) --
+ * used to be two different tunings bundled inside the old Classic/Modern
+ * modes (a lower-saturation "phosphor" look for Classic, a punchier one
+ * for Modern); collapsed to this one profile (the old Modern constants,
+ * the more generally-applicable of the two) when the modes were split
+ * into independent toggles. All four knobs dialed back once already after
+ * feedback that it looked too saturated, then further per "make it more
+ * subtle" -- the current values are meant to be barely perceptible on
+ * their own, only additive over a whole scene. */
+static void apply_color_grade(pixel_t *pixels, int pitch) {
+    float contrast   = 1.03f;  /* >1 = more contrast around mid-gray (was 1.06) */
+    float saturation = 1.015f; /* >1 = more saturated (was 1.08, then 1.03 --
+                                 * reported too saturated both times) */
+    float warm_r     = 1.01f;  /* slight warm push: a touch more red... (was 1.02) */
+    float warm_b     = 0.99f;  /* ...and a touch less blue (was 0.98) */
 
     int w = EB_VIEWPORT_WIDTH, h = EB_VIEWPORT_HEIGHT;
     int stride = pitch / (int)sizeof(pixel_t);
@@ -769,13 +798,20 @@ void platform_video_end_frame(void) {
     if (platform_headless)
         return;
 
-    /* Alternative Visuals: Off/Classic/Modern (settings.h). Modern is the
-     * old "Experimental Visuals: On" look (DoF/grade/AA); Classic is a new
-     * true-4:3 CRT-ish look (scanlines/grade, no DoF/AA) -- see settings.h
-     * for the full mode writeup. */
-    uint8_t alt_mode = engine_alternative_visuals;
-    bool want_modern = alt_mode == ALT_VISUALS_MODERN;
-    bool want_classic = alt_mode == ALT_VISUALS_CLASSIC;
+    /* Visual FX toggles: independent now, see settings.h's FxToggleSetting
+     * comment for what each one does (formerly bundled into a single
+     * Off/Classic/Modern "Alternative Visuals" mode). */
+    bool want_scanlines = engine_fx_scanlines == FX_TOGGLE_ON;
+    bool want_aa = engine_fx_antialiasing == FX_TOGGLE_ON;
+    bool want_tiltshift = engine_fx_tiltshift == FX_TOGGLE_ON;
+    bool want_wide_fov = engine_fx_wide_fov == FX_TOGGLE_ON;
+    /* Suppressed on title/file-select same as Tilt Shift always was (see
+     * fx_suppressed's own doc comment, game_main.c) -- neither screen was
+     * art-directed with this effect in mind. Scanlines has no equivalent
+     * suppression: it was already unconditional under old Classic mode
+     * (a CRT look is meant to be the consistent look of the whole game,
+     * title screen included), so that part is unchanged. */
+    bool want_grading = engine_fx_color_grading == FX_TOGGLE_ON && !fx_suppressed;
     /* Set true only if the AA upscale actually ran this frame (i.e.
      * locked_pixels was valid) -- guards against swapping to aa_texture
      * on a frame where SDL_LockTexture failed in platform_video_begin_frame()
@@ -783,13 +819,32 @@ void platform_video_end_frame(void) {
     bool aa_ran = false;
 
     if (locked_pixels) {
-        /* Modern's DoF/Color Grading share one Config toggle
-         * (engine_alternative_visuals == MODERN) but keep independent
-         * suppression: DoF has its own extra battle/Town-Map/window-open
-         * condition on top of the shared title/file-select one (see
-         * platform_video_set_dof_suppressed()/host_process_frame()).
-         * Classic's scanlines/grade run unconditionally whenever Classic
-         * is active -- unlike Modern's DoF, they're not a "focus effect"
+        /* Motion-dump burst, must happen right here: locked_pixels is the
+         * raw, untouched pre-post-process buffer at this exact point, and
+         * this is the only point in the whole frame it's known valid --
+         * see pending_motion_dump_frames's doc comment above. */
+        if (pending_motion_dump_frames > 0) {
+            platform_debug_dump_raw_frame(locked_pixels, motion_dump_seq++);
+            pending_motion_dump_frames--;
+        }
+
+        /* F1/F2 developer dump and F4 bug-report marker, same reasoning:
+         * capture the raw frame here, before DoF/scanlines/grade/AA run. */
+        if (pending_ppu_dump) {
+            platform_debug_dump_ppu(locked_pixels);
+            platform_debug_dump_vram_image();
+            pending_ppu_dump = false;
+        }
+        if (pending_mark_screenshot) {
+            platform_debug_mark_screenshot(locked_pixels);
+            pending_mark_screenshot = false;
+        }
+
+        /* Tilt Shift has its own extra battle/Town-Map/window-open
+         * suppression condition on top of the shared title/file-select one
+         * (see platform_video_set_dof_suppressed()/host_process_frame());
+         * Scanlines/Color Grading run unconditionally whenever their own
+         * toggle is on -- unlike Tilt Shift, they're not a "focus effect"
          * that needs hiding for menu readability, they're meant to be the
          * look of the whole game, consistently, everywhere. Fixed
          * pipeline order: DoF/scanlines modify the base scene first, Color
@@ -797,10 +852,9 @@ void platform_video_end_frame(void) {
          * base scene, not the upscaled one (grading is resolution-
          * independent, so this order doesn't matter for correctness, just
          * consistency with "grade the composited scene" already
-         * established). AA runs last and unconditionally when Modern is
-         * active -- see apply_aa_upscale()'s doc comment for why it skips
-         * fx_suppressed/dof_suppressed unlike DoF/Color Grading. */
-        bool want_fx = want_modern && !fx_suppressed;
+         * established). AA runs last, independent of every other toggle --
+         * see apply_aa_upscale()'s doc comment for why it skips
+         * fx_suppressed/dof_suppressed unlike Tilt Shift/Color Grading. */
 #ifdef EB_FX_PROFILE
         static double acc_dof, acc_grade, acc_aa;
         static int prof_frames;
@@ -817,9 +871,9 @@ void platform_video_end_frame(void) {
          * step is always exactly one DOF_FADE_STEP regardless of which
          * direction it's easing, and apply_dof() itself is only called
          * while there's still something to show. Naturally eases to 0 when
-         * Classic or Off is active too (want_modern false), so switching
-         * away from Modern mid-game fades DoF out instead of cutting it. */
-        float dof_target = (want_modern && !dof_suppressed) ? 1.0f : 0.0f;
+         * Tilt Shift is off too, so turning it off mid-game fades DoF out
+         * instead of cutting it. */
+        float dof_target = (want_tiltshift && !dof_suppressed) ? 1.0f : 0.0f;
         if (dof_intensity < dof_target) {
             dof_intensity += DOF_FADE_STEP;
             if (dof_intensity > dof_target) dof_intensity = dof_target;
@@ -832,16 +886,14 @@ void platform_video_end_frame(void) {
 #ifdef EB_FX_PROFILE
         p1 = platform_timer_ticks(); acc_dof += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
 #endif
-        if (want_classic)
+        if (want_scanlines)
             apply_scanlines(locked_pixels, locked_pitch);
-        if (want_fx)
-            apply_color_grade(locked_pixels, locked_pitch, GRADE_PROFILE_MODERN);
-        else if (want_classic)
-            apply_color_grade(locked_pixels, locked_pitch, GRADE_PROFILE_CLASSIC);
+        if (want_grading)
+            apply_color_grade(locked_pixels, locked_pitch);
 #ifdef EB_FX_PROFILE
         p1 = platform_timer_ticks(); acc_grade += (double)(p1-p0)*1000.0/platform_timer_ticks_per_sec(); p0 = p1;
 #endif
-        if (want_modern) {
+        if (want_aa) {
             apply_aa_upscale(locked_pixels, locked_pitch,
                               aa_upscaled, EB_VIEWPORT_WIDTH * AA_SCALE);
             aa_ran = true;
@@ -897,17 +949,20 @@ void platform_video_end_frame(void) {
      * the default footprint's exact aspect ratio (see EB_ZOOM_IN_WIDTH's
      * comment), so it looks just as good on any display the default
      * already does. */
+    /* Aspect Ratio (settings.h) only affects the EB_ZOOM_OFF baseline
+     * below -- Zoom Out/Zoom In are unaffected either way (Zoom Out
+     * deliberately adapts to the REAL display shape regardless of this
+     * setting, see its own comment; forcing it to a requested 4:3 would
+     * reintroduce the exact wasted-budget letterbox problem that adaptive
+     * logic exists to avoid. Zoom In is a small fixed crop matching the
+     * 16:9 default's own aspect, independent of this setting too). This
+     * used to be a hard package deal with Scanlines (old "Classic" mode
+     * forced both together, and locked zoom off entirely) -- decoupled
+     * per feedback that wanting the CRT-style scanline look didn't mean
+     * wanting to give up zoom. */
+    bool want_4_3 = engine_aspect_ratio == ASPECT_RATIO_4_3;
+
     int content_w, content_h;
-    if (want_classic) {
-        /* Classic: always true 4:3 (the original SNES resolution), zoom
-         * ignored entirely -- defense in depth alongside the R3/zoom-cycle
-         * gating in game_main.c, which already keeps zoom_mode at
-         * EB_ZOOM_OFF while Classic is active; forcing it here too means
-         * this crop stays correct even if that gate is ever bypassed
-         * (e.g. a leftover zoom_mode from switching modes mid-frame). */
-        content_w = SNES_WIDTH;
-        content_h = SNES_HEIGHT;
-    } else
     switch (zoom_mode) {
     case EB_ZOOM_OUT: {
         double display_ar = (double)out_w / out_h;
@@ -927,36 +982,41 @@ void platform_video_end_frame(void) {
         break;
     case EB_ZOOM_OFF:
     default:
-        if (want_modern) {
+        if (want_4_3) {
+            /* 4:3 Aspect: always true SNES resolution -- matches the old
+             * Classic mode's fixed crop, now independent of Scanlines/zoom. */
+            content_w = SNES_WIDTH;
+            content_h = SNES_HEIGHT;
+        } else if (want_wide_fov) {
             /* game_main.c's needs_zoom_reset (battle/Town Map/title/file-
-             * select) force-persists EB_ZOOM_OFF regardless of Alternative
-             * Visuals, but since the R3 toggle itself never lets Modern
+             * select) force-persists EB_ZOOM_OFF regardless of the Wide FOV
+             * toggle, but since the R3 toggle itself never lets Wide FOV
              * land on EB_ZOOM_OFF by choice anymore (it only cycles
              * Wide<->Zoom In, see game_main.c), landing here with
-             * want_modern true unambiguously means "forced off", not a
+             * want_wide_fov true unambiguously means "forced off", not a
              * genuine user selection -- Off's own real content_w/h (the
-             * fixed 400x224 branch below) is never reachable under Modern
-             * at all. That distinction matters here specifically for
-             * battle: unlike EB_ZOOM_OUT above, the fixed 400x224 default
-             * crop's aspect ratio (1.786:1) is NOT adapted to the actual
-             * display, and battle's own renderer culls sprite/BG content
-             * beyond the native SNES_HEIGHT (224) row window regardless of
-             * crop (battle_ui.c sets sprite_y_offset = EB_VIEWPORT_PAD_TOP,
-             * gating render_obj_scanline's off-native-range cull) -- so
-             * whenever the display's actual aspect ratio isn't extremely
-             * close to 1.786:1 (most displays aren't), forcing the fixed
-             * crop during battle left a real, empty (nothing drawn, not a
-             * device-level letterbox) gap top/bottom that the aspect-
-             * preserving dst-rect math then ALSO padded with genuine
-             * letterbox bars on top of that -- reported live as "black
-             * bars during battle that go away after," worse specifically
-             * for anyone whose window is sized to Modern's usual Wide
-             * aspect rather than happening to match 1.786:1. Mirrors
-             * EB_ZOOM_OUT's own adaptive logic above so the battle crop's
-             * aspect matches the display as closely as the genuinely-
-             * drawn content allows -- same EB_ZOOM_OUT_WIDTH safety
-             * ceiling (proven not to hit the tile-fill margin issue that
-             * ceiling exists for), but height-capped at the real
+             * fixed 400x224 branch below) is never reachable while Wide
+             * FOV is on at all. That distinction matters here specifically
+             * for battle: unlike EB_ZOOM_OUT above, the fixed 400x224
+             * default crop's aspect ratio (1.786:1) is NOT adapted to the
+             * actual display, and battle's own renderer culls sprite/BG
+             * content beyond the native SNES_HEIGHT (224) row window
+             * regardless of crop (battle_ui.c sets sprite_y_offset =
+             * EB_VIEWPORT_PAD_TOP, gating render_obj_scanline's off-
+             * native-range cull) -- so whenever the display's actual
+             * aspect ratio isn't extremely close to 1.786:1 (most displays
+             * aren't), forcing the fixed crop during battle left a real,
+             * empty (nothing drawn, not a device-level letterbox) gap
+             * top/bottom that the aspect-preserving dst-rect math then
+             * ALSO padded with genuine letterbox bars on top of that --
+             * reported live as "black bars during battle that go away
+             * after," worse specifically for anyone whose window is sized
+             * to Wide FOV's usual aspect rather than happening to match
+             * 1.786:1. Mirrors EB_ZOOM_OUT's own adaptive logic above so
+             * the battle crop's aspect matches the display as closely as
+             * the genuinely-drawn content allows -- same EB_ZOOM_OUT_WIDTH
+             * safety ceiling (proven not to hit the tile-fill margin issue
+             * that ceiling exists for), but height-capped at the real
              * SNES_HEIGHT battle limit instead of EB_ZOOM_OUT_HEIGHT,
              * since anything taller is empty content, not a safe zoom
              * budget to spend. On the vast majority of displays (wider

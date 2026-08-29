@@ -64,6 +64,30 @@ void platform_video_begin_frame(void);
 void platform_video_send_scanline(int y, const pixel_t *pixels);
 pixel_t *platform_video_get_framebuffer(void);
 void platform_video_end_frame(void);
+
+/* Motion-dump burst (L3/F8/R3-hold, AUX_MOTION_DUMP, game_main.c): request
+ * `frames` consecutive raw (pre-post-process) framebuffer BMPs, one per
+ * frame, driven from inside platform_video_end_frame() itself where the
+ * buffer is guaranteed still valid (unlike platform_video_get_framebuffer(),
+ * which is always NULL by the time game_main.c could call it after
+ * platform_render_frame() returns -- see sdl2_video.c's doc comment on
+ * this feature for the full story). platform_video_motion_dump_active()
+ * lets game_main.c force do_render/skip frame-skip for the whole burst,
+ * same way it already does for the other debug dump flags. Desktop only
+ * for now; embedded targets no-op (no filesystem path meant for this). */
+void platform_video_request_motion_dump(int frames);
+bool platform_video_motion_dump_active(void);
+/* F1/F2 developer PPU/VRAM dump and F4 bug-report screenshot marker
+ * (AUX_DEBUG_DUMP/AUX_VRAM_DUMP/AUX_LOG_MARK, game_main.c). One-shot
+ * requests, performed from inside platform_video_end_frame() while the
+ * framebuffer is still valid -- game_main.c must call these BEFORE
+ * platform_render_frame() so the request is serviced that same frame.
+ * Reading platform_video_get_framebuffer() after platform_render_frame()
+ * returns instead (as this used to) always saw NULL, so these dumps never
+ * actually produced output -- see the motion-dump doc comment above and
+ * sdl2_video.c for the full story. Desktop only; embedded targets no-op. */
+void platform_video_request_ppu_dump(void);
+void platform_video_request_mark_screenshot(void);
 void platform_video_set_vsync(bool enabled);
 /* Overworld FOV/zoom cycle (R3, see game_main.c's host_process_frame()).
  * The desktop build always renders the full EB_VIEWPORT_WIDTH x HEIGHT
@@ -160,6 +184,8 @@ void platform_log_set_enabled(bool enabled);
 #define AUX_SAVESTATE    (1 << 6)   /* F6: request a torn-safe savestate capture */
 #define AUX_LOAD_STATE   (1 << 7)   /* F7: restore the last savestate */
 #define AUX_LOG_MARK     (1 << 8)   /* F4: bug-report marker, timestamped log line + screenshot */
+#define AUX_MOTION_DUMP  (1 << 9)   /* L3/F8: burst-dump ~1s of raw (pre-scale) framebuffers,
+                                      * see platform_debug_dump_raw_frame() */
 
 bool platform_input_init(void);
 void platform_input_shutdown(void);
@@ -312,6 +338,16 @@ void platform_debug_dump_vram_image(void);
  * right here" without describing the bug in words. Desktop only for now;
  * embedded targets no-op like the other debug dumps above. */
 void platform_debug_mark_screenshot(const pixel_t *framebuffer);
+
+/* Motion-dump burst (L3/F8, AUX_MOTION_DUMP): call once per frame with the
+ * current raw framebuffer and an increasing sequence number (0, 1, 2, ...)
+ * to write eb_motion_NNN.bmp -- game_main.c drives the per-frame sequence
+ * for ~1 second after the button press. Same untouched pre-post-process
+ * capture point as platform_debug_mark_screenshot() above, just repeated
+ * across consecutive frames instead of a single shot -- see that
+ * function's doc comment for why this is upstream of the final window-
+ * scaling blit. Desktop only for now; embedded targets no-op. */
+void platform_debug_dump_raw_frame(const pixel_t *framebuffer, int seq);
 
 /*
  * Self-update, desktop (port/unix) builds only, and only when built with a

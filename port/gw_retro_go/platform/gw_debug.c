@@ -25,6 +25,11 @@ void platform_debug_mark_screenshot(const pixel_t *framebuffer) {
     (void)framebuffer;
 }
 
+void platform_debug_dump_raw_frame(const pixel_t *framebuffer, int seq) {
+    (void)framebuffer;
+    (void)seq;
+}
+
 /* No filesystem path meant for player-visible text output on this target
  * (the SD card driver is busy serving asset loads, same reasoning as the
  * dumps above) -- LOG_WARN/LOG_TRACE are already no-ops under EB_EMBEDDED

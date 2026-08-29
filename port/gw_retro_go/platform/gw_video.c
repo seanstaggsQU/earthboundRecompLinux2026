@@ -59,3 +59,21 @@ void platform_video_set_vsync(bool enabled) {
     /* No-op — LCD refresh is hardware-locked to 60 Hz. */
     (void)enabled;
 }
+
+void platform_video_request_motion_dump(int frames) {
+    /* No-op — no filesystem path meant for this on this target, same
+     * reasoning as the other desktop-only debug dumps (gw_debug.c). */
+    (void)frames;
+}
+
+bool platform_video_motion_dump_active(void) {
+    return false;
+}
+
+void platform_video_request_ppu_dump(void) {
+    /* No-op -- developer PPU/VRAM dump is desktop-only (gw_debug.c). */
+}
+
+void platform_video_request_mark_screenshot(void) {
+    /* No-op -- bug-report screenshot marker is desktop-only (gw_debug.c). */
+}

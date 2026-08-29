@@ -129,10 +129,15 @@ static uint16_t controller_button_to_pad(SDL_GameControllerButton button) {
  * by this game (no camera control), so it's the overworld FOV/zoom cycle
  * for controller players (game_main.c only acts on it outside of battle, so
  * a press during battle is a harmless no-op rather than queued input).
- * No keyboard equivalent -- R3 only, per the feature request. */
+ * No keyboard equivalent -- R3 only, per the feature request. L3 (left
+ * stick click) is likewise otherwise unused, mapped to the motion-dump
+ * debug burst (F8's controller equivalent) so it's reachable on a TV/
+ * Steam Machine setup with no keyboard attached -- this one IS also on a
+ * key (F8) since it's a debug tool, not a player-facing feature. */
 static uint16_t controller_button_to_aux(SDL_GameControllerButton button) {
     switch (button) {
     case SDL_CONTROLLER_BUTTON_RIGHTSTICK: return AUX_ZOOM_TOGGLE;
+    case SDL_CONTROLLER_BUTTON_LEFTSTICK:  return AUX_MOTION_DUMP;
     default: return 0;
     }
 }
@@ -207,6 +212,7 @@ void platform_input_poll(void) {
             case SDL_SCANCODE_F7:     aux_bit = AUX_LOAD_STATE;   break;
             case SDL_SCANCODE_TAB:    aux_bit = AUX_FAST_FORWARD; break;
             case SDL_SCANCODE_F5:     aux_bit = AUX_DEBUG_TOGGLE; break;
+            case SDL_SCANCODE_F8:     aux_bit = AUX_MOTION_DUMP;  break;
             default: break;
             }
             if (event.type == SDL_KEYDOWN) {

@@ -761,11 +761,12 @@ void load_battle_bg(uint16_t layer1_id, uint16_t layer2_id, uint16_t letterbox_s
      * are authored with a cinematic HDMA letterbox bar (LARGE/MEDIUM/SMALL)
      * and others aren't, entirely per-encounter (present for a routine
      * enemy, absent for Carpainter, for instance) -- that asymmetry is
-     * working as designed, not a bug. Suppressed under Modern Alternative
-     * Visuals, where it reads as an unwanted bar rather than a deliberate
-     * cinematic effect once the wider Modern FOV is already in play; Off
-     * and Classic keep the original per-encounter behavior unchanged. */
-    uint16_t lb = (engine_alternative_visuals == ALT_VISUALS_MODERN)
+     * working as designed, not a bug. Suppressed while the Wide FOV toggle
+     * is on, where it reads as an unwanted bar rather than a deliberate
+     * cinematic effect once the wider FOV is already in play; with Wide
+     * FOV off, the original per-encounter behavior is unchanged regardless
+     * of any other visual toggle. */
+    uint16_t lb = (engine_fx_wide_fov == FX_TOGGLE_ON)
         ? 0 : (letterbox_style & 0x0003);
     if (lb == 0) {
         bt.letterbox_top_end = 0;

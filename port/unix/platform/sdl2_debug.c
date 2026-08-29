@@ -272,3 +272,25 @@ void platform_debug_mark_screenshot(const pixel_t *framebuffer) {
     LOG_WARN("==== BUG MARK %s -- screenshot: %s ====\n", timestamp, path);
     printf("Debug: wrote %s\n", path);
 }
+
+/* Motion-dump burst (L3/F8, AUX_MOTION_DUMP): writes one numbered raw
+ * framebuffer BMP per call, same untouched pre-post-process 512x256 buffer
+ * as platform_debug_mark_screenshot() above (not the composited/scaled
+ * window output -- see platform_video_request_screenshot()'s doc comment
+ * for that distinction). game_main.c calls this once per frame for ~1
+ * second after the button press, building a numbered sequence
+ * (eb_motion_000.bmp, eb_motion_001.bmp, ...) so consecutive frames can be
+ * diffed by hand to tell a genuine camera/position reversal (a landmark's
+ * pixel position actually moving backward between two of these raw frames)
+ * apart from a presentation-layer artifact introduced only by the final
+ * window-scaling blit (which this capture point is upstream of entirely) --
+ * see the "vibrating road" investigation. */
+void platform_debug_dump_raw_frame(const pixel_t *framebuffer, int seq) {
+    char path[64];
+    snprintf(path, sizeof(path), "eb_motion_%03d.bmp", seq);
+
+    static uint32_t motion_rgb888[EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT];
+    for (int i = 0; i < EB_VIEWPORT_WIDTH * EB_VIEWPORT_HEIGHT; i++)
+        motion_rgb888[i] = pixel_to_rgb888(framebuffer[i]);
+    write_bmp(path, motion_rgb888, EB_VIEWPORT_WIDTH, EB_VIEWPORT_HEIGHT);
+}

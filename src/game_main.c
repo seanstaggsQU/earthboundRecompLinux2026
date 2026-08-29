@@ -495,7 +495,33 @@ void host_process_frame(void) {
     bool debug_dump = (aux_new & AUX_DEBUG_DUMP) || debug_auto_dump_requested;
     bool vram_dump = (aux_new & AUX_VRAM_DUMP) != 0;
     bool log_mark = (aux_new & AUX_LOG_MARK) != 0;
-    if (debug_dump || vram_dump || log_mark)
+    /* Motion-dump burst (L3/F8/R3-hold, "vibrating road" investigation): a
+     * fresh press (re)arms a ~1-second run of consecutive raw-framebuffer
+     * BMPs regardless of whether a burst was already in progress, so
+     * holding/re-tapping just extends it rather than needing to wait one
+     * out. The actual per-frame dump write happens inside
+     * platform_video_end_frame() itself (sdl2_video.c), not here -- see
+     * platform_video_request_motion_dump()'s doc comment for why (the
+     * framebuffer pointer this file could read after platform_render_frame()
+     * returns is always NULL by then, a real, separate, pre-existing bug in
+     * the F1/F2/F4 dumps below that this deliberately doesn't repeat).
+     * do_render must stay forced true for the whole burst, not just the
+     * press frame, or frame-skip could drop frames from the middle of the
+     * sequence -- platform_video_motion_dump_active() reports whether one
+     * is still in progress. */
+    if (aux_new & AUX_MOTION_DUMP)
+        platform_video_request_motion_dump(60);
+    /* F1/F2/F4 dumps: request now, BEFORE platform_render_frame() below, so
+     * platform_video_end_frame() services them this same frame while the
+     * framebuffer is still valid (it isn't by the time this function could
+     * read it back -- see platform_video_request_ppu_dump()'s doc comment). */
+    if (debug_dump || vram_dump) {
+        platform_video_request_ppu_dump();
+        debug_auto_dump_requested = 0;
+    }
+    if (log_mark)
+        platform_video_request_mark_screenshot();
+    if (debug_dump || vram_dump || log_mark || platform_video_motion_dump_active())
         do_render = true;
 
     /* Capture-safety: never render during a free-run unwind. */
@@ -532,21 +558,8 @@ void host_process_frame(void) {
         }
 
         t2 = platform_timer_ticks();
-
-        pixel_t *fb = platform_video_get_framebuffer();
-
-        /* Debug dump, must happen while texture is locked */
-        if (fb && debug_dump) {
-            platform_debug_dump_ppu(fb);
-            platform_debug_dump_vram_image();
-            debug_auto_dump_requested = 0;
-        }
-        if (fb && vram_dump) {
-            platform_debug_dump_ppu(fb);
-            platform_debug_dump_vram_image();
-        }
-        if (fb && log_mark)
-            platform_debug_mark_screenshot(fb);
+        /* The F1/F2/F4 dumps requested above have already run inside
+         * platform_render_frame() -> platform_video_end_frame() by now. */
     } else {
         t2 = t1;
     }
@@ -613,44 +626,41 @@ void host_process_frame(void) {
      * whole-stack scan cached at the top of this function. */
     bool needs_zoom_reset = in_battle_or_town_map || in_title_or_file_select;
     if (!needs_zoom_reset) {
-        /* Classic Alternative Visuals is always true 4:3, zoom and
-         * "original aspect ratio" are contradictory asks, so the R3 toggle
-         * is a no-op while Classic is active (see settings.h's doc
-         * comment). Left as a no-op rather than resetting ow.zoom_mode to
-         * OFF on every frame here, so a player's zoom choice from Off/
-         * Modern is preserved if they switch back later.
-         *
-         * Off and Modern each get a 2-way toggle instead of one shared
+        /* Off and Wide FOV each get a 2-way toggle instead of one shared
          * 3-way cycle: a 3-state R3 press is confusing, since which of
          * Off/Wide/Zoom In you'd land on next isn't obvious.
-         * Modern already defaults to EB_ZOOM_OUT (Wide) the moment the
-         * player leaves title/file-select (below), and its "true" baseline
-         * is the wide crop, not the original 4:3 window, so its pair is
-         * Wide<->Zoom In, never Off. Off (no Alternative Visuals) never
-         * defaults to a non-OFF zoom anywhere, so its pair is
+         * Wide FOV already defaults to EB_ZOOM_OUT the moment the player
+         * leaves title/file-select (below), and its "true" baseline is the
+         * wide crop, not the original 4:3 window, so its pair is
+         * Wide<->Zoom In, never Off. With Wide FOV off, zoom never
+         * defaults to a non-OFF value anywhere, so its pair is
          * Off<->Zoom In, never Wide -- Wide's "reveal more of the canvas"
-         * framing (platform.h) is specifically tied to Modern's wider
-         * viewport, not something Off ever offers on its own.
+         * framing (platform.h) is specifically tied to the Wide FOV
+         * toggle's own wider viewport, not something available on its own
+         * otherwise. Aspect Ratio (settings.h) is fully decoupled from
+         * this now -- a player can zoom while on 4:3, unlike the old
+         * Classic mode which locked zoom off entirely as part of the same
+         * package deal.
          *
          * Both toggle off the current value against a "primary" state for
-         * the pair (Wide for Modern, Standard/Off for Off) rather than a
-         * plain "is it Zoom In" flip: needs_zoom_reset above (battle/
-         * Town Map/title/file-select) force-persists EB_ZOOM_OFF on exit
-         * from those screens regardless of which pair is active, and
+         * the pair (Wide for Wide-FOV-on, Standard/Off for Wide-FOV-off)
+         * rather than a plain "is it Zoom In" flip: needs_zoom_reset above
+         * (battle/Town Map/title/file-select) force-persists EB_ZOOM_OFF on
+         * exit from those screens regardless of which pair is active, and
          * battles alone happen constantly. A plain flip landed the very
          * next R3 press on Zoom In instead of Wide whenever the stored
          * value was that forced OFF (or any other value outside the
-         * active pair, e.g. Wide left over from Modern after switching to
-         * Off): the first post-battle R3 press wouldn't restore Wide, it'd
-         * jump to Zoom In, so Wide needed an extra press to get back to and
+         * active pair, e.g. Wide left over after turning Wide FOV off):
+         * the first post-battle R3 press wouldn't restore Wide, it'd jump
+         * to Zoom In, so Wide needed an extra press to get back to and
          * looked like it had vanished. Checking against the primary
          * state instead means ANY foreign value snaps straight back to
          * that pair's primary on the very next press, matching what the
          * player actually wants, and still alternates normally afterward. */
         if (aux_new & AUX_ZOOM_TOGGLE) {
-            if (engine_alternative_visuals == ALT_VISUALS_MODERN) {
+            if (engine_fx_wide_fov == FX_TOGGLE_ON) {
                 ow.zoom_mode = (ow.zoom_mode == EB_ZOOM_OUT) ? EB_ZOOM_IN : EB_ZOOM_OUT;
-            } else if (engine_alternative_visuals != ALT_VISUALS_CLASSIC) {
+            } else {
                 ow.zoom_mode = (ow.zoom_mode == EB_ZOOM_OFF) ? EB_ZOOM_IN : EB_ZOOM_OFF;
             }
         }
@@ -658,7 +668,37 @@ void host_process_frame(void) {
         ow.zoom_mode = EB_ZOOM_OFF;
     }
 
-    /* Modern Alternative Visuals defaults gameplay to the zoomed-out FOV
+    /* Motion-dump burst, alternate trigger: holding R3 continuously for
+     * ~1 second also arms the burst, on top of the dedicated L3/F8 press.
+     * Added after L3 (Steam Input very plausibly intercepts a raw stick
+     * click for its own overlay/binding before this game ever sees it,
+     * same environment R3 itself runs in fine since a *tap* is a normal
+     * game action) and F8 (no confirmed keyboard-focus path to this
+     * process in the environment this was actually tested in) both came
+     * back with nothing written, twice each, while R3's own tap-to-zoom
+     * was independently confirmed working (and confirmed live, via a
+     * temporary diagnostic log, that this hold-tracking itself fires
+     * correctly too -- the actual bug turned out to be downstream, the
+     * always-NULL framebuffer pointer documented on
+     * platform_video_request_motion_dump()) -- reusing that exact
+     * already-proven-live input path removes every remaining variable.
+     * `aux` (not aux_new) is the currently-*held* mask, not just this-
+     * frame's press edge, so this fires once, exactly on the frame the
+     * hold crosses the threshold, regardless of whether the tap above
+     * also fired zoom on the initial press (both can coexist, holding
+     * still zooms once on press and dumps once a second later). */
+    {
+        static int r3_hold_frames = 0;
+        if (aux & AUX_ZOOM_TOGGLE) {
+            r3_hold_frames++;
+            if (r3_hold_frames == 60)
+                platform_video_request_motion_dump(60);
+        } else {
+            r3_hold_frames = 0;
+        }
+    }
+
+    /* The Wide FOV toggle defaults gameplay to the zoomed-out FOV
      * (settings.h) the moment the player actually leaves title/file-select
      *, not at raw process boot (tried that first; it left ow.zoom_mode
      * non-OFF by the time the title screen itself rendered, which broke
@@ -670,11 +710,11 @@ void host_process_frame(void) {
      * frame of gameplay after boot, after a New Game/Continue, or after
      * this session's own "Return to Title" reboot and a subsequent
      * restart. mode_step_settings_menu() (text.c) applies the same
-     * default live for the separate case of switching to Modern mid-game,
+     * default live for the separate case of turning Wide FOV on mid-game,
      * without leaving title/file-select at all. */
     static bool was_in_title_or_file_select = true;
     if (was_in_title_or_file_select && !in_title_or_file_select &&
-        engine_alternative_visuals == ALT_VISUALS_MODERN) {
+        engine_fx_wide_fov == FX_TOGGLE_ON) {
         ow.zoom_mode = EB_ZOOM_OUT;
     }
     was_in_title_or_file_select = in_title_or_file_select;
@@ -698,15 +738,7 @@ void host_process_frame(void) {
      * aux_new edge) since any_window_open() can change independently of
      * an R3 press. */
     EbZoomMode effective_zoom = (EbZoomMode)ow.zoom_mode;
-    if (engine_alternative_visuals == ALT_VISUALS_CLASSIC) {
-        /* Defense in depth alongside the R3-toggle gate above, forces
-         * the *effective* (this-frame) zoom off even if ow.zoom_mode
-         * somehow still holds a stale non-OFF value (e.g. the player was
-         * zoomed in Modern, then switched to Classic mid-session). The
-         * render side (sdl2_video.c) also force-crops to 4:3 regardless of
-         * this value, so this is belt and suspenders, not load-bearing. */
-        effective_zoom = EB_ZOOM_OFF;
-    } else if (effective_zoom == EB_ZOOM_IN && any_window_open()) {
+    if (effective_zoom == EB_ZOOM_IN && any_window_open()) {
         effective_zoom = EB_ZOOM_OFF;
     }
     platform_video_set_zoom(effective_zoom);

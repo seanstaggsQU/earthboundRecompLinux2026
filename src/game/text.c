@@ -3568,9 +3568,12 @@ StepResult mode_step_pause_menu(ModeState *ms) {
  * mode_step_debug_menu (game_main.c). Cancel (B/Select) closes the screen
  * and returns to the command menu underneath.
  *
- * Six rows exist today (Sprint Speed, High Quality Audio, Alt Controls,
- * Alternative Visuals, Logging, Auto Save); more engine preferences can be
- * added as additional userdata cases without changing this shape. */
+ * Ten rows exist today (Sprint Speed, High Quality Audio, Alt Controls,
+ * Scanlines, Antialiasing, Tilt Shift, Wide FOV, Color Grading, Aspect
+ * Ratio, Logging -- the five FX toggles plus Aspect Ratio replaced a
+ * single 3-way "Alternative Visuals" row, see settings.h's FxToggleSetting
+ * comment); more engine preferences can be added as additional userdata
+ * cases without changing this shape. */
 static const char *sprint_speed_labels[SPRINT_SPEED_COUNT] = {
     [SPRINT_SPEED_OFF]    = "Sprint: Off",
     [SPRINT_SPEED_MEDIUM] = "Sprint: Medium (+50%)",
@@ -3590,10 +3593,29 @@ static const char *alt_controls_labels[ALT_CONTROLS_COUNT] = {
     [ALT_CONTROLS_OFF] = "Alt Controls: Off",
     [ALT_CONTROLS_ON]  = "Alt Controls: On",
 };
-static const char *alternative_visuals_labels[ALT_VISUALS_COUNT] = {
-    [ALT_VISUALS_OFF]     = "Alt. Visuals: Off",
-    [ALT_VISUALS_CLASSIC] = "Alt. Visuals: Classic",
-    [ALT_VISUALS_MODERN]  = "Alt. Visuals: Modern",
+static const char *scanlines_labels[FX_TOGGLE_COUNT] = {
+    [FX_TOGGLE_OFF] = "Scanlines: Off",
+    [FX_TOGGLE_ON]  = "Scanlines: On",
+};
+static const char *antialiasing_labels[FX_TOGGLE_COUNT] = {
+    [FX_TOGGLE_OFF] = "Antialiasing: Off",
+    [FX_TOGGLE_ON]  = "Antialiasing: On",
+};
+static const char *tiltshift_labels[FX_TOGGLE_COUNT] = {
+    [FX_TOGGLE_OFF] = "Tilt Shift: Off",
+    [FX_TOGGLE_ON]  = "Tilt Shift: On",
+};
+static const char *wide_fov_labels[FX_TOGGLE_COUNT] = {
+    [FX_TOGGLE_OFF] = "Wide FOV: Off",
+    [FX_TOGGLE_ON]  = "Wide FOV: On",
+};
+static const char *color_grading_labels[FX_TOGGLE_COUNT] = {
+    [FX_TOGGLE_OFF] = "Color Grading: Off",
+    [FX_TOGGLE_ON]  = "Color Grading: On",
+};
+static const char *aspect_ratio_labels[ASPECT_RATIO_COUNT] = {
+    [ASPECT_RATIO_16_9] = "Aspect Ratio: 16:9",
+    [ASPECT_RATIO_4_3]  = "Aspect Ratio: 4:3",
 };
 static const char *logging_labels[LOGGING_COUNT] = {
     [LOGGING_OFF] = "Logging: Off",
@@ -3608,8 +3630,13 @@ StepResult mode_step_settings_menu(ModeState *ms) {
         add_menu_item(sprint_speed_labels[engine_sprint_speed], 1, 0, 0);
         add_menu_item(platform_audio_msu_is_loaded() ? hq_audio_labels[engine_hq_audio] : hq_audio_label_no_pack, 2, 0, 1);
         add_menu_item(alt_controls_labels[engine_alt_controls], 3, 0, 2);
-        add_menu_item(alternative_visuals_labels[engine_alternative_visuals], 4, 0, 3);
-        add_menu_item(logging_labels[engine_logging], 5, 0, 4);
+        add_menu_item(scanlines_labels[engine_fx_scanlines], 4, 0, 3);
+        add_menu_item(antialiasing_labels[engine_fx_antialiasing], 5, 0, 4);
+        add_menu_item(tiltshift_labels[engine_fx_tiltshift], 6, 0, 5);
+        add_menu_item(wide_fov_labels[engine_fx_wide_fov], 7, 0, 6);
+        add_menu_item(color_grading_labels[engine_fx_color_grading], 8, 0, 7);
+        add_menu_item(aspect_ratio_labels[engine_aspect_ratio], 9, 0, 8);
+        add_menu_item(logging_labels[engine_logging], 10, 0, 9);
         open_window_and_print_menu(1, 0);
         st->phase = SET_RESULT;
         return menu_push_selection(&st->result_ready, &st->result, 1);
@@ -3657,35 +3684,77 @@ StepResult mode_step_settings_menu(ModeState *ms) {
             return STEP_RESULT_CONTINUE();
         }
         if (selection == 4) {
-            /* Alternative Visuals row confirmed: cycle Off -> Classic ->
-             * Modern -> Off. Purely a rendering flag read fresh every frame
-             * by platform_video_end_frame() (sdl2_video.c), no resync
-             * needed, takes effect on the very next frame. Classic also
-             * locks the zoom toggle off (game_main.c's R3 handling) and
-             * Modern defaults zoom to EB_ZOOM_OUT on the next overworld
-             * entry (overworld.c), both read this setting fresh too, no
-             * extra bookkeeping needed here. Depth of Field (Modern only)
-             * additionally has its own extra battle/Town-Map/window-open
-             * suppression regardless of this setting, see
-             * platform_video_set_dof_suppressed()/host_process_frame(). */
-            engine_alternative_visuals =
-                (uint8_t)((engine_alternative_visuals + 1) % ALT_VISUALS_COUNT);
+            /* Scanlines row confirmed: cycle Off <-> On. Purely a
+             * rendering flag read fresh every frame by
+             * platform_video_end_frame() (sdl2_video.c), no resync needed,
+             * takes effect on the very next frame. A pure overlay -- unlike
+             * the old Classic mode this replaced, does not touch zoom or
+             * aspect ratio. */
+            engine_fx_scanlines = (uint8_t)((engine_fx_scanlines + 1) % FX_TOGGLE_COUNT);
             settings_save();
-            /* Modern defaults to the zoomed-out FOV the instant it's
-             * selected (matches the same default applied at boot in
-             * main.c for a fresh session that already has Modern
-             * configured), the player can still R3-cycle away from it
-             * afterward. Classic doesn't need a symmetric reset here:
-             * game_main.c's R3-toggle gate and sdl2_video.c's forced 4:3
-             * crop both already force the *effective* zoom off for
-             * Classic regardless of ow.zoom_mode's stored value. */
-            if (engine_alternative_visuals == ALT_VISUALS_MODERN)
-                ow.zoom_mode = EB_ZOOM_OUT;
             play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
             st->phase = SET_BUILD;
             return STEP_RESULT_CONTINUE();
         }
         if (selection == 5) {
+            /* Antialiasing row confirmed: cycle Off <-> On. Same
+             * fresh-every-frame read as Scanlines above. */
+            engine_fx_antialiasing = (uint8_t)((engine_fx_antialiasing + 1) % FX_TOGGLE_COUNT);
+            settings_save();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 6) {
+            /* Tilt Shift row confirmed: cycle Off <-> On. Has its own extra
+             * battle/Town-Map/window-open suppression regardless of this
+             * setting, see platform_video_set_dof_suppressed()/
+             * host_process_frame(); the intensity eases in/out over a few
+             * frames (dof_intensity, sdl2_video.c) rather than cutting. */
+            engine_fx_tiltshift = (uint8_t)((engine_fx_tiltshift + 1) % FX_TOGGLE_COUNT);
+            settings_save();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 7) {
+            /* Wide FOV row confirmed: cycle Off <-> On. Changes what the R3
+             * zoom-cycle toggles between (game_main.c) and the original
+             * ROM's per-encounter battle letterbox suppression (battle_ui.c),
+             * both read this setting fresh too, no extra bookkeeping needed
+             * here except defaulting zoom to Wide the instant it's turned
+             * on (matches the same default applied at boot in main.c for a
+             * fresh session that already has Wide FOV configured) -- the
+             * player can still R3-cycle away from it afterward. */
+            engine_fx_wide_fov = (uint8_t)((engine_fx_wide_fov + 1) % FX_TOGGLE_COUNT);
+            settings_save();
+            if (engine_fx_wide_fov == FX_TOGGLE_ON)
+                ow.zoom_mode = EB_ZOOM_OUT;
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 8) {
+            /* Color Grading row confirmed: cycle Off <-> On. Suppressed on
+             * title/file-select same as Tilt Shift, see fx_suppressed's
+             * doc comment (sdl2_video.c). */
+            engine_fx_color_grading = (uint8_t)((engine_fx_color_grading + 1) % FX_TOGGLE_COUNT);
+            settings_save();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 9) {
+            /* Aspect Ratio row confirmed: cycle 16:9 <-> 4:3. Only affects
+             * the EB_ZOOM_OFF baseline crop (sdl2_video.c); Zoom Out/Zoom
+             * In are unaffected either way, see that file's comment. */
+            engine_aspect_ratio = (uint8_t)((engine_aspect_ratio + 1) % ASPECT_RATIO_COUNT);
+            settings_save();
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 10) {
             /* Logging row confirmed: cycle Off <-> On. Turning it on takes
              * effect immediately (platform_log_set_enabled(), platform.h);
              * turning it back off does NOT restore console output this

@@ -119,15 +119,18 @@ static const uint16_t window_configs[][4] = {
      * (Text standard), a screen position already proven not to collide
      * with the command menu it's opened from (0x00 occupies roughly
      * x=1..14, y=1..11; this starts at x=12 like the text window always
-     * has). Height 12 = 5 content rows (Sprint Speed, HQ Audio, Alt
-     * Controls, Alternative Visuals, Logging; briefly 16/7 rows when
-     * Bloom/Depth of Field/Light Shafts/Color Grading were each their own
-     * row, before the latter three were folded into one "Experimental
+     * has). Height 22 = 10 content rows (Sprint Speed, HQ Audio, Alt
+     * Controls, Scanlines, Antialiasing, Tilt Shift, Wide FOV, Color
+     * Grading, Aspect Ratio, Logging; previously height 12 for 5 rows
+     * before the single 3-way "Alternative Visuals" row was split into
+     * five independent FX toggles plus Aspect Ratio; briefly 16/7 rows
+     * when Bloom/Depth of Field/Light Shafts/Color Grading were each their
+     * own row, before the latter three were folded into one "Experimental
      * Visuals" toggle and Bloom was removed; briefly 14 for a 6th Auto
      * Save row before that feature was removed entirely, sm_handle_input()'s
      * cursor bound is (height-2)/2 rows, same formula noted on
      * WINDOW_QUIT_CONFIRM below). */
-    [WINDOW_SETTINGS_MENU] = { 12, 1, 19, 12 },
+    [WINDOW_SETTINGS_MENU] = { 12, 1, 19, 22 },
     /* Self-update screen, this port's own addition (WINDOW_UPDATE_CHECK,
      * window.h). Opened as a child over the file-select main window (0x13,
      * {1,2,30,8}) the same way file-select's own Text Speed (0x18) and
