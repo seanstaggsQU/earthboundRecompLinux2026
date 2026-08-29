@@ -67,3 +67,23 @@ def generate_enemies_header_cmd(
         sys.exit(1)
 
     generate_enemies_header(enemies_json, output)
+
+
+@generate_app.command(name="text-dialogue-source")
+def generate_text_dialogue_source_cmd(
+    output_dir: Annotated[Path, Parameter(help="Directory for the generated .h/.c files")],
+    *,
+    yaml_config: Annotated[Path, Parameter(alias="-y", help="Dump doc YAML")] = Path("earthbound.yml"),
+) -> None:
+    """Generate text_dialogue_source.h/.c: raw ebtxt block + label-offset
+    table for the ROM-only dialogue compiler (src/data/text_compile.c)."""
+    from ebtools.config import load_dump_doc
+    from ebtools.parsers.text_dialogue_source import generate_text_dialogue_source
+
+    if not yaml_config.exists():
+        print(f"Error: {yaml_config} not found", file=sys.stderr)
+        sys.exit(1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    doc = load_dump_doc(yaml_config)
+    generate_text_dialogue_source(doc, output_dir)

@@ -10,6 +10,7 @@
 #include "asset_pack_layout.h"
 #include "core/decomp.h"
 #include "rom_extract_table.h"
+#include "text_compile.h"
 
 #include <dirent.h>
 #include <stdbool.h>
@@ -468,21 +469,40 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
         return EB_ROM_EXTRACT_WRITE_FAILED;
     }
 
+    /* Same derived-asset pattern as the PSI bundles above: dialogue.bin
+     * isn't a plain ROM byte range either, it's every text block's
+     * messages concatenated and relocated (see text_compile.c). Built
+     * once here, up front, same as the PSI bundles, so its real size is
+     * available for eff_size[]/blob_offsets[] below. */
+    uint8_t *dialogue_blob = NULL;
+    size_t dialogue_blob_size = 0;
+    if (!text_compile_build_dialogue_blob(rom, rom_avail, &dialogue_blob, &dialogue_blob_size)) {
+        for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
+        free(rom_data);
+        return EB_ROM_EXTRACT_WRITE_FAILED;
+    }
+
     int psi_base = (int)ASSET_PSIANIMS_ARRANGEMENTS(0);
 
     /* Effective per-asset size: the plain ROM byte range, except for the
-     * PSI arrangement family, which uses its derived bundle size instead. */
+     * PSI arrangement family and dialogue.bin, which use their derived
+     * sizes instead. */
     uint32_t *eff_size = malloc(sizeof(uint32_t) * ASSET_COUNT);
     if (!eff_size) {
         for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
+        free(dialogue_blob);
         free(rom_data);
         return EB_ROM_EXTRACT_IO_ERROR;
     }
     for (int i = 0; i < ASSET_COUNT; i++) {
         int psi_idx = i - psi_base;
-        eff_size[i] = (psi_idx >= 0 && psi_idx < PSI_ARRANGEMENT_COUNT)
-                          ? (uint32_t)psi_bundle_sizes[psi_idx]
-                          : rom_extract_table[i].rom_size;
+        if (psi_idx >= 0 && psi_idx < PSI_ARRANGEMENT_COUNT) {
+            eff_size[i] = (uint32_t)psi_bundle_sizes[psi_idx];
+        } else if (i == (int)ASSET_DIALOGUE_DIALOGUE_BIN) {
+            eff_size[i] = (uint32_t)dialogue_blob_size;
+        } else {
+            eff_size[i] = rom_extract_table[i].rom_size;
+        }
     }
 
     /* Blob offsets: each asset's slot in the pak's blob region, in AssetId
@@ -491,6 +511,7 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
     if (!blob_offsets) {
         for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
         free(eff_size);
+        free(dialogue_blob);
         free(rom_data);
         return EB_ROM_EXTRACT_IO_ERROR;
     }
@@ -506,6 +527,7 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
     if (n <= 0 || (size_t)n >= sizeof(tmp_path)) {
         for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
         free(eff_size);
+        free(dialogue_blob);
         free(rom_data);
         free(blob_offsets);
         return EB_ROM_EXTRACT_WRITE_FAILED;
@@ -517,6 +539,7 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
     if (!of) {
         for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
         free(eff_size);
+        free(dialogue_blob);
         free(rom_data);
         free(blob_offsets);
         return EB_ROM_EXTRACT_WRITE_FAILED;
@@ -545,6 +568,10 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
             ok = fwrite(psi_bundles[psi_idx], 1, sz, of) == sz;
             continue;
         }
+        if (i == (int)ASSET_DIALOGUE_DIALOGUE_BIN) {
+            ok = fwrite(dialogue_blob, 1, sz, of) == sz;
+            continue;
+        }
         uint32_t off = rom_extract_table[i].rom_offset;
         if ((uint64_t)off + (uint64_t)sz > (uint64_t)rom_avail) {
             ok = false;
@@ -556,6 +583,7 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
     fclose(of);
     for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
     free(eff_size);
+    free(dialogue_blob);
     free(rom_data);
     free(blob_offsets);
 
