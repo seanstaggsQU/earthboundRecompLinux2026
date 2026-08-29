@@ -1139,27 +1139,51 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
          * active, status suppressed, special walking style, etc.).
          * Used by NPC AI scripts to wait before triggering interactions. */
         *out_pc = pc;
+        /* TEMPORARY delivery-diag instrumentation, not otherwise scoped --
+         * only fires for the entities running the delivery watcher scripts,
+         * so this stays silent for every other NPC's busy-checks. */
+        bool _delivery_diag = (entity_offset >= 0 &&
+            (entities.script_table[entity_offset] == 499 ||
+             entities.script_table[entity_offset] == 500));
         /* Check 1: fade active (fade step != 0) */
-        if (fade_active())
+        if (fade_active()) {
+            if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=1 (fade active)\n", entity_offset);
             return 1;
-        /* Check 2: screen brightness < 15 (screen not fully on) */
-        if (core.screen_brightness < 15)
+        }
+        /* Check 2: screen brightness < 15 (screen not fully on).
+         * core.screen_brightness is initialized to 0 in core/memory.c and
+         * never written anywhere else in the codebase -- this check was
+         * permanently true for every caller, every frame, forever, making
+         * IS_PLAYER_BUSY() always return "busy" and never reach checks 3-8.
+         * The live brightness (INIDISP) is ppu.inidisp & 0x0F, maintained by
+         * fade_to_brightness()/fade_update() (game/fade.c). */
+        if ((ppu.inidisp & 0x0F) < 15) {
+            if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=1 (brightness=%d)\n", entity_offset, ppu.inidisp & 0x0F);
             return 1;
+        }
         /* Check 3: any window open */
-        if (any_window_open())
+        if (any_window_open()) {
+            if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=1 (window open)\n", entity_offset);
             return 1;
+        }
         /* Check 4: entity fade in progress */
-        if (ow.entity_fade_entity != -1)
+        if (ow.entity_fade_entity != -1) {
+            if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=1 (entity fade entity=%d)\n", entity_offset, ow.entity_fade_entity);
             return 1;
+        }
         /* Check 5: overworld status suppression */
-        if (ow.overworld_status_suppression)
+        if (ow.overworld_status_suppression) {
+            if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=1 (status suppression)\n", entity_offset);
             return 1;
+        }
         /* Check 6: leader entity spritemap high bit set (loading/disabled) */
         {
             uint16_t leader_slot = game_state.current_party_members;
             int16_t leader_off = (int16_t)(ENT(leader_slot));
-            if (entities.spritemap_ptr_hi[leader_off] & 0x8000)
+            if (entities.spritemap_ptr_hi[leader_off] & 0x8000) {
+                if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=1 (leader spritemap hi bit)\n", entity_offset);
                 return 1;
+            }
         }
         /* Check 7: entity tick callbacks disabled for leader entity.
          * Assembly uses hardcoded ENTITY_TICK_CALLBACK_HIGH+46 (slot 23). */
@@ -1169,8 +1193,11 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
                 /* If disabled, check walking style for special movement styles.
                  * Assembly checks LADDER(7), ROPE(8), ESCALATOR(12), STAIRS(13). */
                 uint16_t ws = game_state.walking_style;
-                if (ws == 7 || ws == 8 || ws == 12 || ws == 13)
+                if (ws == 7 || ws == 8 || ws == 12 || ws == 13) {
+                    if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=1 (tick disabled + walking_style=%u)\n", entity_offset, ws);
                     return 1;
+                }
+                if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=0 (tick disabled, ws=%u)\n", entity_offset, ws);
                 return 0;
             }
         }
@@ -1179,8 +1206,11 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         {
             int16_t result = (int16_t)ow.pending_interactions;
             uint16_t ws = game_state.walking_style;
-            if (ws == 7 || ws == 8 || ws == 12 || ws == 13)
+            if (ws == 7 || ws == 8 || ws == 12 || ws == 13) {
+                if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=1 (walking_style=%u)\n", entity_offset, ws);
                 return 1;
+            }
+            if (_delivery_diag) LOG_EVENT("delivery: IS_PLAYER_BUSY(ent=%d)=%d (pending_interactions)\n", entity_offset, result);
             return result;
         }
     }
@@ -1641,7 +1671,15 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         *out_pc = pc;
         uint16_t attrs = load_sector_attrs(
             game_state.leader_x_coord, game_state.leader_y_coord);
-        return ((attrs & 0x0007) < 3) ? 0 : 1;
+        int16_t result = ((attrs & 0x0007) < 3) ? 0 : 1;
+        if (entity_offset >= 0 &&
+            (entities.script_table[entity_offset] == 499 ||
+             entities.script_table[entity_offset] == 500)) {
+            LOG_EVENT("delivery: CHECK_SECTOR_USES_MINISPRITES(ent=%d)=%d (sector_type=%u, leader=%d,%d)\n",
+                      entity_offset, result, (unsigned)(attrs & 7),
+                      (int)game_state.leader_x_coord, (int)game_state.leader_y_coord);
+        }
+        return result;
     }
 
     case ROM_ADDR_DISABLE_PARTY_MOVEMENT_AND_HIDE: {
