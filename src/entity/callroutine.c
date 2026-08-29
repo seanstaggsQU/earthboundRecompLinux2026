@@ -2181,8 +2181,13 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         uint16_t base_ptr = ert.entity_path_points[ent];
         uint16_t src_ptr  = (uint16_t)(base_ptr + (count - 1) * 4);
 
-        /* Compute delivery slot offset: slot * 80 bytes (20 waypoints × 4 bytes) */
+        /* Compute delivery slot offset: slot * 80 bytes (20 waypoints × 4 bytes).
+         * slot comes from a script tempvar -- validate it before trusting it
+         * as an index into ert.delivery_paths[], the same array pathfind_*()
+         * writes waypoints into. */
         uint16_t slot_offset = (uint16_t)((slot * 5) << 4);  /* slot*5*16 = slot*80 */
+        if (slot < 0 || (uint32_t)slot_offset + 80 > DELIVERY_PATHS_SIZE)
+            return 1;
 
         /* Store delivery slot base as the new entity_path_points */
         ert.entity_path_points[ent] = slot_offset;
@@ -2241,8 +2246,13 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         /* Read current path base (already advanced by pathfind_to_party_leader) */
         uint16_t src_ptr = ert.entity_path_points[ent];
 
-        /* Compute delivery slot offset: slot * 80 bytes (20 waypoints × 4 bytes) */
+        /* Compute delivery slot offset: slot * 80 bytes (20 waypoints × 4 bytes).
+         * slot comes from a script tempvar -- validate it before trusting it
+         * as an index into ert.delivery_paths[], the same array pathfind_*()
+         * writes waypoints into. */
         uint16_t slot_offset = (uint16_t)((slot * 5) << 4);  /* slot*5*16 = slot*80 */
+        if (slot < 0 || (uint32_t)slot_offset + 80 > DELIVERY_PATHS_SIZE)
+            return 1;
 
         /* Store delivery slot base as the new entity_path_points */
         ert.entity_path_points[ent] = slot_offset;

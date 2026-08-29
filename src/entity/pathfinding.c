@@ -822,8 +822,16 @@ static int16_t initialize_pathfinding_for_entities(
         int16_t slot = pf->object_index;
         int16_t ent = ENT(slot);
 
-        if (pf->path_point_count == 0) {
-            /* No path found, set pathfinding state to 1 */
+        /* dp_offset accumulates across every pathfinder in this batch with
+         * no per-entry cap (unlike pf_heap_alloc() above, which does check
+         * against pf_heap_end). Enough concurrent pathfinders with long
+         * enough paths could walk dp_offset past DELIVERY_PATHS_SIZE and
+         * write outside ert.delivery_paths[] -- treat that the same as a
+         * failed path (state 1) instead of corrupting adjacent ert fields. */
+        if (pf->path_point_count == 0 ||
+            (uint32_t)dp_offset + (uint32_t)pf->path_point_count * 4 > DELIVERY_PATHS_SIZE) {
+            /* No path found (or no room left to store one), set pathfinding
+             * state to 1 (request reset) */
             entities.pathfinding_states[ent] = 1;
         } else {
             /* Copy waypoints from pf_heap to ert.delivery_paths */
