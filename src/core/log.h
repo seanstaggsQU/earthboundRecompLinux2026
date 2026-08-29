@@ -17,6 +17,7 @@
 
 #define LOG_WARN(...)  ((void)0)
 #define LOG_TRACE(...) ((void)0)
+#define LOG_EVENT(...) ((void)0)
 #define FATAL(...)     __builtin_trap()
 
 #else /* !EB_EMBEDDED */
@@ -29,6 +30,16 @@ extern int verbose_level;
 
 #define LOG_WARN(...)  do { if (verbose_level >= 1) fprintf(stderr, __VA_ARGS__); } while (0)
 #define LOG_TRACE(...) do { if (verbose_level >= 2) fprintf(stderr, __VA_ARGS__); } while (0)
+
+/* LOG_EVENT: like LOG_WARN but always on, no -v needed. For rare,
+ * high-value lifecycle events (not per-frame noise) where requiring a
+ * launch-option flag before a report is even possible isn't acceptable --
+ * e.g. the delivery system's checkpoints, see overworld_spawn.c/
+ * callroutine.c. Combined with the existing "Logging" setting (Config menu
+ * / platform_log_set_enabled(), which redirects stdout+stderr to
+ * eb_debug.log next to the executable), this lands in that file with no
+ * extra setup on the player's part. */
+#define LOG_EVENT(...) fprintf(stderr, __VA_ARGS__)
 
 /* Hard failure for unimplemented/unknown code paths, prints and aborts */
 #define FATAL(...) do { fprintf(stderr, "FATAL: " __VA_ARGS__); abort(); } while (0)

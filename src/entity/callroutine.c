@@ -1753,7 +1753,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         if (limit == 0x00FF) return 1;  /* unlimited (assembly: CMP #<-1) */
         ow.delivery_attempts[var0]++;
         if (limit <= (uint16_t)ow.delivery_attempts[var0]) {
-            LOG_WARN("delivery: index %u attempt limit reached (%d/%u), giving up\n",
+            LOG_EVENT("delivery: index %u attempt limit reached (%d/%u), giving up\n",
                      var0, (int)ow.delivery_attempts[var0], limit);
             return 0;  /* limit reached */
         }
@@ -1800,7 +1800,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         const DeliveryEntry *table = get_delivery_table();
         if (!table || var0 >= DELIVERY_TABLE_COUNT) return 0;
         uint32_t ptr = ((uint32_t)table[var0].success_bank << 16) | table[var0].success_addr;
-        LOG_WARN("delivery: index %u succeeded\n", var0);
+        LOG_EVENT("delivery: index %u succeeded\n", var0);
         queue_interaction(8, ptr);
         return 0;
     }
@@ -1814,7 +1814,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         const DeliveryEntry *table = get_delivery_table();
         if (!table || var0 >= DELIVERY_TABLE_COUNT) return 0;
         uint32_t ptr = ((uint32_t)table[var0].failure_bank << 16) | table[var0].failure_addr;
-        LOG_WARN("delivery: index %u failed permanently\n", var0);
+        LOG_EVENT("delivery: index %u failed permanently\n", var0);
         queue_interaction(10, ptr);
         return 0;
     }
@@ -2172,7 +2172,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
 
         /* Find path from offscreen TO the current entity */
         if (pathfind_to_current_entity() != 0) {
-            LOG_WARN("delivery: SETUP_DELIVERY_PATH_FROM_ENTITY slot %d pathfind failed\n",
+            LOG_EVENT("delivery: SETUP_DELIVERY_PATH_FROM_ENTITY slot %d pathfind failed\n",
                      (int)slot);
             return 1;  /* pathfinding failed */
         }
@@ -2196,7 +2196,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
          * writes waypoints into. */
         uint16_t slot_offset = (uint16_t)((slot * 5) << 4);  /* slot*5*16 = slot*80 */
         if (slot < 0 || (uint32_t)slot_offset + 80 > DELIVERY_PATHS_SIZE) {
-            LOG_WARN("delivery: SETUP_DELIVERY_PATH_FROM_ENTITY rejected out-of-range slot %d\n",
+            LOG_EVENT("delivery: SETUP_DELIVERY_PATH_FROM_ENTITY rejected out-of-range slot %d\n",
                      (int)slot);
             return 1;
         }
@@ -2245,7 +2245,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
              * non-passable sector, with no failure message ever queued
              * (attempts aren't even counted here) -- worth knowing if a
              * delivery is ever reported as "never arriving". */
-            LOG_WARN("delivery: SETUP_DELIVERY_PATH_REVERSE leader sector_type=%u "
+            LOG_EVENT("delivery: SETUP_DELIVERY_PATH_REVERSE leader sector_type=%u "
                      "not delivery-passable, retrying later\n", sector_type);
             return 1;  /* sector not passable for delivery */
         }
@@ -2260,7 +2260,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
          * pathfind_to_party_leader() also snaps the entity position to the
          * path start and decrements path_point_count / advances path_points by 1. */
         if (pathfind_to_party_leader() != 0) {
-            LOG_WARN("delivery: SETUP_DELIVERY_PATH_REVERSE slot %d pathfind failed\n",
+            LOG_EVENT("delivery: SETUP_DELIVERY_PATH_REVERSE slot %d pathfind failed\n",
                      (int)slot);
             return 1;  /* pathfinding failed */
         }
@@ -2277,7 +2277,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
          * writes waypoints into. */
         uint16_t slot_offset = (uint16_t)((slot * 5) << 4);  /* slot*5*16 = slot*80 */
         if (slot < 0 || (uint32_t)slot_offset + 80 > DELIVERY_PATHS_SIZE) {
-            LOG_WARN("delivery: SETUP_DELIVERY_PATH_REVERSE rejected out-of-range slot %d\n",
+            LOG_EVENT("delivery: SETUP_DELIVERY_PATH_REVERSE rejected out-of-range slot %d\n",
                      (int)slot);
             return 1;
         }

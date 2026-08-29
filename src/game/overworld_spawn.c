@@ -111,7 +111,7 @@ void spawn_delivery_entities(void) {
          * watcher entity here even if the one from the original trigger
          * never made it into a save (entities aren't part of save data). */
         int16_t slot = create_entity(sprite_id, EVENT_SCRIPT_500, -1, 0, 0);
-        LOG_WARN("delivery: spawn_delivery_entities() re-armed index %d "
+        LOG_EVENT("delivery: spawn_delivery_entities() re-armed index %d "
                  "(flag %u still set) -> entity slot %d\n",
                  i, delivery_table[i].event_flag, (int)slot);
     }
@@ -142,7 +142,7 @@ void get_delivery_sprite_and_placeholder(uint16_t delivery_id) {
 
     /* Create entity at (0, 0) with EVENT_SCRIPT_499, auto slot */
     int16_t slot = create_entity(sprite_id, EVENT_SCRIPT_499, -1, 0, 0);
-    LOG_WARN("delivery: get_delivery_sprite_and_placeholder(id=%u, index=%u) "
+    LOG_EVENT("delivery: get_delivery_sprite_and_placeholder(id=%u, index=%u) "
              "-> entity slot %d\n", (unsigned)delivery_id, (unsigned)index, (int)slot);
 }
 
