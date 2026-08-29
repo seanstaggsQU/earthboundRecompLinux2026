@@ -104,8 +104,16 @@ void spawn_delivery_entities(void) {
             sprite_id = read_u16_le(&for_sale_signs[r * 2]);
         }
 
-        /* Create entity at (0, 0) with EVENT_SCRIPT_500, auto slot */
-        create_entity(sprite_id, EVENT_SCRIPT_500, -1, 0, 0);
+        /* Create entity at (0, 0) with EVENT_SCRIPT_500, auto slot. This
+         * runs on every boot (initialize_overworld_state -> spawn_buzz_buzz)
+         * and every door transition, unconditionally, for any entry whose
+         * event_flag is still set -- a pending delivery re-spawns its
+         * watcher entity here even if the one from the original trigger
+         * never made it into a save (entities aren't part of save data). */
+        int16_t slot = create_entity(sprite_id, EVENT_SCRIPT_500, -1, 0, 0);
+        LOG_WARN("delivery: spawn_delivery_entities() re-armed index %d "
+                 "(flag %u still set) -> entity slot %d\n",
+                 i, delivery_table[i].event_flag, (int)slot);
     }
 }
 
@@ -133,7 +141,9 @@ void get_delivery_sprite_and_placeholder(uint16_t delivery_id) {
     }
 
     /* Create entity at (0, 0) with EVENT_SCRIPT_499, auto slot */
-    create_entity(sprite_id, EVENT_SCRIPT_499, -1, 0, 0);
+    int16_t slot = create_entity(sprite_id, EVENT_SCRIPT_499, -1, 0, 0);
+    LOG_WARN("delivery: get_delivery_sprite_and_placeholder(id=%u, index=%u) "
+             "-> entity slot %d\n", (unsigned)delivery_id, (unsigned)index, (int)slot);
 }
 
 /* ---- SAVE_PHOTO_STATE (port of C4343E) ----

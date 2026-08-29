@@ -1752,7 +1752,11 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         uint16_t limit = table[var0].attempt_limit;
         if (limit == 0x00FF) return 1;  /* unlimited (assembly: CMP #<-1) */
         ow.delivery_attempts[var0]++;
-        if (limit <= (uint16_t)ow.delivery_attempts[var0]) return 0;  /* limit reached */
+        if (limit <= (uint16_t)ow.delivery_attempts[var0]) {
+            LOG_WARN("delivery: index %u attempt limit reached (%d/%u), giving up\n",
+                     var0, (int)ow.delivery_attempts[var0], limit);
+            return 0;  /* limit reached */
+        }
         return 1;  /* under limit */
     }
 
@@ -1796,6 +1800,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         const DeliveryEntry *table = get_delivery_table();
         if (!table || var0 >= DELIVERY_TABLE_COUNT) return 0;
         uint32_t ptr = ((uint32_t)table[var0].success_bank << 16) | table[var0].success_addr;
+        LOG_WARN("delivery: index %u succeeded\n", var0);
         queue_interaction(8, ptr);
         return 0;
     }
@@ -1809,6 +1814,7 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         const DeliveryEntry *table = get_delivery_table();
         if (!table || var0 >= DELIVERY_TABLE_COUNT) return 0;
         uint32_t ptr = ((uint32_t)table[var0].failure_bank << 16) | table[var0].failure_addr;
+        LOG_WARN("delivery: index %u failed permanently\n", var0);
         queue_interaction(10, ptr);
         return 0;
     }
@@ -2165,8 +2171,11 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         entities.pathfinding_states[ent] = -1;
 
         /* Find path from offscreen TO the current entity */
-        if (pathfind_to_current_entity() != 0)
+        if (pathfind_to_current_entity() != 0) {
+            LOG_WARN("delivery: SETUP_DELIVERY_PATH_FROM_ENTITY slot %d pathfind failed\n",
+                     (int)slot);
             return 1;  /* pathfinding failed */
+        }
 
         /* Clear pathfinding state */
         entities.pathfinding_states[ent] = 0;
@@ -2186,8 +2195,11 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
          * as an index into ert.delivery_paths[], the same array pathfind_*()
          * writes waypoints into. */
         uint16_t slot_offset = (uint16_t)((slot * 5) << 4);  /* slot*5*16 = slot*80 */
-        if (slot < 0 || (uint32_t)slot_offset + 80 > DELIVERY_PATHS_SIZE)
+        if (slot < 0 || (uint32_t)slot_offset + 80 > DELIVERY_PATHS_SIZE) {
+            LOG_WARN("delivery: SETUP_DELIVERY_PATH_FROM_ENTITY rejected out-of-range slot %d\n",
+                     (int)slot);
             return 1;
+        }
 
         /* Store delivery slot base as the new entity_path_points */
         ert.entity_path_points[ent] = slot_offset;
@@ -2225,8 +2237,18 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
             game_state.leader_x_coord,
             game_state.leader_y_coord);
         uint8_t sector_type = attrs & 0x07;
-        if (delivery_sector_passable_table[sector_type] == 0)
+        if (delivery_sector_passable_table[sector_type] == 0) {
+            /* Not a bug by itself -- e.g. standing indoors right after a
+             * phone call. But with an unlimited attempt_limit (0x00FF, see
+             * TIMED_DELIVERY_TABLE), this gate can silently reject every
+             * single retry forever if the player just stays put in a
+             * non-passable sector, with no failure message ever queued
+             * (attempts aren't even counted here) -- worth knowing if a
+             * delivery is ever reported as "never arriving". */
+            LOG_WARN("delivery: SETUP_DELIVERY_PATH_REVERSE leader sector_type=%u "
+                     "not delivery-passable, retrying later\n", sector_type);
             return 1;  /* sector not passable for delivery */
+        }
 
         int16_t ent = ENT(ert.current_entity_slot);
         int16_t slot = scripts.tempvar[script_offset];
@@ -2237,8 +2259,11 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
         /* Find path from offscreen TO the party leader.
          * pathfind_to_party_leader() also snaps the entity position to the
          * path start and decrements path_point_count / advances path_points by 1. */
-        if (pathfind_to_party_leader() != 0)
+        if (pathfind_to_party_leader() != 0) {
+            LOG_WARN("delivery: SETUP_DELIVERY_PATH_REVERSE slot %d pathfind failed\n",
+                     (int)slot);
             return 1;  /* pathfinding failed */
+        }
 
         /* Clear pathfinding state */
         entities.pathfinding_states[ent] = 0;
@@ -2251,8 +2276,11 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
          * as an index into ert.delivery_paths[], the same array pathfind_*()
          * writes waypoints into. */
         uint16_t slot_offset = (uint16_t)((slot * 5) << 4);  /* slot*5*16 = slot*80 */
-        if (slot < 0 || (uint32_t)slot_offset + 80 > DELIVERY_PATHS_SIZE)
+        if (slot < 0 || (uint32_t)slot_offset + 80 > DELIVERY_PATHS_SIZE) {
+            LOG_WARN("delivery: SETUP_DELIVERY_PATH_REVERSE rejected out-of-range slot %d\n",
+                     (int)slot);
             return 1;
+        }
 
         /* Store delivery slot base as the new entity_path_points */
         ert.entity_path_points[ent] = slot_offset;
