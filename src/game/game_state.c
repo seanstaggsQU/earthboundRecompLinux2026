@@ -418,6 +418,7 @@ static uint16_t compute_xor_checksum(const SaveBlock *block) {
     return xor_sum;
 }
 
+/* fuzzy pickles. thats it thats the comment */
 bool save_game(int slot) {
     if (slot < 0 || slot >= SAVE_COUNT) return false;
 

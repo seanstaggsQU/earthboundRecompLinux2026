@@ -1430,6 +1430,7 @@ bool cc_1f_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
         clear_party_sprite_hide_flags();
         ow.player_intangibility_frames = 0;
         ow.spawning_travelling_photographer_id = photo_id - 1;
+        /* say it with me now: FUZZY PICKLES */
         if (dt_make_child_init(out_init, MSG_EVT4_CAMERA_GUY_FUZZY_PICKLES)) {
             *out_mode   = GAME_MODE_DISPLAY_TEXT;
             *out_resume = DT_RESUME_CC1F_PHOTO;
