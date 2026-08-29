@@ -43,7 +43,18 @@ static const uint16_t window_configs[][4] = {
      * at 3 rows (0-2); 10 tiles allows the 4th row (y=3) to be reachable.
      * Deliberate deviation from WINDOW_CONFIGURATION_TABLE, not a porting
      * guess, a new feature. */
-    [0x00] = {  1 + WINDOW_X_NUDGE,  1, 13, 12 },  /* Command menu (Talk to, Goods, PSI, ..., Save, Config, Quit) */
+    /* Command menu (Talk to, Goods, PSI, ..., Save, Set Up, Quit). Width
+     * 15 (was 13): briefly renamed "Config" to "Options" (7 chars), one
+     * character longer than the row's old ~6-char budget, and overflowing
+     * it wasn't just a cosmetic clip -- it corrupted the ROW BELOW
+     * (reported live: "Save" vanished and "Quit" showed as garbled
+     * "Quit e"), consistent with the per-row tile write running past this
+     * window's own content_tilemap row boundary into the next row's cells
+     * rather than being bounds-clamped. Settled on "Set Up" (6 chars,
+     * same length as "Config") instead, but kept the widened window
+     * anyway for real margin against the same class of bug next time a
+     * label here changes, not just enough to limp by. */
+    [0x00] = {  1 + WINDOW_X_NUDGE,  1, 15, 12 },
     [0x01] = { 12,  1, 19,  8 },  /* Out-of-battle text / PSI ability list */
     [0x02] = {  7,  1, 24, 16 },  /* Main inventory window */
     [0x03] = {  1 + WINDOW_X_NUDGE,  1,  6, 10 },  /* Inventory menu */
@@ -115,22 +126,27 @@ static const uint16_t window_configs[][4] = {
     [0x33] = { 22,  8,  9,  4 },  /* Single character select */
     [0x34] = {  7,  9, 18, 18 },  /* Debug menu (US only) */
     /* Settings menu, this port's own addition (WINDOW_SETTINGS_MENU,
-     * window.h), not from WINDOW_CONFIGURATION_TABLE. Same rect as 0x01
-     * (Text standard), a screen position already proven not to collide
-     * with the command menu it's opened from (0x00 occupies roughly
-     * x=1..14, y=1..11; this starts at x=12 like the text window always
-     * has). Height 22 = 10 content rows (Sprint Speed, HQ Audio, Alt
-     * Controls, Scanlines, Antialiasing, Tilt Shift, Wide FOV, Color
-     * Grading, Aspect Ratio, Logging; previously height 12 for 5 rows
-     * before the single 3-way "Alternative Visuals" row was split into
-     * five independent FX toggles plus Aspect Ratio; briefly 16/7 rows
-     * when Bloom/Depth of Field/Light Shafts/Color Grading were each their
-     * own row, before the latter three were folded into one "Experimental
-     * Visuals" toggle and Bloom was removed; briefly 14 for a 6th Auto
-     * Save row before that feature was removed entirely, sm_handle_input()'s
-     * cursor bound is (height-2)/2 rows, same formula noted on
-     * WINDOW_QUIT_CONFIRM below). */
-    [WINDOW_SETTINGS_MENU] = { 12, 1, 19, 22 },
+     * window.h), not from WINDOW_CONFIGURATION_TABLE. Same x as 0x01
+     * (Text standard) always has; y moved from 1 to 0 (see below). Height
+     * 28 = 13 content rows (Text Speed, Sound, Window Style -- the
+     * original ROM's own Set Up preferences, now also live-editable
+     * mid-game, see mode_step_settings_menu()'s doc comment -- plus
+     * Sprint Speed, HQ Audio, Alt Controls, Scanlines, Antialiasing, Tilt
+     * Shift, Wide FOV, Color Grading, Aspect Ratio, Logging; previously
+     * height 22 for 10 rows, 12 for 5 before the single 3-way "Alternative
+     * Visuals" row was split into five independent FX toggles plus Aspect
+     * Ratio; briefly 16/7 rows when Bloom/Depth of Field/Light Shafts/
+     * Color Grading were each their own row, before the latter three were
+     * folded into one "Experimental Visuals" toggle and Bloom was
+     * removed; briefly 14 for a 6th Auto Save row before that feature was
+     * removed entirely, sm_handle_input()'s cursor bound is (height-2)/2
+     * rows, same formula noted on WINDOW_QUIT_CONFIRM below). y=0 (was 1)
+     * because 13 rows' worth of height (28) is the full SNES_HEIGHT/8
+     * tile-row budget with zero slack left for a y=1 top margin -- the
+     * previous 10-row window still had 5 rows of headroom at y=1
+     * (22+1=23 of 28), this one has none, so it starts at the very top
+     * row instead. */
+    [WINDOW_SETTINGS_MENU] = { 12, 0, 19, 28 },
     /* Self-update screen, this port's own addition (WINDOW_UPDATE_CHECK,
      * window.h). Opened as a child over the file-select main window (0x13,
      * {1,2,30,8}) the same way file-select's own Text Speed (0x18) and
@@ -159,6 +175,17 @@ static const uint16_t window_configs[][4] = {
      * (0x02) / WINDOW_ESCARGO_EXPRESS_ITEM (0x0D), never open at the same
      * time as either, so no collision. */
     [WINDOW_KEY_ITEMS] = { 7, 1, 24, 16 },
+    /* Aspect Ratio, this port's own addition to the Set Up cascade (see
+     * window.h). Same shape as Music Mode (0x19, a title line + N single-
+     * pick rows), just a little wider to fit "16:9 (Widescreen)". */
+    [WINDOW_FILE_SELECT_ASPECT] = { 6, 15, 22, 8 },
+    /* Visual Tweaks, this port's own addition to the Set Up cascade (see
+     * window.h). Height 20 = title + 5 toggle rows (text_y 2-6) + a blank
+     * spacer row + Done (text_y 8) -- sm_handle_input()'s cursor bound is
+     * (height-2)/2 rows, same formula noted on WINDOW_SETTINGS_MENU/
+     * WINDOW_QUIT_CONFIRM above, needs >= 8 to reach Done's row. Width 26
+     * to fit "Antialiasing: Off" plus margin. */
+    [WINDOW_FILE_SELECT_TWEAKS] = { 3, 6, 26, 20 },
 };
 #define WINDOW_CONFIG_COUNT (sizeof(window_configs) / sizeof(window_configs[0]))
 
@@ -316,7 +343,28 @@ WindowInfo *create_window(uint16_t window_id) {
     if (!w->content_tilemap || w->content_tilemap_size != needed) {
         tilemap_pool_free(w);
         w->content_tilemap = tilemap_pool_alloc(needed);
-        assert(w->content_tilemap && "tilemap pool exhausted, increase WINDOW_TILEMAP_POOL_SIZE");
+        /* assert() alone isn't enough here: it's compiled out under this
+         * project's Release build (-DNDEBUG), so a genuine pool-exhaustion
+         * failure used to fall straight through with content_tilemap still
+         * NULL -- the memset below wrote through that NULL, and everything
+         * downstream (this window's own tile writes, later windows,
+         * win.current_focus_window) was then working from corrupted state.
+         * Reported live as what looked like an unrelated selection-menu
+         * bug (a screen requiring two confirms) with no crash anywhere
+         * near the real cause. LOG_EVENT is always-on (no -v/Logging
+         * needed) specifically so this stays visible if the pool is ever
+         * this close to its ceiling again, and returning NULL here lets
+         * every existing caller's already-established "if (!w) return ..."
+         * failure path handle it safely instead of continuing on broken
+         * state. */
+        if (!w->content_tilemap) {
+            LOG_EVENT("create_window: tilemap pool exhausted allocating %u "
+                      "entries for window 0x%02X -- increase "
+                      "WINDOW_TILEMAP_POOL_SIZE\n", needed, window_id);
+            w->content_tilemap_size = 0;
+            w->active = false;
+            return NULL;
+        }
         w->content_tilemap_size = needed;
         /* Keep the serializable pool offset in sync with the ptr (savestate D0b). */
         w->content_tilemap_offset = (uint16_t)(w->content_tilemap - win.tilemap_pool);

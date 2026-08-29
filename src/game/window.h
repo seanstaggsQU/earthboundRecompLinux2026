@@ -20,8 +20,22 @@
 #define WINDOW_TILEMAP_MAX 450
 
 /* Shared tilemap pool size (in uint16_t entries).
- * Empirical high-water mark is 936 entries. 1100 gives ~17% headroom. */
-#define WINDOW_TILEMAP_POOL_SIZE 1100
+ * Empirical high-water mark was 936 entries (1100 gave ~17% headroom) before
+ * the Set Up cascade grew two more screens (WINDOW_FILE_SELECT_ASPECT +
+ * WINDOW_FILE_SELECT_TWEAKS, window.h) that stay open as backdrop alongside
+ * every earlier Set Up screen, matching this file's existing "leave prior
+ * screens open" convention (see file_select.c's *_RESULT handlers) -- adds
+ * up to ~550 more entries live at once (WINDOW_FILE_SELECT_TWEAKS alone is
+ * 432, close to the single-window WINDOW_TILEMAP_MAX cap). Reported live as
+ * a real, silent bug: create_window()'s tilemap_pool_alloc() call failed
+ * (first-fit allocator, genuinely out of contiguous room), its assert()
+ * caught nothing (asserts are compiled out under this project's Release
+ * build, -DNDEBUG), and execution continued with a NULL content_tilemap,
+ * corrupting later window/focus state in a way that looked like an
+ * unrelated selection-menu bug (a screen appearing to require confirming
+ * twice) rather than an allocation failure. 1700 gives real headroom over
+ * the new realistic high-water mark (~1488), not just enough to limp by. */
+#define WINDOW_TILEMAP_POOL_SIZE 1700
 
 /* Window IDs matching include/constants/windows.asm */
 #define WINDOW_COMMAND_MENU           0x00
@@ -84,6 +98,12 @@
  * WINDOW_INVENTORY/WINDOW_ESCARGO_EXPRESS_ITEM's rect (never open at the
  * same time as either). */
 #define WINDOW_KEY_ITEMS              0x39
+/* Aspect Ratio and Visual Tweaks screens, this port's own addition
+ * (extending the original ROM's Set Up cascade -- see FM_SETUP_ASPECT/
+ * FM_SETUP_TWEAKS, mode_stack.h, and fm_aspect_build()/fm_tweaks_build(),
+ * file_select.c), one/two past WINDOW_KEY_ITEMS for the same reason. */
+#define WINDOW_FILE_SELECT_ASPECT     0x3A
+#define WINDOW_FILE_SELECT_TWEAKS     0x3B
 
 /* Menu option - matches menu_option from structs.asm (45 bytes in asm) */
 #define MENU_LABEL_SIZE 26  /* asm: 25-byte label at offset 19, +1 for null */

@@ -190,7 +190,8 @@ if(EB_RUNTIME_ASSETS)
     set(EMBED_GENERATED_SOURCE "")
 
     if(NOT EXISTS "${RUNTIME_GEN_DIR}/asset_ids.h" OR NOT EXISTS "${RUNTIME_GEN_DIR}/asset_pack_layout.c"
-        OR NOT EXISTS "${RUNTIME_GEN_DIR}/rom_extract_table.c" OR NOT EXISTS "${RUNTIME_GEN_DIR}/text_dialogue_source.c")
+        OR NOT EXISTS "${RUNTIME_GEN_DIR}/rom_extract_table.c" OR NOT EXISTS "${RUNTIME_GEN_DIR}/text_dialogue_source.c"
+        OR NOT EXISTS "${RUNTIME_GEN_DIR}/dont_care_names_source.c")
         message(WARNING
             "EB_RUNTIME_ASSETS=ON: no pre-generated metadata in ${RUNTIME_GEN_DIR} "
             "yet, so earthbound_game/earthbound won't build until a maintainer "
@@ -210,6 +211,7 @@ if(EB_RUNTIME_ASSETS)
             "${RUNTIME_GEN_DIR}/asset_pack_layout.c"
             "${RUNTIME_GEN_DIR}/rom_extract_table.c"
             "${RUNTIME_GEN_DIR}/text_dialogue_source.c"
+            "${RUNTIME_GEN_DIR}/dont_care_names_source.c"
         )
         target_include_directories(earthbound_game PUBLIC ${RUNTIME_GEN_DIR})
         target_compile_definitions(earthbound_game PUBLIC EB_RUNTIME_ASSETS=1)

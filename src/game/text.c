@@ -672,11 +672,11 @@ static uint16_t count_characters_with_psi(void) {
 }
 
 /* BUILD_COMMAND_MENU: Port of asm/text/menu/build_command_menu.asm, plus
- * "Save"/"Config"/"Quit" items that do not exist in the original ROM (see
+ * "Save"/"Set Up"/"Quit" items that do not exist in the original ROM (see
  * below).
  *
  * Builds the command menu (Talk to, Goods, PSI, Equip, Check, Status, Save,
- * Config, Quit) in a 2-column grid on WINDOW::COMMAND_MENU.
+ * Set Up, Quit) in a 2-column grid on WINDOW::COMMAND_MENU.
  *
  * PSI is omitted if no party member can use PSI.
  * Sound effect per item: Talk to/Check = 1 (CURSOR1), others = 27 (MENU_OPEN_CLOSE).
@@ -687,13 +687,13 @@ static uint16_t count_characters_with_psi(void) {
  *   PSI(0,1)      Equip(6,1)
  *   Check(0,2)    Status(6,2)
  *
- * "Save" (0,3), "Config" (6,3), and "Quit" (0,4) are this port's own
+ * "Save" (0,3), "Set Up" (6,3), and "Quit" (0,4) are this port's own
  * additions, not from the ROM's CMD_WINDOW_TEXT table (which only has 6
  * entries), their labels are hardcoded C strings. Save calls the same
  * save_game() used by the in-game SAVE_GAME text control (phone call to
  * Dad, sanctuaries, etc.), it's the only quick-save path now that the old
  * F4/R3 hotkey has been removed (R3 is the overworld FOV/zoom cycle
- * instead, see AUX_ZOOM_TOGGLE in game_main.c). Config opens
+ * instead, see AUX_ZOOM_TOGGLE in game_main.c). Set Up opens
  * GAME_MODE_SETTINGS_MENU (mode_step_settings_menu below). Quit shows a
  * "Really quit?" Yes/No confirmation (PM_MAIN_RESULT case 9 /
  * PM_QUIT_CONFIRM_RESULT) -- too easy to hit by accident without one --
@@ -721,7 +721,7 @@ static void build_command_menu(void) {
      *   Talk to / Check
      *   Goods   / Keys
      *   PSI     / Equip
-     *   Status  / Config
+     *   Status  / Set Up
      *   Save    / Quit    */
     static const uint8_t cmd_x[6] = { 0, 0, 0, 6, 6, 0 };
     static const uint8_t cmd_y[6] = { 0, 1, 2, 2, 0, 3 };
@@ -763,7 +763,7 @@ static void build_command_menu(void) {
         }
     }
 
-    /* "Save", "Config", and "Quit", this port's own 7th/8th/9th items, not
+    /* "Save", "Set Up", and "Quit", this port's own 7th/8th/9th items, not
      * part of the ROM's 6-entry CMD_WINDOW_TEXT table. userdata 7/8/9 are
      * handled in mode_step_pause_menu() (PM_MAIN_RESULT, text.c). */
     add_menu_item("Save", 7, 0, 4);
@@ -772,7 +772,7 @@ static void build_command_menu(void) {
         if (w && w->menu_count > 0)
             w->menu_items[w->menu_count - 1].sound_effect = 27;  /* SFX::MENU_OPEN_CLOSE */
     }
-    add_menu_item("Config", 8, 6, 3);
+    add_menu_item("Set Up", 8, 6, 3);
     {
         WindowInfo *w = get_window(win.current_focus_window);
         if (w && w->menu_count > 0)
@@ -789,8 +789,9 @@ static void build_command_menu(void) {
      * of the original ROM/assembly). Placed at (6,1), next to "Goods".
      * Label is "Keys", not the full "Key Items" (10 chars): that would
      * overflow the x=6 column and wrap, corrupting the "Goods" item's
-     * rendering. "Config" (6 chars) is the longest label that fits in
-     * that column; "Keys" (4 chars) matches "Quit"/"Save"'s length. */
+     * rendering. "Set Up" (6 chars, renamed from "Config") is the
+     * longest label used in that column today; "Keys" (4 chars) matches
+     * "Quit"/"Save"'s length. */
     add_menu_item("Keys", 10, 6, 1);
     {
         WindowInfo *w = get_window(win.current_focus_window);
@@ -3018,7 +3019,7 @@ StepResult mode_step_pause_menu(ModeState *ms) {
                 continue;
             }
 
-            /* Config (this port's own addition, not in the original ROM menu) */
+            /* Set Up (this port's own addition, not in the original ROM menu) */
             case 8:
                 pm_child_init = (ModeState){0};
                 pm_child_init.settings_menu.phase = SET_BUILD;
@@ -3561,19 +3562,23 @@ StepResult mode_step_pause_menu(ModeState *ms) {
 
 /* GAME_MODE_SETTINGS_MENU step, this port's own addition, not a port of
  * any ROM routine (see SettingsMenuState/SettingsMenuPhase, mode_stack.h).
- * Reached from the command menu's "Config" item (build_command_menu()
+ * Reached from the command menu's "Set Up" item (build_command_menu()
  * above). One selectable row per engine preference; confirming a row
  * cycles its value, persists it, and rebuilds the window so the new value
  * shows immediately, same build/dispatch/rebuild loop shape as
  * mode_step_debug_menu (game_main.c). Cancel (B/Select) closes the screen
  * and returns to the command menu underneath.
  *
- * Ten rows exist today (Sprint Speed, High Quality Audio, Alt Controls,
- * Scanlines, Antialiasing, Tilt Shift, Wide FOV, Color Grading, Aspect
- * Ratio, Logging -- the five FX toggles plus Aspect Ratio replaced a
- * single 3-way "Alternative Visuals" row, see settings.h's FxToggleSetting
- * comment); more engine preferences can be added as additional userdata
- * cases without changing this shape. */
+ * Thirteen rows exist today (Sprint Speed, High Quality Audio, Alt
+ * Controls, Scanlines, Antialiasing, Tilt Shift, Wide FOV, Color Grading,
+ * Aspect Ratio, Logging -- the five FX toggles plus Aspect Ratio replaced
+ * a single 3-way "Alternative Visuals" row, see settings.h's
+ * FxToggleSetting comment -- plus Text Speed, Sound, and Window Style,
+ * the original ROM's own Set Up preferences, folded in here too so
+ * they're changeable mid-game and not just from file-select's Set Up
+ * cascade, see the three label tables below for that story); more engine
+ * preferences can be added as additional userdata cases without changing
+ * this shape. */
 static const char *sprint_speed_labels[SPRINT_SPEED_COUNT] = {
     [SPRINT_SPEED_OFF]    = "Sprint: Off",
     [SPRINT_SPEED_MEDIUM] = "Sprint: Medium (+50%)",
@@ -3621,6 +3626,38 @@ static const char *logging_labels[LOGGING_COUNT] = {
     [LOGGING_OFF] = "Logging: Off",
     [LOGGING_ON]  = "Logging: On",
 };
+/* Text Speed / Sound / Window Style: the original ROM's own Set Up
+ * screens (file_select.c's fm_textspeed_build()/fm_sound_build()/
+ * fm_flavour_build(), reached from a save file's Set Up option and forced
+ * during New Game creation), now also reachable and live-changeable from
+ * this menu mid-game -- unlike every other row above, these write
+ * straight into game_state (the SRAM save file itself, same fields
+ * file_select.c's Set Up screens write), not settings.dat, since they're
+ * per-save-file preferences in the original game, not engine/device
+ * prefs. All three take effect immediately (game_state.text_speed is
+ * read live by display_text.c on every printed line; text_flavour's
+ * palette is reloaded here the same way fm_flavour_apply() does; Sound
+ * has no live audio effect to reapply, see hq_audio_label_no_pack's
+ * comment above for the closest thing this port has to that same
+ * "stored but currently inert" caveat -- Sound predates it and is
+ * inert for a different reason, no code anywhere reads sound_setting
+ * back out). */
+static const char *text_speed_labels[4] = {
+    [1] = "Text Speed: Fast",
+    [2] = "Text Speed: Medium",
+    [3] = "Text Speed: Slow",
+};
+static const char *sound_labels[2] = {
+    [0] = "Sound: Stereo",
+    [1] = "Sound: Mono",
+};
+static const char *window_style_labels[6] = {
+    [1] = "Window Style: Plain",
+    [2] = "Window Style: Mint",
+    [3] = "Window Style: Strawberry",
+    [4] = "Window Style: Banana",
+    [5] = "Window Style: Peanut",
+};
 StepResult mode_step_settings_menu(ModeState *ms) {
     SettingsMenuState *st = &ms->settings_menu;
 
@@ -3637,6 +3674,25 @@ StepResult mode_step_settings_menu(ModeState *ms) {
         add_menu_item(color_grading_labels[engine_fx_color_grading], 8, 0, 7);
         add_menu_item(aspect_ratio_labels[engine_aspect_ratio], 9, 0, 8);
         add_menu_item(logging_labels[engine_logging], 10, 0, 9);
+        /* Text Speed/Sound/Window Style: game_state fields, not engine_*
+         * (see this function's doc comment). Clamped rather than trusted
+         * outright -- this menu is also reachable from file-select's
+         * top-level "Set Up" item (FM_CONFIG, file_select.c) before any
+         * save is loaded/started, where game_state can still be at its
+         * all-zero process-start default (text_speed/text_flavour==0,
+         * out of their real 1..3/1..5 range and NULL in the label
+         * tables above) rather than game_state_init()'s real defaults. */
+        {
+            uint8_t ts = game_state.text_speed;
+            if (ts < 1 || ts > 3) ts = 2;
+            uint8_t sc = game_state.sound_setting;
+            if (sc > 1) sc = 0;
+            uint8_t fl = game_state.text_flavour;
+            if (fl < 1 || fl > 5) fl = 1;
+            add_menu_item(text_speed_labels[ts], 11, 0, 10);
+            add_menu_item(sound_labels[sc], 12, 0, 11);
+            add_menu_item(window_style_labels[fl], 13, 0, 12);
+        }
         open_window_and_print_menu(1, 0);
         st->phase = SET_RESULT;
         return menu_push_selection(&st->result_ready, &st->result, 1);
@@ -3722,14 +3778,19 @@ StepResult mode_step_settings_menu(ModeState *ms) {
              * zoom-cycle toggles between (game_main.c) and the original
              * ROM's per-encounter battle letterbox suppression (battle_ui.c),
              * both read this setting fresh too, no extra bookkeeping needed
-             * here except defaulting zoom to Wide the instant it's turned
-             * on (matches the same default applied at boot in main.c for a
-             * fresh session that already has Wide FOV configured) -- the
-             * player can still R3-cycle away from it afterward. */
+             * here except forcing zoom_mode to match the new state
+             * immediately: Wide the instant it's turned on (matches the
+             * same default applied at boot in main.c for a fresh session
+             * that already has Wide FOV configured), Off the instant it's
+             * turned off (reported live: leaving this unset on the Off
+             * path left zoom_mode stuck at EB_ZOOM_OUT from before, so the
+             * view stayed wide regardless of the toggle, and Aspect Ratio
+             * looked like it did nothing since EB_ZOOM_OUT ignores it by
+             * design, see sdl2_video.c) -- the player can still R3-cycle
+             * away from either afterward. */
             engine_fx_wide_fov = (uint8_t)((engine_fx_wide_fov + 1) % FX_TOGGLE_COUNT);
             settings_save();
-            if (engine_fx_wide_fov == FX_TOGGLE_ON)
-                ow.zoom_mode = EB_ZOOM_OUT;
+            ow.zoom_mode = (engine_fx_wide_fov == FX_TOGGLE_ON) ? EB_ZOOM_OUT : EB_ZOOM_OFF;
             play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
             st->phase = SET_BUILD;
             return STEP_RESULT_CONTINUE();
@@ -3766,6 +3827,47 @@ StepResult mode_step_settings_menu(ModeState *ms) {
             settings_save();
             if (engine_logging == LOGGING_ON)
                 platform_log_set_enabled(true);
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 11) {
+            /* Text Speed row confirmed: cycle Fast -> Medium -> Slow ->
+             * Fast. Writes game_state directly (see this menu's doc
+             * comment) and recomputes dt.text_speed_based_wait the same
+             * way file_select.c's fm_textspeed_apply() does, so the very
+             * next printed line uses the new speed. */
+            uint8_t ts = game_state.text_speed;
+            if (ts < 1 || ts > 3) ts = 2;
+            ts = (uint8_t)(ts % 3) + 1;
+            game_state.text_speed = ts;
+            dt.text_speed_based_wait = (ts == 3) ? 0 : (uint16_t)(ts * 30);
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 12) {
+            /* Sound row confirmed: cycle Stereo <-> Mono. No live audio
+             * effect to reapply -- see this menu's doc comment, nothing
+             * anywhere reads sound_setting back out, same as file-select's
+             * own Sound screen. */
+            uint8_t sc = game_state.sound_setting;
+            if (sc > 1) sc = 0;
+            game_state.sound_setting = (uint8_t)((sc + 1) % 2);
+            play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
+            st->phase = SET_BUILD;
+            return STEP_RESULT_CONTINUE();
+        }
+        if (selection == 13) {
+            /* Window Style row confirmed: cycle Plain -> Mint ->
+             * Strawberry -> Banana -> Peanut -> Plain, reloading the
+             * palette immediately the same way file_select.c's
+             * fm_flavour_apply() does. */
+            uint8_t fl = game_state.text_flavour;
+            if (fl < 1 || fl > 5) fl = 1;
+            fl = (uint8_t)(fl % 5) + 1;
+            game_state.text_flavour = fl;
+            text_load_flavour_palette(fl - 1);
             play_sfx(27);  /* SFX::MENU_OPEN_CLOSE */
             st->phase = SET_BUILD;
             return STEP_RESULT_CONTINUE();

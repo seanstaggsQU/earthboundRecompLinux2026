@@ -2113,12 +2113,20 @@ typedef enum {
     FM_SETUP_SND_RESULT,
     FM_SETUP_FLV,       /* existing-save Set Up: flavour menu */
     FM_SETUP_FLV_RESULT,
+    FM_SETUP_ASPECT,        /* existing-save Set Up: aspect-ratio menu, this port's own addition */
+    FM_SETUP_ASPECT_RESULT,
+    FM_SETUP_TWEAKS,        /* existing-save Set Up: visual-tweaks menu, this port's own addition */
+    FM_SETUP_TWEAKS_RESULT, /* toggle row -> loop back to FM_SETUP_TWEAKS; Done -> save+return */
     FM_NG_TS,           /* new-game: text-speed menu */
     FM_NG_TS_RESULT,
     FM_NG_SND,          /* new-game: sound-mode menu */
     FM_NG_SND_RESULT,
     FM_NG_FLV,          /* new-game: flavour menu */
     FM_NG_FLV_RESULT,
+    FM_NG_ASPECT,        /* new-game: aspect-ratio menu, this port's own addition */
+    FM_NG_ASPECT_RESULT,
+    FM_NG_TWEAKS,        /* new-game: visual-tweaks menu, this port's own addition */
+    FM_NG_TWEAKS_RESULT, /* toggle row -> loop back to FM_NG_TWEAKS; Done -> FM_NG_NAMING */
     FM_NG_NAMING,       /* new-game: push GAME_MODE_NEW_GAME_NAMING */
     FM_NG_NAMING_RESULT,/* naming popped: started (pop 1) or backed out (re-enter flavour) */
     FM_UPDATE_CHECK,        /* "Check for Updates" row chosen: push GAME_MODE_UPDATE_CHECK */

@@ -87,3 +87,24 @@ def generate_text_dialogue_source_cmd(
     output_dir.mkdir(parents=True, exist_ok=True)
     doc = load_dump_doc(yaml_config)
     generate_text_dialogue_source(doc, output_dir)
+
+
+@generate_app.command(name="dont-care-names-source")
+def generate_dont_care_names_source_cmd(
+    output_dir: Annotated[Path, Parameter(help="Directory for the generated .h/.c files")],
+    *,
+    json_path: Annotated[Path, Parameter(alias="-j", help="Path to dont_care_names.json")] = Path(
+        "src/custom_assets/dont_care_names.json"
+    ),
+) -> None:
+    """Generate dont_care_names_source.h/.c: the "Don't Care" naming-screen
+    name pool as plain ASCII C string literals, for the ROM-only build path
+    (src/data/rom_extract.c)."""
+    from ebtools.parsers.dont_care_names_source import generate_dont_care_names_source
+
+    if not json_path.exists():
+        print(f"Error: {json_path} not found", file=sys.stderr)
+        sys.exit(1)
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+    generate_dont_care_names_source(json_path, output_dir)

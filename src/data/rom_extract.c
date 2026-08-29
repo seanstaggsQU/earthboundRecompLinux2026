@@ -11,6 +11,7 @@
 #include "core/decomp.h"
 #include "rom_extract_table.h"
 #include "text_compile.h"
+#include "dont_care_compile.h"
 
 #include <dirent.h>
 #include <stdbool.h>
@@ -482,15 +483,30 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
         return EB_ROM_EXTRACT_WRITE_FAILED;
     }
 
+    /* Same derived-asset pattern again: the "Don't Care" name pool isn't
+     * a ROM byte range either, it's this port's own custom overlay (see
+     * dont_care_compile.c). No ROM data involved at all -- purely
+     * generated-table-to-bytes -- so unlike the two builders above this
+     * one can't actually fail short of malloc failure. */
+    uint8_t *dont_care_blob = NULL;
+    size_t dont_care_blob_size = 0;
+    if (!dont_care_names_build_blob(&dont_care_blob, &dont_care_blob_size)) {
+        for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
+        free(dialogue_blob);
+        free(rom_data);
+        return EB_ROM_EXTRACT_WRITE_FAILED;
+    }
+
     int psi_base = (int)ASSET_PSIANIMS_ARRANGEMENTS(0);
 
     /* Effective per-asset size: the plain ROM byte range, except for the
-     * PSI arrangement family and dialogue.bin, which use their derived
-     * sizes instead. */
+     * PSI arrangement family, dialogue.bin, and the Don't Care name pool,
+     * which use their derived sizes instead. */
     uint32_t *eff_size = malloc(sizeof(uint32_t) * ASSET_COUNT);
     if (!eff_size) {
         for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
         free(dialogue_blob);
+        free(dont_care_blob);
         free(rom_data);
         return EB_ROM_EXTRACT_IO_ERROR;
     }
@@ -500,6 +516,8 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
             eff_size[i] = (uint32_t)psi_bundle_sizes[psi_idx];
         } else if (i == (int)ASSET_DIALOGUE_DIALOGUE_BIN) {
             eff_size[i] = (uint32_t)dialogue_blob_size;
+        } else if (i == (int)ASSET_US_DATA_DONT_CARE_NAMES_BIN) {
+            eff_size[i] = (uint32_t)dont_care_blob_size;
         } else {
             eff_size[i] = rom_extract_table[i].rom_size;
         }
@@ -512,6 +530,7 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
         for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
         free(eff_size);
         free(dialogue_blob);
+        free(dont_care_blob);
         free(rom_data);
         return EB_ROM_EXTRACT_IO_ERROR;
     }
@@ -528,6 +547,7 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
         for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
         free(eff_size);
         free(dialogue_blob);
+        free(dont_care_blob);
         free(rom_data);
         free(blob_offsets);
         return EB_ROM_EXTRACT_WRITE_FAILED;
@@ -540,6 +560,7 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
         for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
         free(eff_size);
         free(dialogue_blob);
+        free(dont_care_blob);
         free(rom_data);
         free(blob_offsets);
         return EB_ROM_EXTRACT_WRITE_FAILED;
@@ -572,6 +593,10 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
             ok = fwrite(dialogue_blob, 1, sz, of) == sz;
             continue;
         }
+        if (i == (int)ASSET_US_DATA_DONT_CARE_NAMES_BIN) {
+            ok = fwrite(dont_care_blob, 1, sz, of) == sz;
+            continue;
+        }
         uint32_t off = rom_extract_table[i].rom_offset;
         if ((uint64_t)off + (uint64_t)sz > (uint64_t)rom_avail) {
             ok = false;
@@ -584,6 +609,7 @@ EbRomExtractResult rom_extract_build_pak(const char *rom_path, const char *out_p
     for (int i = 0; i < PSI_ARRANGEMENT_COUNT; i++) free(psi_bundles[i]);
     free(eff_size);
     free(dialogue_blob);
+    free(dont_care_blob);
     free(rom_data);
     free(blob_offsets);
 

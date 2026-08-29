@@ -18,6 +18,7 @@
 #include "include/pad.h"
 #include "game/overworld.h"
 #include "game/inventory.h"
+#include "game/settings.h"
 #include "game/battle.h"
 #include "include/constants.h"
 #include <string.h>
@@ -232,12 +233,12 @@ static int fm_file_select_build(void) {
     /* This port's own addition, not in WINDOW_CONFIGURATION_TABLE or the
      * original assembly, a 4th row below the 3 save slots, unconditional
      * (unlike Check for Updates below), opening the same
-     * GAME_MODE_SETTINGS_MENU the in-game pause menu's Config item does
+     * GAME_MODE_SETTINGS_MENU the in-game pause menu's Set Up item does
      * (mode_step_settings_menu(), text.c, generic global-state UI, no
      * new implementation needed). userdata 4 is handled as a special case
      * in FM_SELECT_RESULT, before the save-slot math below, same pattern
      * as Check for Updates' userdata 5. */
-    add_menu_item("Config", 4, 0, 3);
+    add_menu_item("Set Up", 4, 0, 3);
 
     /* Only shown on builds that actually have a self-update backend (a
      * desktop build compiled with a private release feed configured; see
@@ -254,9 +255,9 @@ static int fm_file_select_build(void) {
      * Close Game/Title Screen submenu -- there's no meaningfully different
      * "Title Screen" state to return to from file select itself, so a Yes
      * always means platform_request_quit(). userdata 6 is handled as a
-     * special case in FM_SELECT_RESULT, same pattern as Config/Check for
+     * special case in FM_SELECT_RESULT, same pattern as Set Up/Check for
      * Updates above. Row position (below Check for Updates when present,
-     * directly below Config otherwise) follows naturally from insertion
+     * directly below Set Up otherwise) follows naturally from insertion
      * order here. */
     add_menu_item("Quit", 6, 0, platform_update_supported() ? 5 : 4);
 
@@ -548,6 +549,84 @@ static int fm_flavour_build(void) {
 static void fm_flavour_apply(uint16_t result) {
     game_state.text_flavour = (uint8_t)result;  /* 1-indexed, matching assembly */
     text_load_flavour_palette(game_state.text_flavour - 1);
+}
+
+/*
+ * Aspect Ratio selection menu, this port's own addition (not from the
+ * original ROM's Set Up cascade -- see settings.h's AspectRatioSetting).
+ * Same single-pick shape as Text Speed/Sound above: exactly one of the two
+ * rows is the result, appears both in the existing-save Set Up cascade and
+ * the new-game cascade (FM_SETUP_ASPECT/FM_NG_ASPECT), one screen after
+ * Flavour and one before the new Visual Tweaks screen below -- per the
+ * user's explicit ask to keep the original three-screen forced cascade
+ * intact and just extend it, rather than replacing it with a free-form
+ * settings list.
+ */
+static int fm_aspect_build(void) {
+    WindowInfo *w = create_window(WINDOW_FILE_SELECT_ASPECT);
+    if (!w) return 0;
+    w->menu_count = 0; /* Reset for re-entry (back-navigation) */
+
+    set_focus_text_cursor(0, 0);
+    print_string("How much do you wanna see?");
+
+    add_menu_item("16:9 (Widescreen)", 1, 0, 1);
+    add_menu_item("4:3 (Original)", 2, 0, 2);
+
+    print_menu_items();
+    return -1;
+}
+
+/* Apply an aspect-ratio selection (result > 0). */
+static void fm_aspect_apply(uint16_t result) {
+    engine_aspect_ratio = (uint8_t)(result - 1);  /* 1=16:9 -> 0, 2=4:3 -> 1 */
+    settings_save();
+}
+
+/*
+ * Visual Tweaks menu, this port's own addition. Unlike every other Set Up
+ * screen above (single-pick: one selection both applies and advances to
+ * the next screen), this one lists the five independent FX toggles
+ * (settings.h's FxToggleSetting -- Scanlines/Antialiasing/Tilt Shift/Wide
+ * FOV/Color Grading, same rows and same engine_fx_* globals as the
+ * Set Up menu's own copy, see mode_step_settings_menu() in text.c) plus a
+ * trailing "Done" row: picking a toggle row flips it in place and rebuilds
+ * this same screen (FM_SETUP_TWEAKS_RESULT loops back to FM_SETUP_TWEAKS
+ * rather than advancing), picking Done is what actually advances/saves.
+ * Cancel (B) backs out to Aspect Ratio, same as every other screen here.
+ */
+static int fm_tweaks_build(void) {
+    WindowInfo *w = create_window(WINDOW_FILE_SELECT_TWEAKS);
+    if (!w) return 0;
+    w->menu_count = 0; /* Reset for re-entry (back-navigation/re-toggling) */
+
+    set_focus_text_cursor(0, 0);
+    print_string("Anything fancy?");
+
+    add_menu_item(engine_fx_scanlines == FX_TOGGLE_ON ? "Scanlines: On" : "Scanlines: Off", 1, 0, 2);
+    add_menu_item(engine_fx_antialiasing == FX_TOGGLE_ON ? "Antialiasing: On" : "Antialiasing: Off", 2, 0, 3);
+    add_menu_item(engine_fx_tiltshift == FX_TOGGLE_ON ? "Tilt Shift: On" : "Tilt Shift: Off", 3, 0, 4);
+    add_menu_item(engine_fx_wide_fov == FX_TOGGLE_ON ? "Wide FOV: On" : "Wide FOV: Off", 4, 0, 5);
+    add_menu_item(engine_fx_color_grading == FX_TOGGLE_ON ? "Color Grading: On" : "Color Grading: Off", 5, 0, 6);
+    add_menu_item("Done", 6, 0, 8);
+
+    print_menu_items();
+    return -1;
+}
+
+/* Toggles one FX row in place (selection 1-5); selection 6 (Done) is
+ * handled by the caller instead, since it advances/exits rather than
+ * looping. Mirrors mode_step_settings_menu()'s own row dispatch. */
+static void fm_tweaks_toggle(uint16_t selection) {
+    switch (selection) {
+    case 1: engine_fx_scanlines = (uint8_t)((engine_fx_scanlines + 1) % FX_TOGGLE_COUNT); break;
+    case 2: engine_fx_antialiasing = (uint8_t)((engine_fx_antialiasing + 1) % FX_TOGGLE_COUNT); break;
+    case 3: engine_fx_tiltshift = (uint8_t)((engine_fx_tiltshift + 1) % FX_TOGGLE_COUNT); break;
+    case 4: engine_fx_wide_fov = (uint8_t)((engine_fx_wide_fov + 1) % FX_TOGGLE_COUNT); break;
+    case 5: engine_fx_color_grading = (uint8_t)((engine_fx_color_grading + 1) % FX_TOGGLE_COUNT); break;
+    default: return;
+    }
+    settings_save();
 }
 
 /*
@@ -1817,7 +1896,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
         case FM_SELECT_RESULT: {
             uint16_t selected = fm_take_result(st);
             if (selected == 4) {
-                /* "Config" -- not a save slot. Must be handled before the
+                /* "Set Up" -- not a save slot. Must be handled before the
                  * current_save_slot assignment/slot math below, same
                  * reasoning as "Check for Updates" just below (selected==4
                  * would otherwise fall through to save_files_present[3],
@@ -1828,13 +1907,13 @@ StepResult mode_step_file_menu(ModeState *ms) {
                 continue;
             }
             if (selected == 5) {
-                /* "Check for Updates" -- same guard reasoning as Config
+                /* "Check for Updates" -- same guard reasoning as Set Up
                  * above. */
                 st->phase = FM_UPDATE_CHECK;
                 continue;
             }
             if (selected == 6) {
-                /* "Quit" -- same guard reasoning as Config above. */
+                /* "Quit" -- same guard reasoning as Set Up above. */
                 st->phase = FM_QUIT_CONFIRM;
                 continue;
             }
@@ -1853,7 +1932,7 @@ StepResult mode_step_file_menu(ModeState *ms) {
 
         case FM_CONFIG: {
             /* Pushes the exact same GAME_MODE_SETTINGS_MENU the pause
-             * menu's Config item pushes (text.c), generic global engine
+             * menu's Set Up item pushes (text.c), generic global engine
              * state, nothing party/save-slot specific, so it's directly
              * reusable here with no new settings-menu implementation. */
             fm_child_init = (ModeState){0};
@@ -2057,6 +2136,74 @@ StepResult mode_step_file_menu(ModeState *ms) {
                 continue;
             }
             fm_flavour_apply(fl);
+            /* Close the three original Set Up screens here rather than
+             * leaving them open as backdrop like they normally would be
+             * (see the rest of this cascade's own convention): the SNES's
+             * own BG2 tile budget for window text is a hard, small,
+             * genuinely-hardware-authentic limit (alloc_bg2_tilemap_entry(),
+             * 448 tiles total), and Aspect Ratio + Visual Tweaks below push
+             * three screens' worth of already-open backdrop text over that
+             * ceiling. Reported live as what looked exactly like the
+             * earlier tilemap-*pool* exhaustion bug (a screen requiring
+             * two confirms) -- a completely different, ALSO-real
+             * exhaustion, this one in actual tile-ID space, not the C
+             * port's own pool-index bookkeeping: on exhaustion the
+             * original ROM's own emergency recovery is to silently
+             * CLOSE_ALL_WINDOWS (this port's alloc_bg2_tilemap_entry()
+             * fallback matches it exactly), which was firing mid-build of
+             * the Aspect window and clearing focus out from under it.
+             * They'll rebuild fresh if the player backs up into them
+             * again, so nothing here is actually lost. */
+            close_window(WINDOW_FILE_SELECT_TEXT_SPEED);
+            close_window(WINDOW_FILE_SELECT_MUSIC_MODE);
+            close_window(WINDOW_FILE_SELECT_FLAVOUR);
+            st->phase = FM_SETUP_ASPECT;
+            continue;
+        }
+        case FM_SETUP_ASPECT: {
+            int e = fm_aspect_build();
+            if (e >= 0) { st->result_ready = 1; st->result = (uint16_t)e;
+                          st->phase = FM_SETUP_ASPECT_RESULT; continue; }
+            return fm_push_selection(st, FM_SETUP_ASPECT_RESULT, 1);
+        }
+        case FM_SETUP_ASPECT_RESULT: {
+            uint16_t ar = fm_take_result(st);
+            if (ar == 0) {
+                close_window(WINDOW_FILE_SELECT_ASPECT);
+                st->phase = FM_SETUP_FLV;
+                continue;
+            }
+            fm_aspect_apply(ar);
+            /* Same BG2 tile-budget reasoning as above -- Visual Tweaks
+             * (WINDOW_FILE_SELECT_TWEAKS) is the single biggest screen in
+             * this whole cascade on its own, no room to also keep Aspect
+             * open behind it. */
+            close_window(WINDOW_FILE_SELECT_ASPECT);
+            st->phase = FM_SETUP_TWEAKS;
+            continue;
+        }
+        case FM_SETUP_TWEAKS: {
+            int e = fm_tweaks_build();
+            if (e >= 0) { st->result_ready = 1; st->result = (uint16_t)e;
+                          st->phase = FM_SETUP_TWEAKS_RESULT; continue; }
+            return fm_push_selection(st, FM_SETUP_TWEAKS_RESULT, 1);
+        }
+        case FM_SETUP_TWEAKS_RESULT: {
+            uint16_t tw = fm_take_result(st);
+            if (tw == 0) {
+                close_window(WINDOW_FILE_SELECT_TWEAKS);
+                st->phase = FM_SETUP_ASPECT;
+                continue;
+            }
+            if (tw != 6) {
+                /* One of the 5 toggle rows: apply in place and rebuild the
+                 * same screen (fm_tweaks_build() reads the just-updated
+                 * engine_fx_* globals fresh), not advance. */
+                fm_tweaks_toggle(tw);
+                st->phase = FM_SETUP_TWEAKS;
+                continue;
+            }
+            /* Done */
             save_game(st->selected - 1);   /* @MENU_OTHER_SELECTED */
             close_all_windows();
             st->phase = FM_SELECT;
@@ -2112,6 +2259,51 @@ StepResult mode_step_file_menu(ModeState *ms) {
                 continue;
             }
             fm_flavour_apply(fl);
+            /* BG2 tile-budget headroom for Aspect/Tweaks -- see the
+             * matching comment on FM_SETUP_FLV_RESULT above for why. */
+            close_window(WINDOW_FILE_SELECT_TEXT_SPEED);
+            close_window(WINDOW_FILE_SELECT_MUSIC_MODE);
+            close_window(WINDOW_FILE_SELECT_FLAVOUR);
+            st->phase = FM_NG_ASPECT;
+            continue;
+        }
+        case FM_NG_ASPECT: {
+            int e = fm_aspect_build();
+            if (e >= 0) { st->result_ready = 1; st->result = (uint16_t)e;
+                          st->phase = FM_NG_ASPECT_RESULT; continue; }
+            return fm_push_selection(st, FM_NG_ASPECT_RESULT, 1);
+        }
+        case FM_NG_ASPECT_RESULT: {
+            uint16_t ar = fm_take_result(st);
+            if (ar == 0) {
+                close_window(WINDOW_FILE_SELECT_ASPECT);
+                st->phase = FM_NG_FLV;
+                continue;
+            }
+            fm_aspect_apply(ar);
+            close_window(WINDOW_FILE_SELECT_ASPECT);
+            st->phase = FM_NG_TWEAKS;
+            continue;
+        }
+        case FM_NG_TWEAKS: {
+            int e = fm_tweaks_build();
+            if (e >= 0) { st->result_ready = 1; st->result = (uint16_t)e;
+                          st->phase = FM_NG_TWEAKS_RESULT; continue; }
+            return fm_push_selection(st, FM_NG_TWEAKS_RESULT, 1);
+        }
+        case FM_NG_TWEAKS_RESULT: {
+            uint16_t tw = fm_take_result(st);
+            if (tw == 0) {
+                close_window(WINDOW_FILE_SELECT_TWEAKS);
+                st->phase = FM_NG_ASPECT;
+                continue;
+            }
+            if (tw != 6) {
+                fm_tweaks_toggle(tw);
+                st->phase = FM_NG_TWEAKS;
+                continue;
+            }
+            /* Done */
             st->phase = FM_NG_NAMING;
             continue;
         }

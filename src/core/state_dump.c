@@ -172,7 +172,7 @@ _Static_assert(sizeof(key_items_pool)       == KEY_ITEMS_POOL_SIZE, "ABI: key_it
 _Static_assert(sizeof(ow)                   == 392,   "ABI: ow");
 _Static_assert(sizeof(bt)                   == 3780,  "ABI: bt");
 _Static_assert(sizeof(dt)                   == 152,   "ABI: dt");
-_Static_assert(sizeof(win)                  == 12952, "ABI: win");
+_Static_assert(sizeof(win)                  == 14152, "ABI: win");
 _Static_assert(sizeof(ml)                   == 16970, "ABI: ml");
 /* SECTION_PPU serializes only the fixed PREFIX of PPUState, everything before the
  * per-scanline HDMA tables (wh0/wh1/wh2/wh3_table, tm/ts_per_scanline), which are
