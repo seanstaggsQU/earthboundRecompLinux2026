@@ -603,8 +603,8 @@ void host_process_frame(void) {
      * assumes zoom is off there), but ow.zoom_mode can still be non-OFF by
      * the time either is reached (e.g. Modern Alternative Visuals defaulting
      * gameplay to EB_ZOOM_OUT the moment the player leaves these screens,
-     * below, reported live: this left the title screen zoomed on the very
-     * next boot, which quietly broke the version overlay). Scans the whole
+     * below, which without this reset leaves the title screen zoomed on the
+     * very next boot and quietly breaks the version overlay). Scans the whole
      * stack, not just the top, since any of these can be pushed while a
      * text box is still an ancestor frame. Everywhere else (dialogue,
      * menus, ...) leaves the player's persistent zoom *choice* alone, see
@@ -621,8 +621,8 @@ void host_process_frame(void) {
          * Modern is preserved if they switch back later.
          *
          * Off and Modern each get a 2-way toggle instead of one shared
-         * 3-way cycle, per feedback that a 3-state R3 press was confusing
-         * (which of Off/Wide/Zoom In you'd land on next wasn't obvious).
+         * 3-way cycle: a 3-state R3 press is confusing, since which of
+         * Off/Wide/Zoom In you'd land on next isn't obvious.
          * Modern already defaults to EB_ZOOM_OUT (Wide) the moment the
          * player leaves title/file-select (below), and its "true" baseline
          * is the wide crop, not the original 4:3 window, so its pair is
@@ -641,10 +641,9 @@ void host_process_frame(void) {
          * next R3 press on Zoom In instead of Wide whenever the stored
          * value was that forced OFF (or any other value outside the
          * active pair, e.g. Wide left over from Modern after switching to
-         * Off) -- reported live as "Wide keeps turning itself off",
-         * really "the first post-battle R3 press doesn't restore Wide,
-         * it jumps to Zoom In, so Wide needs an extra press to get back
-         * to and looks like it vanished". Checking against the primary
+         * Off): the first post-battle R3 press wouldn't restore Wide, it'd
+         * jump to Zoom In, so Wide needed an extra press to get back to and
+         * looked like it had vanished. Checking against the primary
          * state instead means ANY foreign value snaps straight back to
          * that pair's primary on the very next press, matching what the
          * player actually wants, and still alternates normally afterward. */
@@ -684,9 +683,9 @@ void host_process_frame(void) {
      * open: EarthBound positions windows (e.g. the standard dialogue box,
      * WINDOW::TEXT_STANDARD at y=1, near the very top of the screen --
      * window.c) freely across the full native height, but a ~1.5x zoom-in
-     * crop only shows the center ~2/3 of that height, a window that close
-     * to an edge gets its border clipped clean off (confirmed live: the
-     * dialogue box's whole top edge was missing). Zoom Out has no such
+     * crop only shows the center ~2/3 of that height, so a window that
+     * close to an edge (the dialogue box's whole top edge, for instance)
+     * gets its border clipped clean off. Zoom Out has no such
      * problem (it only ever reveals more area, never less, so nothing that
      * was visible before can become clipped) and doesn't need this.
      *

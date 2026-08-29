@@ -680,23 +680,20 @@ void process_item_transformations(void) {
     }
 }
 
-/* Not part of the original assembly: scale Paula/Poo's starting level to
- * Ness's CURRENT level at the moment they actually join, instead of the
- * fixed low vanilla level INITIAL_STATS seeded them with at new-game start
- * (file_select.c). Paula joins at 25% of Ness's level, Poo at 20% -- keeps
- * a character who joins very late from being drastically underleveled
- * relative to the rest of the party, without overshooting (an earlier
- * version of this scaled Paula to 50%, Jeff to 2/3, and Poo to 100% of
- * Ness's level; per live playtesting feedback that balance didn't work,
- * particularly for Jeff, so he's now excluded from scaling entirely and
- * joins at his default vanilla starting level instead -- see the char_id
- * filter below). Re-running reset_char_level_one() here simply overwrites
- * the INITIAL_STATS-seeded level/stats with a fresh regrowth to the new
- * target, through the exact same incremental random stat-growth path
- * normal leveling uses (no separate formula), so the result is exactly as
- * faithful as any other level this character could have reached by
- * leveling up normally. No-op for char_id outside 2/4 (Paula/Poo) --
- * Jeff (3) is deliberately excluded, not just unhandled.
+/* Not part of the original assembly: scales Paula/Poo's starting level to
+ * a fraction of Ness's CURRENT level at the moment they actually join
+ * (Paula 25%, Poo 20%), instead of the fixed low vanilla level
+ * INITIAL_STATS seeded them with at new-game start (file_select.c) --
+ * keeps a character who joins very late from being drastically
+ * underleveled relative to the rest of the party. Jeff is deliberately
+ * excluded and joins at his own default vanilla starting level, unscaled
+ * -- see the char_id filter below. Re-running reset_char_level_one() here
+ * simply overwrites the INITIAL_STATS-seeded level/stats with a fresh
+ * regrowth to the new target, through the exact same incremental random
+ * stat-growth path normal leveling uses (no separate formula), so the
+ * result is exactly as faithful as any other level this character could
+ * have reached by leveling up normally. No-op for char_id outside 2/4
+ * (Paula/Poo) -- Jeff (3) is deliberately excluded, not just unhandled.
  *
  * Factored out of add_char_to_party() so join_level_scaling_selftest()
  * (game_state.c) can exercise it directly: add_char_to_party() itself
@@ -838,7 +835,7 @@ void remove_char_from_party(uint16_t char_id) {
 /* Item access functions */
 
 /* Key Items pool feature, not part of the original ROM/assembly. Several
- * item-use event scripts (found live: Key to the Cabin's unlock check,
+ * item-use event scripts (e.g. Key to the Cabin's unlock check,
  * MSG_EVT1_CABIN_KEY_USE in EEVENT1.yml) re-fetch "the item currently
  * being used" mid-script via GET_CHARACTER_ITEM(char_id, item_slot),
  * reading the exact (char_id, item_slot) that mode_step_use_item()'s

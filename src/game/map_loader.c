@@ -686,32 +686,29 @@ uint16_t lookup_surface_flags(int16_t x, int16_t y, uint16_t size_code) {
      * A sample tile outside that range still wraps via & 63 onto SOME grid
      * cell, but that cell holds whatever was last written there for a
      * completely different world position, stale/wrong data, not a valid
-     * answer. Two distinct failure modes came from this:
+     * answer. Two distinct failure modes come from this:
      *   - A MOVING entity re-samples every frame, so an aliased read only
-     *     ever lasted one frame before self-correcting, reported live as
-     *     random-looking sprite priority glitches ("Shark gang" enemies in
-     *     Onett) whenever the entity strayed a few tiles past the padded
-     *     edge (player standing still while it paces, camera not yet
-     *     caught up).
+     *     ever lasts one frame before self-correcting: random-looking
+     *     sprite priority glitches ("Shark gang" enemies in Onett)
+     *     whenever the entity strays a few tiles past the padded edge
+     *     (player standing still while it paces, camera not yet caught up).
      *   - A STATIC entity (move_callback CB_MOVE_NOP, e.g. a one-shot
      *     EVENT_UPDATE_ENTITY_SURFACE_FLAGS in its spawn script, see
      *     Frankystein Mk. II's event script 008) samples surface_flags
      *     exactly ONCE at creation and never again. If that one sample
-     *     happened to land outside the window valid at spawn time, the
-     *     wrong answer is frozen forever, reported live as a boss
-     *     encounter's overworld sprite permanently rendering in front of a
-     *     tree it should draw behind, regardless of where the camera goes
-     *     afterward.
-     * An early version of this fix treated an out-of-window sample as "no
-     * flags" (0), which closed the first failure mode (no more aliasing)
-     * but not the second (a wrong-but-plausible 0 is just as permanent for
-     * a static entity as a wrong-but-plausible aliased value was). The
-     * actual fix: compute an out-of-window sample directly from the source
-     * tables (compute_collision_tile_flags(), same per-tile computation
-     * fill_collision_tiles() does for its whole-grid refill) instead of
-     * either reading the alias or giving up, correct regardless of
-     * whether the cached window happens to cover the position, for both
-     * moving and static entities. */
+     *     lands outside the window valid at spawn time, the wrong answer
+     *     is frozen forever: a boss encounter's overworld sprite
+     *     permanently rendering in front of a tree it should draw behind,
+     *     regardless of where the camera goes afterward.
+     * Treating an out-of-window sample as "no flags" (0) would close the
+     * first failure mode but not the second (a wrong-but-plausible 0 is
+     * just as permanent for a static entity as a wrong-but-plausible
+     * aliased value). Instead this computes an out-of-window sample
+     * directly from the source tables (compute_collision_tile_flags(),
+     * the same per-tile computation fill_collision_tiles() does for its
+     * whole-grid refill) rather than either reading the alias or giving
+     * up, correct regardless of whether the cached window happens to
+     * cover the position, for both moving and static entities. */
     int16_t win_x0 = ml.screen_left_x - 16, win_x1 = ml.screen_left_x + 47;
     int16_t win_y0 = ml.screen_top_y - 16, win_y1 = ml.screen_top_y + 47;
 
@@ -1198,10 +1195,9 @@ static void fill_tilemaps(int16_t view_x_tile, int16_t view_y_tile) {
                      * into LOADED_MAP_BLOCKS the same as a real lookup would,
                      * and that ID still goes through the normal arrangement
                      * table for the CURRENTLY loaded tileset, same as any
-                     * other tile. Forcing a literal blank tilemap entry
-                     * instead (as this code previously did) skips that
-                     * lookup and renders solid black -- reported live as
-                     * the Winters bubble-monkey rope-climb cave going
+                     * other tile. A literal blank tilemap entry here would
+                     * skip that lookup and render solid black instead --
+                     * e.g. the Winters bubble-monkey rope-climb cave going
                      * half-black when the climb crosses such a boundary. */
                     block_id = 0;
                 }
@@ -1680,10 +1676,9 @@ void load_map_at_sector(uint16_t sector_x, uint16_t sector_y) {
      * graphics data is bigger than that) overwrite live VRAM past the
      * tilemaps -- including another BG layer's actual tile graphics -- with
      * garbage tail data from this same stream, corrupting the background
-     * the moment a map/sector reload lands on such a tileset (reported live
-     * as the Winters bubble-monkey rope-climb cave going half-black/
-     * half-corrupted mid-scene, which crosses a tileset-combo sector
-     * boundary partway up the climb). */
+     * the moment a map/sector reload lands on such a tileset (e.g. the
+     * Winters bubble-monkey rope-climb cave, which crosses a tileset-combo
+     * sector boundary partway up the climb). */
     if (tileset_combo != ml.loaded_tileset_combo) {
         load_and_decompress(ASSET_MAPS_GFX(tileset_id), ppu.vram, 0x7000);
         /* Clear collision grid when switching tilesets. Fill with 0x40 (wall)
@@ -2382,10 +2377,10 @@ void reload_map_at_position(uint16_t x_pixels, uint16_t y_pixels) {
  * amount, immediately after EVENT_263's 10 correct row-by-row updates for
  * the Winters bubble-monkey rope-climb scene (which calls
  * EVENT_LOAD_INITIAL_MAP_DATA_FAR right after streaming the rope's rows
- * into VRAM) -- reported live as the cave going half-black/half-wrong
- * immediately after the rope switch. Fixed to match the assembly: no BG
- * VRAM write, and the viewport's own top-left tile (no extra center
- * subtraction) for the collision-cache rebuild that still belongs here. */
+ * into VRAM) -- the cave went half-black/half-wrong immediately after the
+ * rope switch. Fixed to match the assembly: no BG VRAM write, and the
+ * viewport's own top-left tile (no extra center subtraction) for the
+ * collision-cache rebuild that still belongs here. */
 void load_initial_map_data(void) {
     /* BG1_X_POS = ppu.bg_hofs[0], BG1_Y_POS = ppu.bg_vofs[0] -- these are
      * already viewport-top-left scroll values, so no center subtraction. */

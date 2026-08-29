@@ -696,9 +696,8 @@ static uint16_t count_characters_with_psi(void) {
  * instead, see AUX_ZOOM_TOGGLE in game_main.c). Config opens
  * GAME_MODE_SETTINGS_MENU (mode_step_settings_menu below). Quit shows a
  * "Really quit?" Yes/No confirmation (PM_MAIN_RESULT case 9 /
- * PM_QUIT_CONFIRM_RESULT), added after it turned out to be too easy to
- * hit by accident, exactly the risk flagged when this first shipped
- * without one, followed by a "Quit how?" Close Game/Title Screen
+ * PM_QUIT_CONFIRM_RESULT) -- too easy to hit by accident without one --
+ * followed by a "Quit how?" Close Game/Title Screen
  * prompt (PM_QUIT_METHOD_RESULT) before actually calling
  * platform_request_quit() or resetting to the title screen. All three
  * require WINDOW::COMMAND_MENU's height to be 12, not the ROM's 8
@@ -788,11 +787,10 @@ static void build_command_menu(void) {
 
     /* "Keys", this port's own 10th item (Key Items pool feature, not part
      * of the original ROM/assembly). Placed at (6,1), next to "Goods".
-     * Label is "Keys", not "Key Items", the full label (10 chars)
-     * previously overflowed the x=6 column and wrapped, corrupting the
-     * "Goods" item's rendering (found live). "Config" (6 chars) is the
-     * longest label confirmed to fit in that column; "Keys" (4 chars)
-     * matches "Quit"/"Save"'s length. */
+     * Label is "Keys", not the full "Key Items" (10 chars): that would
+     * overflow the x=6 column and wrap, corrupting the "Goods" item's
+     * rendering. "Config" (6 chars) is the longest label that fits in
+     * that column; "Keys" (4 chars) matches "Quit"/"Save"'s length. */
     add_menu_item("Keys", 10, 6, 1);
     {
         WindowInfo *w = get_window(win.current_focus_window);
@@ -2335,7 +2333,7 @@ StepResult mode_step_use_item(ModeState *ms) {
              * UI_SETUP below writes it to argument_memory for ANY item use,
              * and some item-use scripts re-fetch "the item being used" via
              * GET_CHARACTER_ITEM(working_memory, argument_memory) mid-script
-             * (found live: Key to the Cabin's unlock check), the sentinel
+             * (e.g. Key to the Cabin's unlock check) -- the sentinel
              * plus key_items_set_use_in_progress() is what makes that
              * re-fetch still resolve correctly for a pool item. See
              * get_character_item()'s doc comment (inventory.c). */
@@ -2713,13 +2711,11 @@ static uint16_t key_items_menu_seq_ids[KEY_ITEMS_POOL_SIZE];
  * WINDOW_INVENTORY_MENU, the exact shape the Goods menu's own item
  * action menu uses (PM_ACTION_MENU/PM_ACTION_RESULT above), minus
  * Give/Drop (key items carry ITEM_FLAG_CANNOT_GIVE and were never meant
- * to be given away or discarded). Shipped twice without this and both
- * times looked broken, reported live: first as pure view-only (selecting
- * did nothing at all), then as auto-Use-with-no-menu (still looked broken
- * for items whose use-script has no effect unless used in the right
- * place, e.g. "Key to the Cabin" at the door, with zero feedback either
- * way), an explicit Use/Help choice matching Goods' own UX is what was
- * actually asked for. */
+ * to be given away or discarded). A pure view-only list, or an auto-Use
+ * with no menu, both look broken here: many key items' use-scripts have
+ * no visible effect unless used in the right place (e.g. "Key to the
+ * Cabin" at the door), so selecting one needs an explicit Use/Help choice,
+ * matching the Goods menu's own item action menu, not a silent auto-use. */
 StepResult mode_step_key_items_menu(ModeState *ms) {
     KeyItemsMenuState *st = &ms->key_items_menu;
 
@@ -3023,12 +3019,11 @@ StepResult mode_step_pause_menu(ModeState *ms) {
                 return STEP_RESULT_PUSH_INIT(GAME_MODE_SETTINGS_MENU, &pm_child_init);
 
             /* Quit (this port's own addition, not in the original ROM menu) ---
-             * Confirms first, too easy to hit by accident, exactly the
-             * risk flagged in the comment above build_command_menu() when
-             * this shipped without a prompt. Yes/No via the same
-             * create_window/add_menu_item/push_selection shape every other
-             * confirm screen in this file uses (e.g. file_select.c's
-             * "Are you sure?" delete confirm). */
+             * Confirms first: too easy to hit by accident without one, see
+             * the comment above build_command_menu() for that risk. Yes/No
+             * via the same create_window/add_menu_item/push_selection shape
+             * every other confirm screen in this file uses (e.g.
+             * file_select.c's "Are you sure?" delete confirm). */
             case 9:
                 create_window(WINDOW_QUIT_CONFIRM);
                 set_focus_text_cursor(0, 0);

@@ -1772,23 +1772,21 @@ bool cc_18_dispatch(ScriptReader *r, ModeState *out_init, GameMode *out_mode,
 
 
 /* Key Items pool feature, not part of the original ROM/assembly. Several
- * CC opcodes below inline the exact same raw
+ * CC opcodes below need the exact same raw
  * party_characters[char_id-1].items[slot-1] access that get_character_item()
- * (inventory.c) also implements, rather than calling that function, so
- * they never picked up its KEY_ITEMS_POOL_USE_SLOT_SENTINEL handling (see
- * that constant's doc comment for the full rationale). Found live: "Key
- * to the Cabin"'s mid-script possession re-check (CC 0x19 sub 0x19,
- * ADD_ITEM_ID_TO_WORK_MEMORY, immediately below) always failed for a
- * pool-sourced item because of exactly this, mode_step_use_item()
- * (text.c) set the sentinel up correctly, but this opcode's own inline
- * copy of the lookup never checked for it.
+ * (inventory.c) implements, rather than reimplementing it inline, so they
+ * pick up its KEY_ITEMS_POOL_USE_SLOT_SENTINEL handling too (see that
+ * constant's doc comment for the full rationale): a raw array access here
+ * would fail "Key to the Cabin"'s mid-script possession re-check (CC 0x19
+ * sub 0x19, ADD_ITEM_ID_TO_WORK_MEMORY, immediately below) for a
+ * pool-sourced item, since mode_step_use_item() (text.c) sets the
+ * sentinel up but a bare items[] read never checks for it.
  *
  * This wrapper just delegates to get_character_item(), which already
  * handles the sentinel *and* bounds-checks char_id/slot for the real-slot
- * case, an earlier version of this wrapper hand-rolled its own
- * duplicate bounds-checked array access instead of calling it, which
- * both duplicated that logic and left get_character_item()'s own
- * real-slot path unguarded for its *other*, non-wrapped callers. */
+ * case -- a single implementation shared with get_character_item()'s
+ * other, non-wrapped callers, rather than a second bounds-checked copy
+ * of the same array access living here too. */
 static uint8_t cc_get_character_item(uint16_t char_id, uint16_t slot) {
     return (uint8_t)get_character_item(char_id, slot);
 }
@@ -3076,10 +3074,9 @@ void cc_1d_dispatch(ScriptReader *r) {
              * so that trick finds the SAME (now-stale) empty slot as
              * before the give, which the message then misreads as
              * whatever item already happened to sit one slot earlier --
-             * reported live as "Ness got the cookie" when the item
-             * actually received was the Backstage Pass. Route pool items
-             * through the same sentinel mechanism
-             * mode_step_use_item() (text.c) uses instead. */
+             * e.g. "Ness got the cookie" when the item actually received
+             * was the Backstage Pass. Route pool items through the same
+             * sentinel mechanism mode_step_use_item() (text.c) uses instead. */
             if (is_key_item_type(item_id)) {
                 key_items_set_use_in_progress(item_id);
                 empty = KEY_ITEMS_POOL_USE_SLOT_SENTINEL;

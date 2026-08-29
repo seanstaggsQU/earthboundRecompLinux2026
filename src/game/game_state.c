@@ -779,12 +779,12 @@ bool key_items_selftest(void) {
 
     /* --- 8. The actual real-game scenario: a normal SRAM save/load
      * (save_game()/load_game(), NOT the F6/F7 savestate) taken while Poo
-     * hasn't joined yet must not leak his key item on load. This is the
-     * live bug load_game()'s OLD unconditional migration sweep had: it
-     * couldn't tell "a genuinely pre-feature save" apart from "a new-format
-     * save where a character just hasn't joined yet", and migrated both
-     * the same way. party_ever_joined_mask (game_state.h) is what now
-     * lets it tell them apart -- exercise that discrimination directly,
+     * hasn't joined yet must not leak his key item on load. An
+     * unconditional migration sweep in load_game() can't tell "a
+     * genuinely pre-feature save" apart from "a new-format save where a
+     * character just hasn't joined yet", and would migrate both the same
+     * way. party_ever_joined_mask (game_state.h) is what lets it tell
+     * them apart -- exercise that discrimination directly,
      * simulating a real new game: Ness already active (his mask bit set,
      * matching what file_select.c does at new-game start), Poo seeded but
      * not yet joined. */
@@ -845,13 +845,13 @@ bool key_items_selftest(void) {
 
     /* --- 9. The same deferral, but for a key item PICKED UP during a
      * not-yet-joined character's solo section (e.g. Jeff's Pencil Eraser
-     * in Winters), not just a new-game-seeded starting item. Live bug:
-     * give_item_to_specific_character()/give_item_to_character() used to
-     * route ALL key items straight into the shared pool unconditionally,
-     * so a not-yet-joined character's item was visible/usable by every
-     * other character immediately -- reported live as Jeff being able to
-     * use Ness's already-pooled Pencil Eraser on an obstacle meant to stay
-     * until Jeff actually joins. Both give paths route through
+     * in Winters), not just a new-game-seeded starting item.
+     * give_item_to_specific_character()/give_item_to_character() route
+     * every key item straight into the shared pool unconditionally without
+     * this deferral, so a not-yet-joined character's item would be
+     * visible/usable by every other character immediately -- e.g. Jeff
+     * using Ness's already-pooled Pencil Eraser on an obstacle meant to
+     * stay until Jeff actually joins. Both give paths route through
      * give_item_to_specific_character() eventually, so exercising it
      * directly covers give_item_to_character() too. */
     game_state_init();
@@ -947,12 +947,11 @@ bool join_level_scaling_selftest(void) {
         ok = false;
     }
 
-    /* Jeff is deliberately excluded from level scaling (per live playtesting
-     * feedback, an earlier 2/3-of-Ness's-level version didn't balance well)
-     * -- he joins at his own default vanilla starting level, untouched.
-     * Seed a sentinel level/HP/PP first (game_state_init() zeroed
-     * everything) so this can confirm apply_join_level_scaling() really is
-     * a complete no-op for him, not just "didn't crash". */
+    /* Jeff is deliberately excluded from level scaling -- he joins at his
+     * own default vanilla starting level, untouched. Seed a sentinel
+     * level/HP/PP first (game_state_init() zeroed everything) so this can
+     * confirm apply_join_level_scaling() really is a complete no-op for
+     * him, not just "didn't crash". */
     party_characters[2].level = 1;
     party_characters[2].max_hp = 32;
     party_characters[2].current_hp = 20; /* deliberately not synced to max yet */

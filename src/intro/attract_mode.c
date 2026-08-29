@@ -73,14 +73,13 @@ static bool load_attract_mode_text_offsets(void) {
 StepResult mode_step_attract_mode(ModeState *st) {
   AttractState *s = &st->attract;
 
-  /* NOTE: this used to shift ppu.bg_vofs[2] by -EB_VIEWPORT_PAD_TOP here, as
-   * a scoped workaround for the BG3 overlay-text layer (scene credits, etc.)
-   * top-aligning instead of centering in a taller viewport. That's now fixed
-   * at the source: overworld_setup_vram() (overworld.c) sets
+  /* NOTE: do not shift ppu.bg_vofs[2] by -EB_VIEWPORT_PAD_TOP here to
+   * center the BG3 overlay-text layer (scene credits, etc.) in a taller
+   * viewport -- overworld_setup_vram() (overworld.c) already sets
    * ppu.bg_win_y_offset = EB_VIEWPORT_PAD_TOP for every overworld-context
    * scene, attract mode included, so ppu_render.c's non-filling-layer
-   * scanline selection already accounts for it. Re-adding a bg_vofs[2] shift
-   * here would double-count that offset, bg_vofs[2] is a genuine scroll
+   * scanline selection already accounts for it. A bg_vofs[2] shift here
+   * would double-count that offset: bg_vofs[2] is a genuine scroll
    * register also driven by flyover text (flyover.c) and the ending credits
    * (ending.c), so it must stay untouched by this unrelated concern. */
 

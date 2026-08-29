@@ -759,14 +759,12 @@ void load_battle_bg(uint16_t layer1_id, uint16_t layer2_id, uint16_t letterbox_s
      * presentation choice, not a display/aspect-ratio artifact: certain
      * enemy battle backgrounds (BG_DATA_TABLE, keyed by letterbox_style)
      * are authored with a cinematic HDMA letterbox bar (LARGE/MEDIUM/SMALL)
-     * and others aren't, entirely per-encounter -- reported live as "black
-     * bars during battle" appearing for some enemies and not others (e.g.
-     * present for a routine enemy, absent for Carpainter), which is
-     * exactly this working as designed. Suppressed under Modern
-     * Alternative Visuals per feedback that it reads as an unwanted bar
-     * rather than a deliberate cinematic effect once the wider Modern FOV
-     * is already in play; Off and Classic keep the original per-encounter
-     * behavior unchanged. */
+     * and others aren't, entirely per-encounter (present for a routine
+     * enemy, absent for Carpainter, for instance) -- that asymmetry is
+     * working as designed, not a bug. Suppressed under Modern Alternative
+     * Visuals, where it reads as an unwanted bar rather than a deliberate
+     * cinematic effect once the wider Modern FOV is already in play; Off
+     * and Classic keep the original per-encounter behavior unchanged. */
     uint16_t lb = (engine_alternative_visuals == ALT_VISUALS_MODERN)
         ? 0 : (letterbox_style & 0x0003);
     if (lb == 0) {

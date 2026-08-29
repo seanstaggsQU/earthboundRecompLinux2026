@@ -14,8 +14,8 @@
  *
  * Two things are required for any window here to actually stay visible
  * while idling (waiting on the background thread, or waiting for a
- * button), found live via diagnostic logging after the naive first version
- * created windows and printed to them correctly but nothing ever rendered:
+ * button) -- without both, windows get created and printed to correctly
+ * but nothing ever renders:
  *
  * 1. clear_instant_printing() after create_window(). window_tick_prepare()
  *    (display_text.c, the per-frame renderer every window depends on)
