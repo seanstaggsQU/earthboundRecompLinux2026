@@ -1844,17 +1844,39 @@ int16_t callroutine_dispatch(uint32_t rom_addr, int16_t entity_offset,
      * QUEUE_DELIVERY_SUCCESS_INTERACTION, but its text pointer resolved to
      * NULL, so nothing ever displayed and no item was ever given.
      *
-     * This table patches the ones identified so far by cross-referencing
+     * This table patches all 10 entries, identified by cross-referencing
      * asm/data/timed_delivery_table.asm's old labels against
      * earthbound-1995-03-27.yml/mother2.yml (where those old names still
      * exist) to find the renamed US label at the same position in
      * earthbound.yml, then that label's migrated address in text_refs.h.
-     * Only entry 7 (Zombie Paper) is confirmed so far -- the same bug
-     * affects the other 9 entries' success/failure text, still open. */
+     * Entry 7 (Zombie Paper) confirmed live; entries 3-6 (the "For Sale"
+     * sign mail-order customers) shared one retry-over message even in the
+     * old JP/prototype labeling (MSG_CUSTOMER_RETRY_OVER for all four), and
+     * the US text has no per-customer success text either -- just one
+     * shared MSG_GOODS1_FOR_SALE_SIGN_CUSTOMER_COMING/_EXPIRED pair, same
+     * as the old table's shared-message pattern. */
     static const struct { uint16_t index; uint32_t raw_success; uint32_t fixed_success;
                            uint32_t raw_failure; uint32_t fixed_failure; } delivery_text_fixups[] = {
+        { 0, 0xC64BBF, MSG_SHOP3_PIZZA_DELIVERY_VISIT,
+             0xC64CF8, MSG_SHOP3_PIZZA_DELIVERY_GAVE_UP },
+        { 1, 0xC642A3, MSG_SHOP3_ESCARGO_DELIVERY_VISIT,
+             0xC64515, MSG_SHOP3_ESCARGO_DELIVERY_GAVE_UP },
+        { 2, 0xC63EB0, MSG_SHOP3_ESCARGO_PICKUP_VISIT,
+             0xC6451A, MSG_SHOP3_ESCARGO_PICKUP_GAVE_UP },
+        { 3, 0xC5D844, MSG_GOODS1_FOR_SALE_SIGN_CUSTOMER_COMING,
+             0xC5DDF1, MSG_GOODS1_FOR_SALE_SIGN_EXPIRED },
+        { 4, 0xC5D858, MSG_GOODS1_FOR_SALE_SIGN_CUSTOMER_COMING,
+             0xC5DDF1, MSG_GOODS1_FOR_SALE_SIGN_EXPIRED },
+        { 5, 0xC5D86C, MSG_GOODS1_FOR_SALE_SIGN_CUSTOMER_COMING,
+             0xC5DDF1, MSG_GOODS1_FOR_SALE_SIGN_EXPIRED },
+        { 6, 0xC5D880, MSG_GOODS1_FOR_SALE_SIGN_CUSTOMER_COMING,
+             0xC5DDF1, MSG_GOODS1_FOR_SALE_SIGN_EXPIRED },
         { 7, 0xC7A542, MSG_EVT4_MACH_PIZZA_DELIVERS_ZOMBIE_PAPER,
              0xC7A7D9, MSG_EVT4_ZOMBIE_PAPER_RETRY_TIMER },
+        { 8, 0xC6943A, MSG_GLOBAL_DELIVERY_PENCIL_ERASER,
+             0xC695AC, MSG_PENCIL_ERASER_DELIVERY_RESET },
+        { 9, 0xC694F4, MSG_GLOBAL_DELIVERY_HAWK_EYE,
+             0xC695B3, MSG_HAWK_EYE_DELIVERY_RESET },
     };
 
     case ROM_ADDR_QUEUE_DELIVERY_SUCCESS: {
