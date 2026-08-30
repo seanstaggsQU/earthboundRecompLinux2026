@@ -1638,11 +1638,45 @@ StepResult mode_step_overworld(ModeState *mst) {
                 return actionscript_frame_take_push();
             continue;   /* no park: flush in the same step (no yield) */
 
-        case OWP_RENDER_FLUSH:
+        case OWP_RENDER_FLUSH: {
+            /* Safety net: a special screen (flyover/cutscene text crawl,
+             * mosaic fade, etc.) deliberately force-blanks the display
+             * (INIDISP=$80) and hands off to its CALLER to un-blank once
+             * it's done -- by design, not a bug on its own (see
+             * flyover.c's FOP_S_CLEAN1/CLEAN2). Confirmed live: a rare,
+             * hard-to-pin-down interpreter hiccup can make that handoff's
+             * own "restore brightness" instruction never run, permanently
+             * stranding the player on a solid black screen even though
+             * gameplay itself is fully healthy underneath (every entity's
+             * script keeps ticking normally -- confirmed by direct
+             * inspection of a repro savestate). Reaching THIS specific
+             * phase over and over already proves we're sitting at plain,
+             * unblocked root overworld (a real transition/cutscene would
+             * have a child mode pushed on top instead, so this phase
+             * wouldn't run again until it popped) -- so a sustained
+             * stretch of force-blank here, with nothing else explaining
+             * it, is never legitimate. 90 frames (1.5s) is generous
+             * headroom above any real brief blank (map-load VRAM writes,
+             * etc.) while still resolving a genuine stall in well under
+             * the many real minutes a player would otherwise sit stuck. */
+            static int stuck_blank_frames = 0;
+            if (ppu.inidisp & 0x80) {
+                stuck_blank_frames++;
+                if (stuck_blank_frames > 90) {
+                    LOG_WARN("WARN: overworld stuck force-blanked for %d frames with "
+                             "nothing else active -- restoring normal brightness\n",
+                             stuck_blank_frames);
+                    ppu.inidisp = 0x0F;
+                    stuck_blank_frames = 0;
+                }
+            } else {
+                stuck_blank_frames = 0;
+            }
             update_screen();
             update_swirl_effect();  /* advances the battle swirl animation */
             st->phase = OWP_POST_TOP;
             return STEP_RESULT_CONTINUE();
+        }
 
         case OWP_POST_TOP:
             /* Assembly lines 30-42: process queued interactions (read != write

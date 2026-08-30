@@ -200,6 +200,88 @@ void render_entity_hdma_window(int16_t entity_offset,
 #define TICK_ADDR_CENTER_CAMERA_WITH_RECT_WINDOW 0xC47A27
 #define TICK_ADDR_UPDATE_PARTY_FOLLOWER_MOVEMENT 0xEF031E
 
+/* Recover a tick-callback address whose bank byte reads $00 -- confirmed
+ * live: entity 23 (the reserved overworld-frame driver, INIT_ENTITY_SLOT)
+ * ends up with tick_callback_hi's bank byte silently dropped to 0 after a
+ * flyover/narration cutscene finishes (root cause not pinned down despite
+ * extensive tracing -- the corruption is already baked into game state by
+ * the time it's observable, so the exact write site never got caught red-
+ * handed), while tick_callback_lo still holds the correct low word for
+ * TICK_ADDR_UPDATE_OVERWORLD_FRAME. Left alone this is a permanent,
+ * un-recoverable hang: entity 23 drives the whole overworld's per-frame
+ * animation/palette/camera update, so once its callback stops resolving,
+ * NOTHING about the overworld advances ever again -- the exact "screen
+ * goes solid black and stays that way" symptom reported after this exact
+ * cutscene (Saturn Valley, post-Master-Belch).
+ *
+ * $00 is never a legitimate bank for ANY of this table's targets -- every
+ * one lives in bank $C0, $C4, or $EF (real 65816 game code), never bank 0
+ * (WRAM/hardware registers, never executable script/movement code). So a
+ * bank-0 address whose low word exactly matches one of these known targets
+ * is unambiguous: it's that target, just missing its top byte. Restoring
+ * the bank turns a permanent hang into the game working correctly, without
+ * risking a real, still-unimplemented address being silently misrouted --
+ * anything that doesn't match a known low word falls through to the
+ * default case exactly as before (logged, harmless no-op). */
+static uint32_t recover_dropped_bank(uint32_t rom_addr) {
+    if ((rom_addr >> 16) != 0)
+        return rom_addr; /* bank byte already present, nothing to recover */
+    switch (rom_addr) {
+    case (TICK_ADDR_UPDATE_OVERWORLD_FRAME & 0xFFFF):
+        return TICK_ADDR_UPDATE_OVERWORLD_FRAME;
+    case (TICK_ADDR_UPDATE_LEADER_MOVEMENT & 0xFFFF):
+        return TICK_ADDR_UPDATE_LEADER_MOVEMENT;
+    case (TICK_ADDR_UPDATE_ENTITY_ANIMATION & 0xFFFF):
+        return TICK_ADDR_UPDATE_ENTITY_ANIMATION;
+    case (TICK_ADDR_UPDATE_FOLLOWER_STATE & 0xFFFF):
+        return TICK_ADDR_UPDATE_FOLLOWER_STATE;
+    case (TICK_ADDR_SIMPLE_SCREEN_POS_CALLBACK & 0xFFFF):
+        return TICK_ADDR_SIMPLE_SCREEN_POS_CALLBACK;
+    case (TICK_ADDR_SIMPLE_SCREEN_POS_CALLBACK_OFS & 0xFFFF):
+        return TICK_ADDR_SIMPLE_SCREEN_POS_CALLBACK_OFS;
+    case (TICK_ADDR_ENTITY_PATHFINDING_STEP & 0xFFFF):
+        return TICK_ADDR_ENTITY_PATHFINDING_STEP;
+    case (TICK_ADDR_RESET_ENTITY_PATHFINDING & 0xFFFF):
+        return TICK_ADDR_RESET_ENTITY_PATHFINDING;
+    case (TICK_ADDR_MAKE_PARTY_LOOK_AT_ENTITY & 0xFFFF):
+        return TICK_ADDR_MAKE_PARTY_LOOK_AT_ENTITY;
+    case (TICK_ADDR_ANIMATED_BACKGROUND_CALLBACK & 0xFFFF):
+        return TICK_ADDR_ANIMATED_BACKGROUND_CALLBACK;
+    case (TICK_ADDR_CENTRE_SCREEN_ON_ENTITY & 0xFFFF):
+        return TICK_ADDR_CENTRE_SCREEN_ON_ENTITY;
+    case (TICK_ADDR_CENTRE_SCREEN_ON_ENTITY_OFS & 0xFFFF):
+        return TICK_ADDR_CENTRE_SCREEN_ON_ENTITY_OFS;
+    case (TICK_ADDR_NOP & 0xFFFF):
+        return TICK_ADDR_NOP;
+    case (TICK_ADDR_UPDATE_ENTITY_SURFACE_AND_GRAPHICS & 0xFFFF):
+        return TICK_ADDR_UPDATE_ENTITY_SURFACE_AND_GRAPHICS;
+    case (TICK_ADDR_PSI_TELEPORT_ALPHA_TICK & 0xFFFF):
+        return TICK_ADDR_PSI_TELEPORT_ALPHA_TICK;
+    case (TICK_ADDR_UPDATE_PARTY_ENTITY_FROM_BUFFER & 0xFFFF):
+        return TICK_ADDR_UPDATE_PARTY_ENTITY_FROM_BUFFER;
+    case (TICK_ADDR_PSI_TELEPORT_BETA_TICK & 0xFFFF):
+        return TICK_ADDR_PSI_TELEPORT_BETA_TICK;
+    case (TICK_ADDR_PSI_TELEPORT_SUCCESS_TICK & 0xFFFF):
+        return TICK_ADDR_PSI_TELEPORT_SUCCESS_TICK;
+    case (TICK_ADDR_PSI_TELEPORT_DECELERATE_TICK & 0xFFFF):
+        return TICK_ADDR_PSI_TELEPORT_DECELERATE_TICK;
+    case (TICK_ADDR_HANDLE_CAST_SCROLLING & 0xFFFF):
+        return TICK_ADDR_HANDLE_CAST_SCROLLING;
+    case (TICK_ADDR_SETUP_ENTITY_HDMA_WINDOW_CH4 & 0xFFFF):
+        return TICK_ADDR_SETUP_ENTITY_HDMA_WINDOW_CH4;
+    case (TICK_ADDR_SETUP_ENTITY_HDMA_WINDOW_CH5 & 0xFFFF):
+        return TICK_ADDR_SETUP_ENTITY_HDMA_WINDOW_CH5;
+    case (TICK_ADDR_APPLY_ENTITY_RECT_WINDOW & 0xFFFF):
+        return TICK_ADDR_APPLY_ENTITY_RECT_WINDOW;
+    case (TICK_ADDR_CENTER_CAMERA_WITH_RECT_WINDOW & 0xFFFF):
+        return TICK_ADDR_CENTER_CAMERA_WITH_RECT_WINDOW;
+    case (TICK_ADDR_UPDATE_PARTY_FOLLOWER_MOVEMENT & 0xFFFF):
+        return TICK_ADDR_UPDATE_PARTY_FOLLOWER_MOVEMENT;
+    default:
+        return rom_addr; /* genuinely unknown -- let the switch below log it */
+    }
+}
+
 /*
  * dispatch_tick_callback, called from script.c after running all scripts
  * for an entity. Dispatches the entity's tick callback by ROM address.
@@ -208,6 +290,24 @@ void render_entity_hdma_window(int16_t entity_offset,
  */
 void dispatch_tick_callback(uint32_t rom_addr, int16_t entity_offset) {
     uint16_t dummy_pc;
+    uint32_t recovered = recover_dropped_bank(rom_addr);
+    if (recovered != rom_addr) {
+        LOG_WARN("WARN: tick callback $%06X for entity %d had no bank byte -- "
+                 "recovered as $%06X\n", rom_addr, entity_offset, recovered);
+        rom_addr = recovered;
+        /* Write the recovered bank back into stored state, not just this one
+         * dispatch: leaving entities.tick_callback_hi[entity_offset] itself
+         * still reading bank $00 means anything ELSE that reads it directly
+         * (a script's own "did my callback take?" check, IS_PLAYER_BUSY's
+         * tick_callback_hi[23] read in callroutine.c, etc.) keeps seeing the
+         * broken value forever even though dispatch itself now self-heals
+         * every frame -- confirmed live: papering over just the dispatch
+         * still left the game's own follow-up logic (whatever restores the
+         * screen after this cutscene) permanently stalled, screen staying
+         * black long after the recovery kicked in. */
+        entities.tick_callback_hi[entity_offset] =
+            (entities.tick_callback_hi[entity_offset] & 0xFF00) | (uint8_t)(rom_addr >> 16);
+    }
     switch (rom_addr) {
     case TICK_ADDR_UPDATE_OVERWORLD_FRAME:
         /* C05200: UPDATE_OVERWORLD_FRAME, init entity (slot 23) tick callback.
