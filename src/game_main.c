@@ -433,6 +433,22 @@ void host_process_frame(void) {
      * four times a frame. */
     bool in_battle_or_town_map = mode_stack_has_any(GAME_MODE_BATTLE, GAME_MODE_TOWN_MAP);
     bool in_title_or_file_select = mode_stack_has_any(GAME_MODE_TITLE_SCREEN, GAME_MODE_FILE_MENU);
+    /* Intro company-logo splash (HAL/Nintendo/APE) and the attract-mode demo
+     * loop: same "player never controls zoom here, static/unscrolled art"
+     * situation as title/file-select (needs_zoom_reset below), but a
+     * separate GameMode pair, not covered by in_title_or_file_select above
+     * -- kept as its own flag rather than folded into that one since
+     * version_overlay_show/suppress_fx below are deliberately title/file-
+     * select-only (the version watermark and Color Grading suppression
+     * reasoning don't apply to a company logo screen). Reported live as
+     * "logo wrapping is back": with zoom_mode left at EB_ZOOM_OUT from a
+     * previous session's Wide FOV gameplay (e.g. a "Return to Title" that
+     * replays the logos), needs_zoom_reset not covering this mode pair
+     * meant the persistent-reset logic below never forced it back to
+     * EB_ZOOM_OFF here, so 21:9's EB_ZOOM_OUT-side crop (sdl2_video.c) ran
+     * against this static logo art the same way it's meant to for real
+     * scrolling gameplay, reintroducing the wide-crop edge-repeat bug. */
+    bool in_intro_logo_or_attract = mode_stack_has_any(GAME_MODE_INTRO_LOGO, GAME_MODE_ATTRACT);
 
     /* Capture-safety free-run: while a snapshot is pending, this frame is a pure
      * unwind step, keep the per-frame logic (fade/timers/RNG/tasks) so blocking
@@ -650,7 +666,8 @@ void host_process_frame(void) {
      * the separate any_window_open() check below for the one case that
      * still needs a temporary (not persistent) override. Reuses the
      * whole-stack scan cached at the top of this function. */
-    bool needs_zoom_reset = in_battle_or_town_map || in_title_or_file_select;
+    bool needs_zoom_reset = in_battle_or_town_map || in_title_or_file_select
+        || in_intro_logo_or_attract;
     if (!needs_zoom_reset) {
         /* Off and Wide FOV each get a 2-way toggle instead of one shared
          * 3-way cycle: a 3-state R3 press is confusing, since which of
@@ -795,11 +812,20 @@ void host_process_frame(void) {
     bool suppress_dof = suppress_fx || any_window_open() || in_battle_or_town_map;
     platform_video_set_dof_suppressed(suppress_dof);
 
-    /* 21:9 Aspect Ratio's extra height crop: suppressed on the exact same
-     * needs_zoom_reset set (title/file-select/battle/Town Map) computed
-     * above for zoom itself -- see platform_video_set_wide_crop_suppressed()'s
-     * doc comment (platform.h). */
-    platform_video_set_wide_crop_suppressed(needs_zoom_reset);
+    /* 21:9 Aspect Ratio's extra height crop: suppressed on the same
+     * needs_zoom_reset set (title/file-select/intro logos/attract/battle/
+     * Town Map) computed above for zoom itself -- see
+     * platform_video_set_wide_crop_suppressed()'s doc comment (platform.h)
+     * -- PLUS any_window_open(), same as DoF just above and for the same
+     * reason: EarthBound positions windows (dialogue boxes, the pause
+     * menu, shops, ...) freely across the full native height during
+     * perfectly ordinary EB_ZOOM_OFF overworld gameplay too, not just on
+     * the always-forced screens, so a window open there needs the same
+     * temporary override. Reported live as "Wide FOV disabled, 21:9 cuts
+     * off the tops of menus" -- needs_zoom_reset alone doesn't cover plain
+     * gameplay-with-a-window-open the way it covers title/file-select/etc. */
+    bool suppress_wide_crop = needs_zoom_reset || any_window_open();
+    platform_video_set_wide_crop_suppressed(suppress_wide_crop);
     if (aux_new & AUX_FAST_FORWARD) {
         fast_forward_active = !fast_forward_active;
         platform_video_set_vsync(!fast_forward_active);

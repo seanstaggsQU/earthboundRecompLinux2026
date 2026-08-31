@@ -969,29 +969,39 @@ void platform_video_end_frame(void) {
     case EB_ZOOM_OUT: {
         if (want_21_9) {
             /* 21:9 Aspect overrides Zoom Out's normal "adapt to fill
-             * whatever the real display is" behavior below -- unlike 4:3
-             * (deliberately left display-adaptive, see the paragraph
-             * above: forcing a fixed 4:3 there was reasoned to just waste
-             * zoom budget as unwanted letterbox, not a look anyone was
-             * after), 21:9 IS explicitly a cinematic-letterbox look, the
-             * entire point of picking it is seeing the bars. Reported live
-             * as "Wide FOV silently ignores 21:9": on an ordinary 16:9
-             * display the adaptive crop below already renders ~16:9-shaped
-             * with zero visible bars, so 21:9 has to deliberately NOT
-             * adapt to be visible there at all -- same reasoning as
-             * want_21_9's own EB_ZOOM_OFF branch further down not
-             * adapting to the display either. EB_ZOOM_OUT_WIDTH/HEIGHT's
-             * own ratio (~2.21:1) is the closest this crop's existing
-             * safety-margin budget gets to true 21:9 (2.33:1, same VRAM-
-             * fill margin reasoning EB_ZOOM_OUT_WIDTH's own comment above
-             * covers) -- reuse it directly as a fixed target instead of
-             * deriving a separate figure. The later aspect-preserving
-             * dst-rect math (bottom of this function) letterboxes/
-             * pillarboxes this fixed ratio against whatever the real
-             * display is automatically, same as it does for every other
-             * zoom mode here. */
+             * whatever the real display is" behavior below on a display
+             * NARROWER than 21:9 -- unlike 4:3 (deliberately left fully
+             * display-adaptive, see the paragraph above: forcing a fixed
+             * 4:3 there was reasoned to just waste zoom budget as unwanted
+             * letterbox, not a look anyone was after), 21:9 IS explicitly
+             * a cinematic-letterbox look, the entire point of picking it
+             * is seeing the bars. Reported live as "Wide FOV silently
+             * ignores 21:9": on an ordinary 16:9 display the adaptive crop
+             * below already renders ~16:9-shaped with zero visible bars,
+             * so 21:9 has to deliberately NOT adapt there to be visible at
+             * all.
+             *
+             * On a display AT LEAST as wide as 21:9 (a real ultrawide
+             * monitor), though, forcing that same fixed ratio UNDER-fills
+             * it -- reported live by someone with a real 21:9 display as
+             * "16:9 and 21:9 look identical, 21:9 doesn't fill my
+             * monitor": Zoom Out's adaptive crop already renders ~21:9-
+             * shaped there even on the PLAIN 16:9 setting (nothing to add
+             * bars to), while a fixed 21:9 target narrower than their
+             * actual screen pillarboxed instead of filling it -- worse
+             * than 16:9, not better. So only force the fixed budget when
+             * the display itself is narrower than 21:9; on a wider-or-
+             * equal display, adapt up to fill it exactly, the same
+             * "match the real display, capped at the width ceiling"
+             * formula the plain (non-21:9) branch below already uses for
+             * this same wide-display case -- there's nothing left to
+             * force once the display is already this wide on its own. */
+            double display_ar = (double)out_w / out_h;
+            double target_21_9_ar = (double)EB_ZOOM_OUT_WIDTH / EB_ZOOM_OUT_HEIGHT;
             content_w = EB_ZOOM_OUT_WIDTH;
-            content_h = EB_ZOOM_OUT_HEIGHT;
+            content_h = (display_ar <= target_21_9_ar)
+                ? EB_ZOOM_OUT_HEIGHT
+                : (int)(EB_ZOOM_OUT_WIDTH / display_ar);
             break;
         }
         double display_ar = (double)out_w / out_h;
