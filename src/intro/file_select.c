@@ -572,6 +572,7 @@ static int fm_aspect_build(void) {
 
     add_menu_item("16:9 (Widescreen)", 1, 0, 1);
     add_menu_item("4:3 (Original)", 2, 0, 2);
+    add_menu_item("21:9 (Ultrawide)", 3, 0, 3);
 
     print_menu_items();
     return -1;
@@ -579,7 +580,7 @@ static int fm_aspect_build(void) {
 
 /* Apply an aspect-ratio selection (result > 0). */
 static void fm_aspect_apply(uint16_t result) {
-    engine_aspect_ratio = (uint8_t)(result - 1);  /* 1=16:9 -> 0, 2=4:3 -> 1 */
+    engine_aspect_ratio = (uint8_t)(result - 1);  /* 1=16:9 -> 0, 2=4:3 -> 1, 3=21:9 -> 2 */
     settings_save();
 }
 
@@ -595,7 +596,7 @@ static void fm_aspect_apply(uint16_t result) {
  * rather than advancing), picking Done is what actually advances/saves.
  * Cancel (B) backs out to Aspect Ratio, same as every other screen here.
  */
-static int fm_tweaks_build(void) {
+static int fm_tweaks_build(uint16_t initial_selection) {
     WindowInfo *w = create_window(WINDOW_FILE_SELECT_TWEAKS);
     if (!w) return 0;
     w->menu_count = 0; /* Reset for re-entry (back-navigation/re-toggling) */
@@ -610,7 +611,14 @@ static int fm_tweaks_build(void) {
     add_menu_item(engine_fx_color_grading == FX_TOGGLE_ON ? "Color Grading: On" : "Color Grading: Off", 5, 0, 6);
     add_menu_item("Done", 6, 0, 8);
 
-    print_menu_items();
+    /* Re-select the row the player just toggled instead of always landing
+     * back on Scanlines -- see FileMenuState.tweaks_cursor's own comment.
+     * (uint16_t)-1 (fresh entry, not a toggle re-loop) falls through to
+     * print_menu_items()'s own default (top row), same as before. */
+    if (initial_selection != (uint16_t)-1)
+        layout_and_print_menu_at_selection(1, 0, initial_selection);
+    else
+        print_menu_items();
     return -1;
 }
 
@@ -2179,11 +2187,12 @@ StepResult mode_step_file_menu(ModeState *ms) {
              * this whole cascade on its own, no room to also keep Aspect
              * open behind it. */
             close_window(WINDOW_FILE_SELECT_ASPECT);
+            st->tweaks_cursor = (uint16_t)-1; /* fresh entry: top row */
             st->phase = FM_SETUP_TWEAKS;
             continue;
         }
         case FM_SETUP_TWEAKS: {
-            int e = fm_tweaks_build();
+            int e = fm_tweaks_build(st->tweaks_cursor);
             if (e >= 0) { st->result_ready = 1; st->result = (uint16_t)e;
                           st->phase = FM_SETUP_TWEAKS_RESULT; continue; }
             return fm_push_selection(st, FM_SETUP_TWEAKS_RESULT, 1);
@@ -2198,8 +2207,10 @@ StepResult mode_step_file_menu(ModeState *ms) {
             if (tw != 6) {
                 /* One of the 5 toggle rows: apply in place and rebuild the
                  * same screen (fm_tweaks_build() reads the just-updated
-                 * engine_fx_* globals fresh), not advance. */
+                 * engine_fx_* globals fresh), not advance. Re-select the
+                 * same row on rebuild instead of resetting to the top. */
                 fm_tweaks_toggle(tw);
+                st->tweaks_cursor = tw - 1;
                 st->phase = FM_SETUP_TWEAKS;
                 continue;
             }
@@ -2282,11 +2293,12 @@ StepResult mode_step_file_menu(ModeState *ms) {
             }
             fm_aspect_apply(ar);
             close_window(WINDOW_FILE_SELECT_ASPECT);
+            st->tweaks_cursor = (uint16_t)-1; /* fresh entry: top row */
             st->phase = FM_NG_TWEAKS;
             continue;
         }
         case FM_NG_TWEAKS: {
-            int e = fm_tweaks_build();
+            int e = fm_tweaks_build(st->tweaks_cursor);
             if (e >= 0) { st->result_ready = 1; st->result = (uint16_t)e;
                           st->phase = FM_NG_TWEAKS_RESULT; continue; }
             return fm_push_selection(st, FM_NG_TWEAKS_RESULT, 1);
@@ -2299,7 +2311,10 @@ StepResult mode_step_file_menu(ModeState *ms) {
                 continue;
             }
             if (tw != 6) {
+                /* Re-select the same row on rebuild instead of resetting
+                 * to the top -- see FileMenuState.tweaks_cursor. */
                 fm_tweaks_toggle(tw);
+                st->tweaks_cursor = tw - 1;
                 st->phase = FM_NG_TWEAKS;
                 continue;
             }

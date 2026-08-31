@@ -3621,6 +3621,7 @@ static const char *color_grading_labels[FX_TOGGLE_COUNT] = {
 static const char *aspect_ratio_labels[ASPECT_RATIO_COUNT] = {
     [ASPECT_RATIO_16_9] = "Aspect Ratio: 16:9",
     [ASPECT_RATIO_4_3]  = "Aspect Ratio: 4:3",
+    [ASPECT_RATIO_21_9] = "Aspect Ratio: 21:9",
 };
 static const char *logging_labels[LOGGING_COUNT] = {
     [LOGGING_OFF] = "Logging: Off",

@@ -132,12 +132,18 @@ extern uint8_t engine_fx_color_grading; /* current value, one of FxToggleSetting
  * this to 4:3 as a package deal, see the FxToggleSetting comment above).
  * 16:9 is today's existing widescreen baseline (EB_DEFAULT_WIDTH, unaffected
  * by this setting historically); 4:3 crops to the true original SNES
- * resolution (SNES_WIDTH x SNES_HEIGHT, sdl2_video.c). Only affects the
- * EB_ZOOM_OFF baseline -- Zoom In/Wide FOV still layer their own crop on
- * top exactly as before, whichever aspect is selected. */
+ * resolution (SNES_WIDTH x SNES_HEIGHT, sdl2_video.c); 21:9 crops to the
+ * compiled viewport's own hard width ceiling (EB_VIEWPORT_WIDTH, 512 --
+ * the SNES's own 64-tile tilemap limit, see EB_VIEWPORT_WIDTH's own doc
+ * comment) with a small height trim (512x219, sdl2_video.c) to land on
+ * exactly 21:9 -- a true 21:9 crop at full SNES_HEIGHT would need ~523px,
+ * just over that ceiling. Only affects the EB_ZOOM_OFF baseline -- Zoom
+ * In/Wide FOV still layer their own crop on top exactly as before,
+ * whichever aspect is selected. */
 typedef enum {
     ASPECT_RATIO_16_9 = 0,
     ASPECT_RATIO_4_3  = 1,
+    ASPECT_RATIO_21_9 = 2,
     ASPECT_RATIO_COUNT,
 } AspectRatioSetting;
 

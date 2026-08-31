@@ -2142,6 +2142,11 @@ typedef struct {
     uint8_t  result_ready;  /* 1 = `result` holds an inline early-exit value (no child was pushed) */
     uint16_t selected;      /* chosen slot, 1-based (file_select_menu result) */
     uint16_t result;        /* inline early-exit result for the *_RESULT phase */
+    uint16_t tweaks_cursor; /* Visual Tweaks: 0-based row to reselect on rebuild after a
+                             * toggle (fm_tweaks_build() recreates the window from scratch
+                             * each loop, which would otherwise always reset the cursor to
+                             * the top row -- see fm_tweaks_build()'s own doc comment).
+                             * (uint16_t)-1 = no explicit selection (fresh entry, top row). */
 } FileMenuState;
 
 /* GAME_MODE_NEW_GAME_NAMING: run-to-completion port of new_game_naming()

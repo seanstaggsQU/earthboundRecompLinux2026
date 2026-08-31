@@ -961,6 +961,7 @@ void platform_video_end_frame(void) {
      * per feedback that wanting the CRT-style scanline look didn't mean
      * wanting to give up zoom. */
     bool want_4_3 = engine_aspect_ratio == ASPECT_RATIO_4_3;
+    bool want_21_9 = engine_aspect_ratio == ASPECT_RATIO_21_9;
 
     int content_w, content_h;
     switch (zoom_mode) {
@@ -987,6 +988,17 @@ void platform_video_end_frame(void) {
              * Classic mode's fixed crop, now independent of Scanlines/zoom. */
             content_w = SNES_WIDTH;
             content_h = SNES_HEIGHT;
+        } else if (want_21_9) {
+            /* 21:9 Aspect: the compiled viewport's own hard width ceiling
+             * (EB_VIEWPORT_WIDTH, 512 -- the SNES's own 64-tile tilemap
+             * limit) with a small height trim to land on exactly 21:9. A
+             * true 21:9 crop at full SNES_HEIGHT (224) would need ~523px,
+             * just over that ceiling -- trimming height instead of trying
+             * to exceed it costs a few rows off the very top/bottom
+             * (224 -> 219, ~2% of the frame) rather than touching the
+             * canvas ceiling itself. */
+            content_w = EB_VIEWPORT_WIDTH;
+            content_h = (int)(EB_VIEWPORT_WIDTH * 9.0 / 21.0);
         } else if (want_wide_fov) {
             /* game_main.c's needs_zoom_reset (battle/Town Map/title/file-
              * select) force-persists EB_ZOOM_OFF regardless of the Wide FOV
