@@ -950,30 +950,62 @@ void platform_video_end_frame(void) {
      * the default footprint's exact aspect ratio (see EB_ZOOM_IN_WIDTH's
      * comment), so it looks just as good on any display the default
      * already does. */
-    /* Aspect Ratio (settings.h) only affects the EB_ZOOM_OFF baseline
-     * below -- Zoom Out/Zoom In are unaffected either way (Zoom Out
-     * deliberately adapts to the REAL display shape regardless of this
-     * setting, see its own comment; forcing it to a requested 4:3 would
-     * reintroduce the exact wasted-budget letterbox problem that adaptive
-     * logic exists to avoid. Zoom In is a small fixed crop matching the
-     * 16:9 default's own aspect, independent of this setting too). This
-     * used to be a hard package deal with Scanlines (old "Classic" mode
-     * forced both together, and locked zoom off entirely) -- decoupled
-     * per feedback that wanting the CRT-style scanline look didn't mean
-     * wanting to give up zoom. */
+    /* Aspect Ratio (settings.h) vs. Wide FOV / zoom_mode: two genuinely
+     * separate concerns, kept strictly separate after these two got
+     * blurred together enough times to cause real, reported bugs (21:9
+     * silently ignored under Wide FOV, then under-filling a real
+     * ultrawide monitor once it wasn't, then 4:3 found to have the exact
+     * same silently-ignored gap below once 21:9's got fixed). The rule
+     * now, applied uniformly: zoom_mode/Wide FOV decides ONLY how much of
+     * the world is revealed (the FOV budget -- EB_DEFAULT_WIDTH x
+     * SNES_HEIGHT off, EB_ZOOM_OUT_WIDTH x EB_ZOOM_OUT_HEIGHT on, a fixed
+     * budget either way, no display awareness of its own). Aspect Ratio
+     * decides ONLY how that budget maps onto the actual screen -- 4:3
+     * forces the true SNES shape (a fixed crop, unaffected by which FOV
+     * budget it's carved from -- letterboxes/pillarboxes as needed, same
+     * look whether Wide FOV is on or off, a deliberate behavior change
+     * from this crop's old "adapt regardless of Aspect Ratio" design:
+     * that reasoning traded correctness for the same wasted-budget
+     * letterbox 21:9 has its own comment about below, now judged not
+     * worth the inconsistency), 21:9 forces the wide cinematic shape
+     * (see its own comment below for the real-ultrawide nuance), and 16:9
+     * -- the one case with no specific shape to force -- fills the FOV
+     * budget adaptively to match whatever the real display is, same as
+     * it always has, on both zoom_mode settings that adapt at all.
+     * EB_ZOOM_IN stays the one exception to all of this: a small fixed
+     * crop matching the 16:9 default's own aspect, independent of Aspect
+     * Ratio entirely, no VRAM-fill-margin or wasted-budget concern to
+     * resolve either way (see its own comment above).
+     *
+     * This used to be a hard package deal with Scanlines too (old
+     * "Classic" mode forced both together, and locked zoom off entirely)
+     * -- decoupled per feedback that wanting the CRT-style scanline look
+     * didn't mean wanting to give up zoom. */
     bool want_4_3 = engine_aspect_ratio == ASPECT_RATIO_4_3;
     bool want_21_9 = engine_aspect_ratio == ASPECT_RATIO_21_9;
 
     int content_w, content_h;
     switch (zoom_mode) {
     case EB_ZOOM_OUT: {
+        if (want_4_3) {
+            /* 4:3 forces the true SNES crop here too, unaffected by Wide
+             * FOV's larger reveal budget -- same fixed shape the
+             * EB_ZOOM_OFF branch below has always used for it, applied
+             * consistently now instead of silently falling through to the
+             * adaptive 16:9 behavior a few lines down (the exact gap 21:9
+             * had before its own fix just below -- found by checking for
+             * more of the same class of bug once that one was confirmed).
+             * See the long comment above this switch for the reasoning:
+             * Aspect Ratio always dictates shape, Wide FOV only changes
+             * how much world that shape reveals. */
+            content_w = SNES_WIDTH;
+            content_h = SNES_HEIGHT;
+            break;
+        }
         if (want_21_9) {
             /* 21:9 Aspect overrides Zoom Out's normal "adapt to fill
              * whatever the real display is" behavior below on a display
-             * NARROWER than 21:9 -- unlike 4:3 (deliberately left fully
-             * display-adaptive, see the paragraph above: forcing a fixed
-             * 4:3 there was reasoned to just waste zoom budget as unwanted
-             * letterbox, not a look anyone was after), 21:9 IS explicitly
+             * NARROWER than 21:9 -- 21:9 IS explicitly
              * a cinematic-letterbox look, the entire point of picking it
              * is seeing the bars. Reported live as "Wide FOV silently
              * ignores 21:9": on an ordinary 16:9 display the adaptive crop
