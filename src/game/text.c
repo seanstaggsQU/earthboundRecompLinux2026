@@ -3694,13 +3694,26 @@ StepResult mode_step_settings_menu(ModeState *ms) {
             add_menu_item(sound_labels[sc], 12, 0, 11);
             add_menu_item(window_style_labels[fl], 13, 0, 12);
         }
-        open_window_and_print_menu(1, 0);
+        /* layout_and_print_menu_at_selection over open_window_and_print_menu:
+         * re-selects st->cursor (the row just toggled, see SettingsMenuState's
+         * doc comment) instead of always landing back on row 0. Safe here
+         * unlike file-select's Tweaks screen (see fm_tweaks_build()) because
+         * every one of this menu's 13 rows is a plain sequential row with no
+         * hand-placed gap, exactly what that helper's row = i/columns layout
+         * assumes. */
+        layout_and_print_menu_at_selection(1, 0, st->cursor);
         st->phase = SET_RESULT;
         return menu_push_selection(&st->result_ready, &st->result, 1);
     }
 
     case SET_RESULT: {
         uint16_t selection = menu_take_result(&st->result_ready, &st->result);
+        /* Rows 1-13 all confirm-and-rebuild (see the branches below); capture
+         * the toggled row once here instead of repeating this assignment in
+         * all 13 branches. Cancel/other leaves st->cursor untouched, which is
+         * fine -- SET_CLEANUP closes the window on that path regardless. */
+        if (selection >= 1 && selection <= 13)
+            st->cursor = (uint16_t)(selection - 1);
         if (selection == 1) {
             /* Sprint Speed row confirmed: cycle Off -> Medium -> Stinky -> Off. */
             engine_sprint_speed = (uint8_t)((engine_sprint_speed + 1) % SPRINT_SPEED_COUNT);

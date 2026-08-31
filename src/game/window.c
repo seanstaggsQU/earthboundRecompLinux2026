@@ -177,8 +177,16 @@ static const uint16_t window_configs[][4] = {
     [WINDOW_KEY_ITEMS] = { 7, 1, 24, 16 },
     /* Aspect Ratio, this port's own addition to the Set Up cascade (see
      * window.h). Same shape as Music Mode (0x19, a title line + N single-
-     * pick rows), just a little wider to fit "16:9 (Widescreen)". */
-    [WINDOW_FILE_SELECT_ASPECT] = { 6, 15, 22, 8 },
+     * pick rows), just a little wider to fit "16:9 (Widescreen)". Height 10
+     * (bumped from 8 when 21:9 became a 3rd row at text_y=3) -- same
+     * sm_handle_input()/find_next_menu_option() cursor bound as every other
+     * window here, (height-2)/2 rows: height 8 gave max_rows=3, capping
+     * vertical cursor search at rows 0-2, leaving row 3 unreachable by
+     * Down from "4:3 (Original)" -- reported live as 21:9 "not showing up",
+     * same off-by-one WINDOW_QUIT_CONFIRM's own height bump above already
+     * fixed for its second prompt. Height 10 gives max_rows=4, covering
+     * rows 0-3. */
+    [WINDOW_FILE_SELECT_ASPECT] = { 6, 15, 22, 10 },
     /* Visual Tweaks, this port's own addition to the Set Up cascade (see
      * window.h). Height 20 = title + 5 toggle rows (text_y 2-6) + a blank
      * spacer row + Done (text_y 8) -- sm_handle_input()'s cursor bound is

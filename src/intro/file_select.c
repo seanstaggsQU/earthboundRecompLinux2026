@@ -572,7 +572,7 @@ static int fm_aspect_build(void) {
 
     add_menu_item("16:9 (Widescreen)", 1, 0, 1);
     add_menu_item("4:3 (Original)", 2, 0, 2);
-    add_menu_item("21:9 (Ultrawide)", 3, 0, 3);
+    add_menu_item("21:9 (Beta)", 3, 0, 3);
 
     print_menu_items();
     return -1;
@@ -613,12 +613,15 @@ static int fm_tweaks_build(uint16_t initial_selection) {
 
     /* Re-select the row the player just toggled instead of always landing
      * back on Scanlines -- see FileMenuState.tweaks_cursor's own comment.
-     * (uint16_t)-1 (fresh entry, not a toggle re-loop) falls through to
-     * print_menu_items()'s own default (top row), same as before. */
-    if (initial_selection != (uint16_t)-1)
-        layout_and_print_menu_at_selection(1, 0, initial_selection);
-    else
-        print_menu_items();
+     * Set selected_option directly (what sm_setup_pre() reads to seed the
+     * cursor, window.c) rather than going through
+     * layout_and_print_menu_at_selection(): that helper ALSO recomputes
+     * every row's text_x/text_y from a plain column/row grid, which would
+     * clobber this screen's hand-placed rows (2-6, then a deliberate gap
+     * to 8 for "Done"). */
+    if (initial_selection != (uint16_t)-1 && initial_selection < w->menu_count)
+        w->selected_option = (uint8_t)initial_selection;
+    print_menu_items();
     return -1;
 }
 

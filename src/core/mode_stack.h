@@ -485,6 +485,11 @@ typedef struct {
     uint8_t  phase;         /* SettingsMenuPhase */
     uint8_t  result_ready;  /* 1 = `result` holds an inline early-exit value */
     uint16_t result;        /* inline early-exit selection result */
+    uint16_t cursor;        /* row to re-select on the next SET_BUILD rebuild
+                              * (0-based; zero-inits to row 0, Sprint Speed,
+                              * on fresh entry). SET_RESULT sets this to the
+                              * row just toggled so confirming a row doesn't
+                              * bounce the cursor back to the top every time. */
 } SettingsMenuState;
 
 /* GAME_MODE_UPDATE_CHECK, this port's own addition, not a port of any ROM

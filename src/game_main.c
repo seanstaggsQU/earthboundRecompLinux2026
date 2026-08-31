@@ -300,6 +300,27 @@ static void fps_overlay_stamp_scanline(int y, pixel_t *pixels) {
  * EB_VIEWPORT_HEIGHT), this is the same reasoning applied to X. */
 #define VERSION_OVERLAY_CONTENT_WIDTH 400
 
+/* Aspect Ratio (settings.h) changes the actual on-screen crop width the
+ * same way Zoom would, just via a different setting -- title/file-select
+ * force zoom off (see this overlay's own doc comment) but do NOT force
+ * Aspect Ratio to 16:9, so this overlay has to track 4:3 too, not just
+ * assume the 16:9 400-wide crop always applies. Mirrors sdl2_video.c's own
+ * want_4_3 content_w -- kept in sync by hand for the same cross-platform-
+ * file reason VERSION_OVERLAY_CONTENT_WIDTH already is.
+ *
+ * Height, unlike width, is NOT aspect-ratio-dependent here: 21:9's own
+ * extra height crop is suppressed on title/file-select specifically
+ * (platform_video_set_wide_crop_suppressed(), game_main.c/sdl2_video.c) --
+ * exactly the screens this overlay ever renders on -- so the actual crop
+ * height there is always plain SNES_HEIGHT regardless of Aspect Ratio,
+ * same as 16:9. 21:9 deliberately reuses the exact same 400 width as 16:9
+ * too (not a wider crop): see sdl2_video.c's want_21_9 comment for why
+ * widening past 400 on these non-scrolling screens isn't safe. */
+static int version_overlay_crop_w(void) {
+    if (engine_aspect_ratio == ASPECT_RATIO_4_3) return SNES_WIDTH;   /* 256 */
+    return VERSION_OVERLAY_CONTENT_WIDTH;                             /* 400 (16:9 and 21:9 alike) */
+}
+
 /* ---- Version string overlay (title screen / file-select only) ----
  * This port's own addition: stamps the build version ("v1.2.1", "dev",
  * ...) as small dim text near the bottom of the screen, same scanline-
@@ -310,31 +331,36 @@ static void fps_overlay_stamp_scanline(int y, pixel_t *pixels) {
  * Positioned inside the default (zoom-off) crop's visible range, not the
  * full EB_VIEWPORT_WIDTH x EB_VIEWPORT_HEIGHT compiled canvas --
  * anything stamped outside that crop renders into the letterboxed-off
- * margin and is never actually seen (see VERSION_OVERLAY_CONTENT_WIDTH
- * above). This assumes zoom is off, which title screen/file-select
- * always are in the normal case (nothing on those screens lets the
- * player change zoom); combined_overlay_stamp_scanline()'s caller skips
- * installing this callback at all if ow.zoom_mode is somehow non-default
- * there (e.g. a debug/event-script edge case), rather than this function
- * trying to track every possible crop size itself. Right-aligned with a
- * small margin from the bottom-right corner, dim gray so it reads as a
- * watermark rather than UI. */
+ * margin and is never actually seen (see version_overlay_crop_w above).
+ * This assumes zoom is off, which title screen/file-select always are in
+ * the normal case (nothing on those screens lets the player change zoom);
+ * combined_overlay_stamp_scanline()'s caller skips installing this callback
+ * at all if ow.zoom_mode is somehow non-default there (e.g. a debug/event-
+ * script edge case), rather than this function trying to track every
+ * possible crop size itself -- Aspect Ratio, unlike zoom, IS changeable on
+ * these screens, hence version_overlay_crop_w tracking it explicitly (height
+ * needs no equivalent, see that function's own doc comment).
+ * Right-aligned with a small margin from the bottom-right corner, dim gray
+ * so it reads as a watermark rather than UI. */
 static void version_overlay_stamp_scanline(int y, pixel_t *pixels) {
     const char *ver = platform_get_version_string();
     if (!ver || !ver[0]) return;
     if (!font_get_glyph(FONT_ID_TINY, 0)) return;
 
+    int crop_w = version_overlay_crop_w();
+    int crop_h = SNES_HEIGHT;
+
     uint8_t h = font_get_height(FONT_ID_TINY);
-    int crop_top = (EB_VIEWPORT_HEIGHT - SNES_HEIGHT) / 2;
-    int text_top = crop_top + SNES_HEIGHT - h - 3; /* 3px margin above the visible bottom edge */
+    int crop_top = (EB_VIEWPORT_HEIGHT - crop_h) / 2;
+    int text_top = crop_top + crop_h - h - 3; /* 3px margin above the visible bottom edge */
     if (y < text_top || y >= text_top + h) return;
     int glyph_y = y - text_top;
 
     int text_w = 0;
     for (const char *s = ver; *s; s++)
         text_w += font_get_width(FONT_ID_TINY, ascii_to_eb_char(*s) - 0x50);
-    int crop_left = (EB_VIEWPORT_WIDTH - VERSION_OVERLAY_CONTENT_WIDTH) / 2;
-    int ox = crop_left + VERSION_OVERLAY_CONTENT_WIDTH - text_w - 3;
+    int crop_left = (EB_VIEWPORT_WIDTH - crop_w) / 2;
+    int ox = crop_left + crop_w - text_w - 3;
 
     pixel_t color = PIXEL_RGB(0x80, 0x80, 0x80);
     int cx = ox;
@@ -768,6 +794,12 @@ void host_process_frame(void) {
      * the title/file-select suppression above. */
     bool suppress_dof = suppress_fx || any_window_open() || in_battle_or_town_map;
     platform_video_set_dof_suppressed(suppress_dof);
+
+    /* 21:9 Aspect Ratio's extra height crop: suppressed on the exact same
+     * needs_zoom_reset set (title/file-select/battle/Town Map) computed
+     * above for zoom itself -- see platform_video_set_wide_crop_suppressed()'s
+     * doc comment (platform.h). */
+    platform_video_set_wide_crop_suppressed(needs_zoom_reset);
     if (aux_new & AUX_FAST_FORWARD) {
         fast_forward_active = !fast_forward_active;
         platform_video_set_vsync(!fast_forward_active);

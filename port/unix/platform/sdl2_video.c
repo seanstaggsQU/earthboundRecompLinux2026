@@ -71,10 +71,11 @@ static SDL_Texture *aa_texture;
 static EbZoomMode zoom_mode = EB_ZOOM_OFF;
 
 /* Per-frame overrides set by platform_video_set_fx_suppressed()/
- * platform_video_set_dof_suppressed(); see platform.h. Read in
- * platform_video_end_frame(), same as zoom_mode. */
+ * platform_video_set_dof_suppressed()/platform_video_set_wide_crop_suppressed();
+ * see platform.h. Read in platform_video_end_frame(), same as zoom_mode. */
 static bool fx_suppressed = false;
 static bool dof_suppressed = false;
+static bool wide_crop_suppressed = false;
 
 /* DoF's own faded-in/out intensity (0..1), separate from the hard
  * fx_suppressed/dof_suppressed booleans above. Those flip instantly (battle
@@ -988,17 +989,42 @@ void platform_video_end_frame(void) {
              * Classic mode's fixed crop, now independent of Scanlines/zoom. */
             content_w = SNES_WIDTH;
             content_h = SNES_HEIGHT;
-        } else if (want_21_9) {
-            /* 21:9 Aspect: the compiled viewport's own hard width ceiling
-             * (EB_VIEWPORT_WIDTH, 512 -- the SNES's own 64-tile tilemap
-             * limit) with a small height trim to land on exactly 21:9. A
-             * true 21:9 crop at full SNES_HEIGHT (224) would need ~523px,
-             * just over that ceiling -- trimming height instead of trying
-             * to exceed it costs a few rows off the very top/bottom
-             * (224 -> 219, ~2% of the frame) rather than touching the
-             * canvas ceiling itself. */
-            content_w = EB_VIEWPORT_WIDTH;
-            content_h = (int)(EB_VIEWPORT_WIDTH * 9.0 / 21.0);
+        } else if (want_21_9 && !wide_crop_suppressed) {
+            /* 21:9 Aspect: EB_DEFAULT_WIDTH (400), the same width the
+             * default (non-4:3, non-21:9) EB_ZOOM_OFF crop below has always
+             * used -- not EB_VIEWPORT_WIDTH or EB_ZOOM_OUT_WIDTH. Those are
+             * safe only for the dynamically-scrolled overworld fill
+             * (EB_ZOOM_OUT_WIDTH's own long comment above is specifically
+             * about map_loader.c's camera-tile fill margin); title/logo/
+             * file-select screens force EB_ZOOM_OFF and have static,
+             * non-scrolling BG content that was only ever authored/proven
+             * safe up to 400px wide (this exact 400 -- "today's shipped
+             * widescreen baseline" per EB_DEFAULT_WIDTH's comment). Cropping
+             * wider than that on those screens shows the BG tilemap's own
+             * repeat boundary, confirmed live as logo art repeating at the
+             * edges in 21:9 even after backing off to EB_ZOOM_OUT_WIDTH.
+             * Height still trims to land on exactly 21:9 from that width.
+             * Also keep VERSION_OVERLAY_CONTENT_WIDTH (game_main.c) in sync
+             * with content_w here if it changes -- that overlay has no
+             * visibility into this file's crop math and has to duplicate it
+             * by hand (see its own comment).
+             *
+             * wide_crop_suppressed (set by game_main.c's needs_zoom_reset,
+             * same title/file-select/battle/Town Map set platform_video_set_
+             * fx_suppressed() already forces off Color Grading for) additionally
+             * skips the height trim below even once width is already safely
+             * capped at 400: those screens position UI (file-select's menu
+             * window, a battle/Town Map text box) freely across the full
+             * native SNES_HEIGHT, the same "positioned across the full
+             * height, a shorter crop clips it clean off" problem
+             * EB_ZOOM_IN's own any_window_open() suppression (game_main.c)
+             * already exists for -- confirmed live as the file-select menu's
+             * top row and the title screen's own baked-in credits both
+             * clipped under the height trim. Falls through to the plain
+             * EB_DEFAULT_WIDTH x SNES_HEIGHT default crop below when
+             * suppressed, identical to what 16:9 already shows there. */
+            content_w = EB_DEFAULT_WIDTH;
+            content_h = (int)(EB_DEFAULT_WIDTH * 9.0 / 21.0);
         } else if (want_wide_fov) {
             /* game_main.c's needs_zoom_reset (battle/Town Map/title/file-
              * select) force-persists EB_ZOOM_OFF regardless of the Wide FOV
@@ -1107,6 +1133,10 @@ void platform_video_set_fx_suppressed(bool suppressed) {
 
 void platform_video_set_dof_suppressed(bool suppressed) {
     dof_suppressed = suppressed;
+}
+
+void platform_video_set_wide_crop_suppressed(bool suppressed) {
+    wide_crop_suppressed = suppressed;
 }
 
 void platform_video_set_vsync(bool enabled) {
