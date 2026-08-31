@@ -954,17 +954,31 @@ int main(int argc, char *argv[]) {
     if (threed_zombie_flag_check || threed_zombie_flag_fix) {
         /* See --check-threed-zombie-flag/--fix-threed-zombie-flag's own
          * doc comments above for the full story. Read-only unless -fix
-         * is the one that was passed. */
+         * is the one that was passed. zf[] is the fix-eligible set only
+         * (--fix only ever clears these); ctx[] is read-only-always
+         * additional context to help diagnose which stage of the chain a
+         * save is actually stuck in -- deliberately NOT fix-eligible:
+         * FLG_JEFF in particular is a real, wanted story-progress flag,
+         * clearing it would be actively harmful, not a repair. */
         static const struct { const char *name; uint16_t id; } zf[] = {
             {"FLG_THRK_BIKINIZOMBI_F_APPEAR", 296},
             {"FLG_THRK_BIKINIZOMBI_P_APPEAR", 297},
             {"FLG_THRK_HOTELZOMBI_APPEAR",    298},
+        };
+        static const struct { const char *name; uint16_t id; } ctx[] = {
+            {"FLG_JEFF",                      14},
+            {"FLG_THRK_BIKINIZOMBI_APPEAR",   46},
+            {"FLG_THRK_HOTELMAN_DISAPPEAR",   433},
         };
         for (int slot = 0; slot < SAVE_COUNT; slot++) {
             if (!load_game(slot)) {
                 fprintf(stderr, "slot %d: empty/unreadable, skipping\n", slot + 1);
                 continue;
             }
+            fprintf(stderr, "slot %d (context):", slot + 1);
+            for (size_t fi = 0; fi < sizeof(ctx) / sizeof(ctx[0]); fi++)
+                fprintf(stderr, " %s=%d", ctx[fi].name, event_flag_get(ctx[fi].id));
+            fprintf(stderr, "\n");
             fprintf(stderr, "slot %d (before):", slot + 1);
             for (size_t fi = 0; fi < sizeof(zf) / sizeof(zf[0]); fi++)
                 fprintf(stderr, " %s=%d", zf[fi].name, event_flag_get(zf[fi].id));
