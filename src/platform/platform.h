@@ -129,23 +129,12 @@ void platform_video_set_fx_suppressed(bool suppressed);
  * there, not derived from the flag above, since none of DoF's extra
  * conditions apply to Color Grading). */
 void platform_video_set_dof_suppressed(bool suppressed);
-/* 21:9 Aspect Ratio's extra height crop, suppressed (falls back to the
- * plain default crop, same footprint 16:9 already shows) on the same
- * title/file-select/battle/Town Map set platform_video_set_fx_suppressed()
- * already forces Color Grading off for -- see want_21_9's own doc comment,
- * sdl2_video.c. Those screens position UI (a menu window, baked-in credits
- * art, a battle/Town Map text box) freely across the full native height,
- * the same reason EB_ZOOM_IN suspends itself whenever any_window_open()
- * (game_main.c) rather than clip it. Driven straight from game_main.c's
- * needs_zoom_reset, not a separate scan. */
-void platform_video_set_wide_crop_suppressed(bool suppressed);
 /* Marks the current frame as one of the static/non-scrolling "always
  * forced EB_ZOOM_OFF" screens (title/file-select/intro logos/attract-mode
  * demo) as opposed to battle/Town Map, which force EB_ZOOM_OFF too but for
  * a different reason and need to stay display-adaptive there (see
  * want_wide_fov's own long comment, sdl2_video.c, for why that branch
- * can't tell those two situations apart on its own). Narrower than
- * platform_video_set_wide_crop_suppressed() above, which covers both. */
+ * can't tell those two situations apart on its own). */
 void platform_video_set_static_screen(bool is_static_screen);
 void platform_render_frame(scanline_stamp_cb_t fps_overlay_cb);
 

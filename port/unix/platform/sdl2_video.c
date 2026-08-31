@@ -71,12 +71,10 @@ static SDL_Texture *aa_texture;
 static EbZoomMode zoom_mode = EB_ZOOM_OFF;
 
 /* Per-frame overrides set by platform_video_set_fx_suppressed()/
- * platform_video_set_dof_suppressed()/platform_video_set_wide_crop_suppressed()/
- * platform_video_set_static_screen(); see platform.h. Read in
- * platform_video_end_frame(), same as zoom_mode. */
+ * platform_video_set_dof_suppressed()/platform_video_set_static_screen();
+ * see platform.h. Read in platform_video_end_frame(), same as zoom_mode. */
 static bool fx_suppressed = false;
 static bool dof_suppressed = false;
-static bool wide_crop_suppressed = false;
 static bool static_screen = false;
 
 /* DoF's own faded-in/out intensity (0..1), separate from the hard
@@ -1060,42 +1058,25 @@ void platform_video_end_frame(void) {
              * Classic mode's fixed crop, now independent of Scanlines/zoom. */
             content_w = SNES_WIDTH;
             content_h = SNES_HEIGHT;
-        } else if (want_21_9 && !wide_crop_suppressed) {
-            /* 21:9 Aspect: EB_DEFAULT_WIDTH (400), the same width the
-             * default (non-4:3, non-21:9) EB_ZOOM_OFF crop below has always
-             * used -- not EB_VIEWPORT_WIDTH or EB_ZOOM_OUT_WIDTH. Those are
-             * safe only for the dynamically-scrolled overworld fill
-             * (EB_ZOOM_OUT_WIDTH's own long comment above is specifically
-             * about map_loader.c's camera-tile fill margin); title/logo/
-             * file-select screens force EB_ZOOM_OFF and have static,
-             * non-scrolling BG content that was only ever authored/proven
-             * safe up to 400px wide (this exact 400 -- "today's shipped
-             * widescreen baseline" per EB_DEFAULT_WIDTH's comment). Cropping
-             * wider than that on those screens shows the BG tilemap's own
-             * repeat boundary, confirmed live as logo art repeating at the
-             * edges in 21:9 even after backing off to EB_ZOOM_OUT_WIDTH.
-             * Height still trims to land on exactly 21:9 from that width.
-             * Also keep VERSION_OVERLAY_CONTENT_WIDTH (game_main.c) in sync
-             * with content_w here if it changes -- that overlay has no
-             * visibility into this file's crop math and has to duplicate it
-             * by hand (see its own comment).
-             *
-             * wide_crop_suppressed (set by game_main.c's needs_zoom_reset,
-             * same title/file-select/battle/Town Map set platform_video_set_
-             * fx_suppressed() already forces off Color Grading for) additionally
-             * skips the height trim below even once width is already safely
-             * capped at 400: those screens position UI (file-select's menu
-             * window, a battle/Town Map text box) freely across the full
-             * native SNES_HEIGHT, the same "positioned across the full
-             * height, a shorter crop clips it clean off" problem
-             * EB_ZOOM_IN's own any_window_open() suppression (game_main.c)
-             * already exists for -- confirmed live as the file-select menu's
-             * top row and the title screen's own baked-in credits both
-             * clipped under the height trim. Falls through to the plain
-             * EB_DEFAULT_WIDTH x SNES_HEIGHT default crop below when
-             * suppressed, identical to what 16:9 already shows there. */
-            content_w = EB_DEFAULT_WIDTH;
-            content_h = (int)(EB_DEFAULT_WIDTH * 9.0 / 21.0);
+        /* want_21_9 deliberately has no branch here anymore (it used to:
+         * a 400x171 height-trimmed crop, suppressed whenever a window was
+         * open or one of the always-forced screens was active, same
+         * pattern as want_4_3 above). Every time a text box/menu opened
+         * during ordinary EB_ZOOM_OFF gameplay -- extremely common right
+         * after a battle -- the crop briefly widened back to the full
+         * SNES_HEIGHT default and then snapped back to the trimmed height
+         * the instant the window closed, reported live as a jarring
+         * "zoom pulse." Rather than a real fix each time this flip
+         * happened to matter (a menu clipped, a battle text box clipped,
+         * a logo screen wrapped, an ultrawide monitor under-filled -- see
+         * this file's git history for the full chain), 21:9 simply no
+         * longer adds any extra crop during EB_ZOOM_OFF at all: it falls
+         * through to whichever of the branches below would apply anyway
+         * (want_wide_fov, or the plain default), so it renders exactly
+         * like 16:9 there -- stable, no flicker, always. The cinematic
+         * letterbox look 21:9 is actually for still applies normally
+         * during EB_ZOOM_OUT (Wide FOV on) above, which was never part of
+         * this flicker (any_window_open() never touched that branch). */
         } else if (want_wide_fov && !static_screen) {
             /* game_main.c's needs_zoom_reset (battle/Town Map/title/file-
              * select/intro logos/attract) force-persists EB_ZOOM_OFF
@@ -1215,10 +1196,6 @@ void platform_video_set_fx_suppressed(bool suppressed) {
 
 void platform_video_set_dof_suppressed(bool suppressed) {
     dof_suppressed = suppressed;
-}
-
-void platform_video_set_wide_crop_suppressed(bool suppressed) {
-    wide_crop_suppressed = suppressed;
 }
 
 void platform_video_set_static_screen(bool is_static_screen) {

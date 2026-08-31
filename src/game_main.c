@@ -308,14 +308,13 @@ static void fps_overlay_stamp_scanline(int y, pixel_t *pixels) {
  * want_4_3 content_w -- kept in sync by hand for the same cross-platform-
  * file reason VERSION_OVERLAY_CONTENT_WIDTH already is.
  *
- * Height, unlike width, is NOT aspect-ratio-dependent here: 21:9's own
- * extra height crop is suppressed on title/file-select specifically
- * (platform_video_set_wide_crop_suppressed(), game_main.c/sdl2_video.c) --
- * exactly the screens this overlay ever renders on -- so the actual crop
- * height there is always plain SNES_HEIGHT regardless of Aspect Ratio,
- * same as 16:9. 21:9 deliberately reuses the exact same 400 width as 16:9
- * too (not a wider crop): see sdl2_video.c's want_21_9 comment for why
- * widening past 400 on these non-scrolling screens isn't safe. */
+ * Height, unlike width, is NOT aspect-ratio-dependent here: 21:9 adds no
+ * extra crop of its own during EB_ZOOM_OFF at all anymore (see want_21_9's
+ * removal, sdl2_video.c, for the jarring-flicker story) -- the actual crop
+ * height on title/file-select is always plain SNES_HEIGHT regardless of
+ * Aspect Ratio, same as 16:9. 21:9 also reuses the exact same 400 width as
+ * 16:9 (not a wider crop): see sdl2_video.c's want_4_3 comment area for
+ * why widening past 400 on these non-scrolling screens isn't safe. */
 static int version_overlay_crop_w(void) {
     if (engine_aspect_ratio == ASPECT_RATIO_4_3) return SNES_WIDTH;   /* 256 */
     return VERSION_OVERLAY_CONTENT_WIDTH;                             /* 400 (16:9 and 21:9 alike) */
@@ -817,28 +816,16 @@ void host_process_frame(void) {
     bool suppress_dof = suppress_fx || any_window_open() || in_battle_or_town_map;
     platform_video_set_dof_suppressed(suppress_dof);
 
-    /* 21:9 Aspect Ratio's extra height crop: suppressed on the same
-     * needs_zoom_reset set (title/file-select/intro logos/attract/battle/
-     * Town Map) computed above for zoom itself -- see
-     * platform_video_set_wide_crop_suppressed()'s doc comment (platform.h)
-     * -- PLUS any_window_open(), same as DoF just above and for the same
-     * reason: EarthBound positions windows (dialogue boxes, the pause
-     * menu, shops, ...) freely across the full native height during
-     * perfectly ordinary EB_ZOOM_OFF overworld gameplay too, not just on
-     * the always-forced screens, so a window open there needs the same
-     * temporary override. Reported live as "Wide FOV disabled, 21:9 cuts
-     * off the tops of menus" -- needs_zoom_reset alone doesn't cover plain
-     * gameplay-with-a-window-open the way it covers title/file-select/etc. */
-    bool suppress_wide_crop = needs_zoom_reset || any_window_open();
-    platform_video_set_wide_crop_suppressed(suppress_wide_crop);
-
-    /* Narrower than the above: tells sdl2_video.c specifically which
-     * forced-EB_ZOOM_OFF screens are static/non-scrolling art (title/
-     * file-select/intro-logos/attract) vs. battle/Town Map, which also
-     * force EB_ZOOM_OFF via needs_zoom_reset but need to stay display-
-     * adaptive for a real, different reason (see want_wide_fov's own
-     * comment, sdl2_video.c) -- suppress_wide_crop above can't make that
-     * distinction, it's the same true/false for both. */
+    /* Tells sdl2_video.c specifically which forced-EB_ZOOM_OFF screens are
+     * static/non-scrolling art (title/file-select/intro-logos/attract) vs.
+     * battle/Town Map, which also force EB_ZOOM_OFF via needs_zoom_reset
+     * but need to stay display-adaptive for a real, different reason (see
+     * want_wide_fov's own comment, sdl2_video.c). Used to also gate 21:9's
+     * own extra height crop, but that crop was removed entirely (see its
+     * own removal comment there) after the suppress-on-any-window-open
+     * logic it needed caused a jarring "zoom pulse" every time a text box
+     * opened during ordinary gameplay -- reported live, right after
+     * battle specifically, where post-battle text is near-guaranteed. */
     platform_video_set_static_screen(in_static_screen);
     if (aux_new & AUX_FAST_FORWARD) {
         fast_forward_active = !fast_forward_active;
