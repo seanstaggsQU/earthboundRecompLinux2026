@@ -449,6 +449,11 @@ void host_process_frame(void) {
      * against this static logo art the same way it's meant to for real
      * scrolling gameplay, reintroducing the wide-crop edge-repeat bug. */
     bool in_intro_logo_or_attract = mode_stack_has_any(GAME_MODE_INTRO_LOGO, GAME_MODE_ATTRACT);
+    /* Static/non-scrolling screens specifically -- title/file-select and
+     * the intro logos/attract loop, deliberately NOT battle/Town Map (see
+     * platform_video_set_static_screen()'s doc comment, platform.h, for
+     * why those two need to stay out of this one). */
+    bool in_static_screen = in_title_or_file_select || in_intro_logo_or_attract;
 
     /* Capture-safety free-run: while a snapshot is pending, this frame is a pure
      * unwind step, keep the per-frame logic (fade/timers/RNG/tasks) so blocking
@@ -826,6 +831,15 @@ void host_process_frame(void) {
      * gameplay-with-a-window-open the way it covers title/file-select/etc. */
     bool suppress_wide_crop = needs_zoom_reset || any_window_open();
     platform_video_set_wide_crop_suppressed(suppress_wide_crop);
+
+    /* Narrower than the above: tells sdl2_video.c specifically which
+     * forced-EB_ZOOM_OFF screens are static/non-scrolling art (title/
+     * file-select/intro-logos/attract) vs. battle/Town Map, which also
+     * force EB_ZOOM_OFF via needs_zoom_reset but need to stay display-
+     * adaptive for a real, different reason (see want_wide_fov's own
+     * comment, sdl2_video.c) -- suppress_wide_crop above can't make that
+     * distinction, it's the same true/false for both. */
+    platform_video_set_static_screen(in_static_screen);
     if (aux_new & AUX_FAST_FORWARD) {
         fast_forward_active = !fast_forward_active;
         platform_video_set_vsync(!fast_forward_active);

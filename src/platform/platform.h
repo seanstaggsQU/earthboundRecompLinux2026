@@ -139,6 +139,14 @@ void platform_video_set_dof_suppressed(bool suppressed);
  * (game_main.c) rather than clip it. Driven straight from game_main.c's
  * needs_zoom_reset, not a separate scan. */
 void platform_video_set_wide_crop_suppressed(bool suppressed);
+/* Marks the current frame as one of the static/non-scrolling "always
+ * forced EB_ZOOM_OFF" screens (title/file-select/intro logos/attract-mode
+ * demo) as opposed to battle/Town Map, which force EB_ZOOM_OFF too but for
+ * a different reason and need to stay display-adaptive there (see
+ * want_wide_fov's own long comment, sdl2_video.c, for why that branch
+ * can't tell those two situations apart on its own). Narrower than
+ * platform_video_set_wide_crop_suppressed() above, which covers both. */
+void platform_video_set_static_screen(bool is_static_screen);
 void platform_render_frame(scanline_stamp_cb_t fps_overlay_cb);
 
 /* Short build version string ("v1.2.1", "dev", ...) for display on the

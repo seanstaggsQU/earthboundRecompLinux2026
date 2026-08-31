@@ -71,11 +71,13 @@ static SDL_Texture *aa_texture;
 static EbZoomMode zoom_mode = EB_ZOOM_OFF;
 
 /* Per-frame overrides set by platform_video_set_fx_suppressed()/
- * platform_video_set_dof_suppressed()/platform_video_set_wide_crop_suppressed();
- * see platform.h. Read in platform_video_end_frame(), same as zoom_mode. */
+ * platform_video_set_dof_suppressed()/platform_video_set_wide_crop_suppressed()/
+ * platform_video_set_static_screen(); see platform.h. Read in
+ * platform_video_end_frame(), same as zoom_mode. */
 static bool fx_suppressed = false;
 static bool dof_suppressed = false;
 static bool wide_crop_suppressed = false;
+static bool static_screen = false;
 
 /* DoF's own faded-in/out intensity (0..1), separate from the hard
  * fx_suppressed/dof_suppressed booleans above. Those flip instantly (battle
@@ -1094,46 +1096,57 @@ void platform_video_end_frame(void) {
              * suppressed, identical to what 16:9 already shows there. */
             content_w = EB_DEFAULT_WIDTH;
             content_h = (int)(EB_DEFAULT_WIDTH * 9.0 / 21.0);
-        } else if (want_wide_fov) {
+        } else if (want_wide_fov && !static_screen) {
             /* game_main.c's needs_zoom_reset (battle/Town Map/title/file-
-             * select) force-persists EB_ZOOM_OFF regardless of the Wide FOV
-             * toggle, but since the R3 toggle itself never lets Wide FOV
-             * land on EB_ZOOM_OFF by choice anymore (it only cycles
-             * Wide<->Zoom In, see game_main.c), landing here with
-             * want_wide_fov true unambiguously means "forced off", not a
-             * genuine user selection -- Off's own real content_w/h (the
-             * fixed 400x224 branch below) is never reachable while Wide
-             * FOV is on at all. That distinction matters here specifically
-             * for battle: unlike EB_ZOOM_OUT above, the fixed 400x224
-             * default crop's aspect ratio (1.786:1) is NOT adapted to the
-             * actual display, and battle's own renderer culls sprite/BG
-             * content beyond the native SNES_HEIGHT (224) row window
-             * regardless of crop (battle_ui.c sets sprite_y_offset =
-             * EB_VIEWPORT_PAD_TOP, gating render_obj_scanline's off-
-             * native-range cull) -- so whenever the display's actual
-             * aspect ratio isn't extremely close to 1.786:1 (most displays
-             * aren't), forcing the fixed crop during battle left a real,
-             * empty (nothing drawn, not a device-level letterbox) gap
-             * top/bottom that the aspect-preserving dst-rect math then
-             * ALSO padded with genuine letterbox bars on top of that --
-             * reported live as "black bars during battle that go away
-             * after," worse specifically for anyone whose window is sized
-             * to Wide FOV's usual aspect rather than happening to match
-             * 1.786:1. Mirrors EB_ZOOM_OUT's own adaptive logic above so
-             * the battle crop's aspect matches the display as closely as
-             * the genuinely-drawn content allows -- same EB_ZOOM_OUT_WIDTH
-             * safety ceiling (proven not to hit the tile-fill margin issue
-             * that ceiling exists for), but height-capped at the real
-             * SNES_HEIGHT battle limit instead of EB_ZOOM_OUT_HEIGHT,
-             * since anything taller is empty content, not a safe zoom
-             * budget to spend. On the vast majority of displays (wider
-             * than SNES_HEIGHT/EB_ZOOM_OUT_WIDTH's own ~2.21:1), this
-             * lands width-constrained and still can't fill 100% of a very
-             * wide window without either genuinely-blank content or a
-             * (small, unavoidable) pillarbox -- letterbox specifically
-             * (the reported symptom) is eliminated on any display at or
-             * above that ratio, which covers essentially every real
-             * monitor/TV shape. */
+             * select/intro logos/attract) force-persists EB_ZOOM_OFF
+             * regardless of the Wide FOV toggle, but since the R3 toggle
+             * itself never lets Wide FOV land on EB_ZOOM_OFF by choice
+             * anymore (it only cycles Wide<->Zoom In, see game_main.c),
+             * landing here with want_wide_fov true unambiguously means
+             * "forced off", not a genuine user selection -- Off's own real
+             * content_w/h (the fixed 400x224 branch below) is never
+             * reachable while Wide FOV is on at all. That distinction
+             * matters here specifically for battle: unlike EB_ZOOM_OUT
+             * above, the fixed 400x224 default crop's aspect ratio
+             * (1.786:1) is NOT adapted to the actual display, and battle's
+             * own renderer culls sprite/BG content beyond the native
+             * SNES_HEIGHT (224) row window regardless of crop (battle_ui.c
+             * sets sprite_y_offset = EB_VIEWPORT_PAD_TOP, gating
+             * render_obj_scanline's off-native-range cull) -- so whenever
+             * the display's actual aspect ratio isn't extremely close to
+             * 1.786:1 (most displays aren't), forcing the fixed crop
+             * during battle left a real, empty (nothing drawn, not a
+             * device-level letterbox) gap top/bottom that the aspect-
+             * preserving dst-rect math then ALSO padded with genuine
+             * letterbox bars on top of that -- reported live as "black
+             * bars during battle that go away after," worse specifically
+             * for anyone whose window is sized to Wide FOV's usual aspect
+             * rather than happening to match 1.786:1. Mirrors EB_ZOOM_OUT's
+             * own adaptive logic above so the battle crop's aspect matches
+             * the display as closely as the genuinely-drawn content
+             * allows -- same EB_ZOOM_OUT_WIDTH safety ceiling (proven not
+             * to hit the tile-fill margin issue that ceiling exists for),
+             * but height-capped at the real SNES_HEIGHT battle limit
+             * instead of EB_ZOOM_OUT_HEIGHT, since anything taller is
+             * empty content, not a safe zoom budget to spend.
+             *
+             * !static_screen excludes title/file-select/intro logos/
+             * attract from all of the above: this adaptive-width behavior
+             * is specifically about battle's empty-content gap, which
+             * doesn't apply to those screens at all -- they have real,
+             * static, non-scrolling BG art that was only ever authored/
+             * proven safe up to the 400px default width (same reasoning
+             * as want_21_9's own EB_DEFAULT_WIDTH cap above), and going
+             * wider shows that art's own tilemap repeat boundary. Before
+             * this flag existed, needs_zoom_reset gaining intro-logo/
+             * attract coverage (fixing a *different* wraparound bug on
+             * those exact screens) meant this branch started running there
+             * for the first time too, since it has no screen-type
+             * awareness of its own -- reported live as the wraparound
+             * bug's return, this time via Wide FOV rather than 21:9
+             * Aspect Ratio. Falls through to the plain 400x224 default
+             * below when suppressed, same as every other screen-type
+             * safety fallback in this switch. */
             double display_ar = (double)out_w / out_h;
             double max_zoom_ar = (double)EB_ZOOM_OUT_WIDTH / SNES_HEIGHT;
             if (display_ar <= max_zoom_ar) {
@@ -1206,6 +1219,10 @@ void platform_video_set_dof_suppressed(bool suppressed) {
 
 void platform_video_set_wide_crop_suppressed(bool suppressed) {
     wide_crop_suppressed = suppressed;
+}
+
+void platform_video_set_static_screen(bool is_static_screen) {
+    static_screen = is_static_screen;
 }
 
 void platform_video_set_vsync(bool enabled) {
