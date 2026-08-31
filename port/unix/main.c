@@ -372,6 +372,8 @@ int main(int argc, char *argv[]) {
     bool savestate_selftest = false;
     bool keyitems_selftest = false;
     bool joinlevel_selftest = false;
+    bool threed_zombie_flag_check = false;
+    bool threed_zombie_flag_fix = false;
     bool update_now = false; /* --update-now: drive a real check+download+install synchronously, then exit -- see its own comment below */
     bool load_state_at_boot = false; /* --load-state: resume from savestate.bin.0/.1 in CWD instead of a fresh boot */
     int dump_flags_frame = -1; /* --dump-flags N: print a hardcoded event-flag debug list on frame N */
@@ -417,6 +419,31 @@ int main(int argc, char *argv[]) {
              * level, see add_char_to_party()'s doc comment, inventory.c).
              * Pure in-memory, no save file touched. Implies headless. */
             joinlevel_selftest = true;
+            platform_headless = true;
+        } else if (strcmp(argv[i], "--check-threed-zombie-flag") == 0) {
+            /* One-off, read-only data-repair diagnostic (not a permanent
+             * CLI surface): reports FLG_THRK_BIKINIZOMBI_F_APPEAR/
+             * _P_APPEAR/FLG_THRK_HOTELZOMBI_APPEAR (296/297/298) for every
+             * populated save slot in the .srm at CWD (or --save FILE).
+             * See cr_movement_cmd_set_event_flag()'s fix (callroutine_
+             * movement.c) -- that bug meant a save made before the fix can
+             * have flag 296 stuck permanently set even after the Threed
+             * hotel-zombie quest was completed, which this exists to
+             * confirm before --check-threed-zombie-flag's write-capable
+             * sibling below touches anything. Implies headless, writes
+             * nothing. */
+            threed_zombie_flag_check = true;
+            platform_headless = true;
+        } else if (strcmp(argv[i], "--fix-threed-zombie-flag") == 0) {
+            /* Write-capable sibling of --check-threed-zombie-flag above:
+             * for every save slot where flag 296 (FLG_THRK_BIKINIZOMBI_
+             * F_APPEAR) is stuck set, clears it and re-saves that slot via
+             * the normal save_game() path (same checksum'd format, same
+             * function real gameplay uses) -- a one-time repair for a save
+             * made before cr_movement_cmd_set_event_flag()'s fix, not
+             * something a fixed-going-forward save ever needs again. Back
+             * up the .srm before running this. Implies headless. */
+            threed_zombie_flag_fix = true;
             platform_headless = true;
         } else if (strcmp(argv[i], "--headless") == 0) {
             platform_headless = true;
@@ -922,6 +949,44 @@ int main(int argc, char *argv[]) {
         bool ok_jl = join_level_scaling_selftest();
         fprintf(stderr, "join-level scaling self-test: %s\n", ok_jl ? "PASS" : "FAIL");
         exit(ok_jl ? 0 : 1);
+    }
+
+    if (threed_zombie_flag_check || threed_zombie_flag_fix) {
+        /* See --check-threed-zombie-flag/--fix-threed-zombie-flag's own
+         * doc comments above for the full story. Read-only unless -fix
+         * is the one that was passed. */
+        static const struct { const char *name; uint16_t id; } zf[] = {
+            {"FLG_THRK_BIKINIZOMBI_F_APPEAR", 296},
+            {"FLG_THRK_BIKINIZOMBI_P_APPEAR", 297},
+            {"FLG_THRK_HOTELZOMBI_APPEAR",    298},
+        };
+        for (int slot = 0; slot < SAVE_COUNT; slot++) {
+            if (!load_game(slot)) {
+                fprintf(stderr, "slot %d: empty/unreadable, skipping\n", slot + 1);
+                continue;
+            }
+            fprintf(stderr, "slot %d (before):", slot + 1);
+            for (size_t fi = 0; fi < sizeof(zf) / sizeof(zf[0]); fi++)
+                fprintf(stderr, " %s=%d", zf[fi].name, event_flag_get(zf[fi].id));
+            fprintf(stderr, "\n");
+            if (threed_zombie_flag_fix) {
+                bool changed = false;
+                for (size_t fi = 0; fi < sizeof(zf) / sizeof(zf[0]); fi++) {
+                    if (event_flag_get(zf[fi].id)) {
+                        event_flag_clear(zf[fi].id);
+                        changed = true;
+                    }
+                }
+                if (changed) {
+                    bool ok = save_game(slot);
+                    fprintf(stderr, "slot %d: cleared, re-save %s\n", slot + 1,
+                            ok ? "OK" : "FAILED");
+                } else {
+                    fprintf(stderr, "slot %d: nothing stuck, left untouched\n", slot + 1);
+                }
+            }
+        }
+        exit(0);
     }
 
     /* Initialize audio (loads audio packs from embedded assets) */
