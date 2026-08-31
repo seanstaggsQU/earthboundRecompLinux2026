@@ -977,17 +977,44 @@ static int download_thread_fn(void *unused) {
 
 #ifdef __APPLE__
     /* 4.5. Re-sign the .app bundle now that its executable has been
-     * swapped. Every release ships with the bundle ad-hoc-signed
-     * (`codesign --force --deep --sign -`, see the release process) so a
-     * fresh download opens with Gatekeeper's milder "unidentified
-     * developer" prompt instead of the harder "damaged, move to Trash"
-     * block -- but that signature seals a hash of Contents/MacOS/earthbound
-     * specifically, and the rename() just above replaces that exact file
-     * out from under it. Without re-signing here, EVERY in-app update on
-     * macOS silently broke the bundle's signature the same way skipping
-     * codesign on a release entirely would, reintroducing the "damaged"
-     * block on the player's very next launch regardless of how carefully
-     * the release itself was signed -- reported live, more than once.
+     * swapped. Every release ships real Developer ID-signed + notarized
+     * (see the release process) so a fresh download passes Gatekeeper
+     * cleanly ("accepted, source=Notarized Developer ID") instead of the
+     * "damaged, move to Trash" block ad-hoc signing (`--sign -`) only ever
+     * delayed, never actually fixed -- but that signature seals a hash of
+     * Contents/MacOS/earthbound specifically, and the rename() just above
+     * replaces that exact file out from under it. Without re-signing here,
+     * EVERY in-app update on macOS silently broke the bundle's signature
+     * the same way skipping codesign on a release entirely would,
+     * reintroducing the block on the player's very next launch regardless
+     * of how carefully the release itself was signed -- reported live,
+     * more than once.
+     *
+     * EB_MACOS_SIGN_IDENTITY (Developer ID Application: Sean Staggs
+     * (HKAD24H7YH)) is not a secret -- it's the same identity string
+     * embedded in every signature this project ships and publicly visible
+     * via `codesign -dv` on any release -- so hardcoding it here is no
+     * different from it appearing in the CodeDirectory of the binary being
+     * re-signed. --options runtime matches the Hardened Runtime every
+     * release build gets (required for notarization, see the release
+     * process); using anything else here would produce a signature
+     * shaped differently from what Apple's notary service actually
+     * scanned this exact binary under.
+     *
+     * This re-sign does NOT itself re-notarize or re-staple -- neither is
+     * possible without a live round-trip to Apple's notary service, not
+     * something to block a relaunch on. It works anyway because the
+     * release process notarizes this exact same raw binary (not just the
+     * .app it ships inside) as its own standalone submission before
+     * publishing it to the update feed; Apple's notary service remembers
+     * that binary's hash once accepted, so as long as the LOCAL signature
+     * here matches (same identity, same Hardened Runtime flags) what was
+     * actually submitted, Gatekeeper's online ticket lookup at next
+     * launch succeeds without a staple -- the same mechanism a stapled
+     * ticket exists to make work offline, just requiring one online
+     * check instead, which is a non-issue immediately after downloading a
+     * whole new binary over the same connection.
+     *
      * CWD is Contents/MacOS/ (chdir_to_executable_dir(), main.c), so the
      * bundle root is two levels up. Best-effort via system(): if codesign
      * isn't on PATH or fails for some other reason, the swapped binary
@@ -996,8 +1023,9 @@ static int download_thread_fn(void *unused) {
      * the "Open Anyway" override -- only a FRESH download's Gatekeeper
      * quarantine check is stricter -- so this doesn't newly break an
      * update that would've otherwise worked), just without restoring the
-     * milder prompt for anyone who later copies the app somewhere new. */
-    system("codesign --force --deep --sign - ../.. >/dev/null 2>&1");
+     * clean pass for anyone who later copies the app somewhere new. */
+#define EB_MACOS_SIGN_IDENTITY "Developer ID Application: Sean Staggs (HKAD24H7YH)"
+    system("codesign --force --deep --options runtime --sign \"" EB_MACOS_SIGN_IDENTITY "\" ../.. >/dev/null 2>&1");
 #endif
 
     /* 5. Stage the relaunch (main.c's atexit-ordered execv, see its own
