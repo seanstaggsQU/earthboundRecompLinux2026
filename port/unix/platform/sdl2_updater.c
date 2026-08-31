@@ -975,6 +975,31 @@ static int download_thread_fn(void *unused) {
     }
 #endif
 
+#ifdef __APPLE__
+    /* 4.5. Re-sign the .app bundle now that its executable has been
+     * swapped. Every release ships with the bundle ad-hoc-signed
+     * (`codesign --force --deep --sign -`, see the release process) so a
+     * fresh download opens with Gatekeeper's milder "unidentified
+     * developer" prompt instead of the harder "damaged, move to Trash"
+     * block -- but that signature seals a hash of Contents/MacOS/earthbound
+     * specifically, and the rename() just above replaces that exact file
+     * out from under it. Without re-signing here, EVERY in-app update on
+     * macOS silently broke the bundle's signature the same way skipping
+     * codesign on a release entirely would, reintroducing the "damaged"
+     * block on the player's very next launch regardless of how carefully
+     * the release itself was signed -- reported live, more than once.
+     * CWD is Contents/MacOS/ (chdir_to_executable_dir(), main.c), so the
+     * bundle root is two levels up. Best-effort via system(): if codesign
+     * isn't on PATH or fails for some other reason, the swapped binary
+     * still runs (unsigned/invalidated-signature apps aren't blocked from
+     * running once already on disk and launched via `open`/Finder after
+     * the "Open Anyway" override -- only a FRESH download's Gatekeeper
+     * quarantine check is stricter -- so this doesn't newly break an
+     * update that would've otherwise worked), just without restoring the
+     * milder prompt for anyone who later copies the app somewhere new. */
+    system("codesign --force --deep --sign - ../.. >/dev/null 2>&1");
+#endif
+
     /* 5. Stage the relaunch (main.c's atexit-ordered execv, see its own
      * comment for why this can't just be an inline execv() here) and
      * request a clean quit. */
