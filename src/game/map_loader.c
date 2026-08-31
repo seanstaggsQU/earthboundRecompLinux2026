@@ -2178,12 +2178,24 @@ void spawn_npcs_at_sector(uint16_t sector_x, uint16_t sector_y) {
          * appearance_style: 0=always, 1=show_if_flag_off, 2=show_if_flag_on.
          *   DEC / DEC / EOR flag_value / AND #1 / BEQ skip */
         uint8_t appearance = cfg->appearance_style;
+        bool diag_threed_npc = (npc_id == 537 || npc_id == 538 || npc_id == 484 ||
+                                 npc_id == 489 || (npc_id >= 492 && npc_id <= 497));
         if (appearance != 0) {
             uint16_t event_flag_id = cfg->event_flag;
             bool flag_value = event_flag_get(event_flag_id);
+            if (diag_threed_npc) {
+                LOG_WARN("DIAG threed_npc: npc_id=%u appearance_style=%u event_flag=%u "
+                         "flag_value=%d sprite=%u script=%u -> %s\n",
+                         npc_id, appearance, event_flag_id, flag_value, cfg->sprite,
+                         cfg->event_script,
+                         (!(((appearance - 2) ^ flag_value) & 1)) ? "SKIP" : "SPAWN");
+            }
             if (!(((appearance - 2) ^ flag_value) & 1)) {
                 continue;
             }
+        } else if (diag_threed_npc) {
+            LOG_WARN("DIAG threed_npc: npc_id=%u appearance_style=0 (always) sprite=%u "
+                     "script=%u -> SPAWN\n", npc_id, cfg->sprite, cfg->event_script);
         }
 
         uint16_t sprite_id = cfg->sprite;
