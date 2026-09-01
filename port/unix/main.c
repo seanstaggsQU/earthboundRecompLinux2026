@@ -984,6 +984,10 @@ int main(int argc, char *argv[]) {
              * record, in case the flag and the roster ever disagree. */
             fprintf(stderr, " party_ever_joined_mask=0x%02x (jeff_bit=%d)",
                     party_ever_joined_mask, (party_ever_joined_mask & 0x04) != 0);
+            fprintf(stderr, " party_members=[%d,%d,%d,%d,%d,%d]",
+                    game_state.party_members[0], game_state.party_members[1],
+                    game_state.party_members[2], game_state.party_members[3],
+                    game_state.party_members[4], game_state.party_members[5]);
             fprintf(stderr, "\n");
             fprintf(stderr, "slot %d (before):", slot + 1);
             for (size_t fi = 0; fi < sizeof(zf) / sizeof(zf[0]); fi++)
