@@ -541,13 +541,52 @@ bool load_game(int slot) {
      * this same load_game() call's caller would still see an all-zero mask
      * and this save would keep re-running the full unconditional sweep
      * (harmlessly idempotent, but not the "new-format" behavior a save
-     * written from here on out should have). */
-    if (legacy_save) {
-        for (uint16_t i = 0; i < TOTAL_PARTY_COUNT; i++) {
-            uint8_t member = game_state.party_members[i];
-            if (member >= 1 && member <= TOTAL_PARTY_COUNT)
-                party_ever_joined_mask |= (uint8_t)(1 << (member - 1));
-        }
+     * written from here on out should have).
+     *
+     * Run this sync UNCONDITIONALLY, not just when legacy_save -- a save
+     * can also have a non-zero-but-INCOMPLETE mask, missing a bit for a
+     * character who is definitely, currently active in party_members[]
+     * right now. Confirmed live: a save with real, long-completed Paula
+     * and Jeff joins still had their bits unset in party_ever_joined_mask
+     * (0x31 instead of 0x37+), even though a fresh, isolated join->save->
+     * load round-trip on current code preserves the mask correctly --
+     * meaning the corruption predates whatever earlier fix landed for
+     * this same subsystem (see migrate_key_items_to_pool()'s own history)
+     * and this save simply never had a chance to self-correct, since the
+     * legacy_save gate only ever catches an all-zero mask, not a partial
+     * one. Syncing from the current roster on every load is always safe
+     * regardless of cause: if someone is in party_members[] right now,
+     * they have unambiguously joined at least once, whatever the mask
+     * says. Purely additive (never clears a bit), so it can't un-set
+     * anything a legitimate not-yet-rejoined former member's bit still
+     * correctly records. */
+    for (uint16_t i = 0; i < TOTAL_PARTY_COUNT; i++) {
+        uint8_t member = game_state.party_members[i];
+        if (member >= 1 && member <= TOTAL_PARTY_COUNT)
+            party_ever_joined_mask |= (uint8_t)(1 << (member - 1));
+    }
+
+    /* FLG_JEFF (event flag 14, no named C constant -- flags are referenced
+     * purely by number at this layer, matching the compiled dialogue
+     * data) gates a real, live gameplay check: E05THRK.yml's Threed
+     * gatekeeper NPCs re-arm the entire hotel-zombie sequence from its
+     * very first stage on every conversation, specifically as long as
+     * this flag reads unset, so a stuck-clear FLG_JEFF is directly
+     * player-visible and disruptive, not just an inert data mismatch --
+     * confirmed live as the sequence replaying indefinitely on a save
+     * where Jeff had genuinely, fully joined (the entire canonical join
+     * sequence completed) long before. That flag is dialogue-engine-set
+     * (EEVENT2.yml/EEVENT1.yml's own add_party_member/set_event_flag
+     * opcodes, a different, already-reliable code path from the
+     * movement-script opcode bug fixed earlier in this file's history),
+     * but has no self-healing mechanism of its own the way
+     * party_ever_joined_mask now does above -- if Jeff's mask bit is
+     * confirmed set (by the sync just above, from whatever source), that
+     * unambiguously means he has really joined, so repair FLG_JEFF to
+     * match rather than trust it blindly. Purely additive here too,
+     * same reasoning as the mask sync. */
+    if ((party_ever_joined_mask & 0x04) && !event_flag_get(14)) {
+        event_flag_set(14);
     }
 
     return true;
