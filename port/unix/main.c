@@ -374,6 +374,7 @@ int main(int argc, char *argv[]) {
     bool joinlevel_selftest = false;
     bool threed_zombie_flag_check = false;
     bool threed_zombie_flag_fix = false;
+    bool jeff_flag_fix = false;
     bool update_now = false; /* --update-now: drive a real check+download+install synchronously, then exit -- see its own comment below */
     bool load_state_at_boot = false; /* --load-state: resume from savestate.bin.0/.1 in CWD instead of a fresh boot */
     int dump_flags_frame = -1; /* --dump-flags N: print a hardcoded event-flag debug list on frame N */
@@ -444,6 +445,27 @@ int main(int argc, char *argv[]) {
              * something a fixed-going-forward save ever needs again. Back
              * up the .srm before running this. Implies headless. */
             threed_zombie_flag_fix = true;
+            platform_headless = true;
+        } else if (strcmp(argv[i], "--fix-jeff-flag") == 0) {
+            /* Direct, one-off repair for FLG_JEFF (event flag 14): sets it
+             * unconditionally on every populated save slot, then re-saves.
+             * Deliberately NOT auto-derived from party_members[]/party_
+             * order[]/party_ever_joined_mask the way load_game()'s own
+             * repair pass (game_state.c) tries to -- on the save this was
+             * built to fix, all of those are themselves stale from the
+             * very start of the game (still show Ness/Pokey/Picky, the
+             * opening Onett roster), so there's nothing reliable to derive
+             * from. This exists specifically because the player directly
+             * confirmed Jeff has genuinely joined and stays confirmed
+             * despite that underlying data being wrong -- trust that
+             * confirmation directly rather than infer it. Sets
+             * unconditionally on every slot regardless of current value
+             * (idempotent -- a slot where Jeff hasn't actually joined
+             * would incorrectly get the flag set too, so this is a
+             * targeted one-off for a specific confirmed save, not a
+             * general-purpose tool). Back up the .srm before running
+             * this. Implies headless. */
+            jeff_flag_fix = true;
             platform_headless = true;
         } else if (strcmp(argv[i], "--headless") == 0) {
             platform_headless = true;
@@ -1022,6 +1044,26 @@ int main(int argc, char *argv[]) {
                     fprintf(stderr, "slot %d: nothing stuck, left untouched\n", slot + 1);
                 }
             }
+        }
+        exit(0);
+    }
+
+    if (jeff_flag_fix) {
+        /* See --fix-jeff-flag's own doc comment above for the full story. */
+        for (int slot = 0; slot < SAVE_COUNT; slot++) {
+            if (!load_game(slot)) {
+                fprintf(stderr, "slot %d: empty/unreadable, skipping\n", slot + 1);
+                continue;
+            }
+            bool before = event_flag_get(14);
+            fprintf(stderr, "slot %d: FLG_JEFF was %d, ", slot + 1, before);
+            if (before) {
+                fprintf(stderr, "already set, left untouched\n");
+                continue;
+            }
+            event_flag_set(14);
+            bool ok = save_game(slot);
+            fprintf(stderr, "set to 1, re-save %s\n", ok ? "OK" : "FAILED");
         }
         exit(0);
     }
