@@ -33,6 +33,7 @@
 #include "game_main.h"
 #include "game/audio.h"
 #include "game/game_state.h"
+#include "game/display_text.h"
 #include "game/settings.h"
 #include "core/log.h"
 #include "core/state_dump.h"
@@ -1024,6 +1025,18 @@ int main(int argc, char *argv[]) {
                     game_state.player_controlled_party_members[5],
                     game_state.player_controlled_party_count);
             fprintf(stderr, " timer=%u money=%u", game_state.timer, game_state.money_carried);
+            fprintf(stderr, "\n");
+            /* party_characters[] is indexed by char_id-1 directly (0=Ness,
+             * 1=Paula, 2=Jeff, 3=Poo, 4=Pokey, 5=Picky per commondefs.yml's
+             * partyMembers list) -- decode each slot's actual stored name
+             * to see whether Paula/Jeff's real data ended up written into
+             * the Pokey/Picky slots instead of their own dedicated ones. */
+            fprintf(stderr, "slot %d character names by slot:", slot + 1);
+            for (int ci = 0; ci < TOTAL_PARTY_COUNT; ci++) {
+                char name_buf[6] = {0};
+                eb_to_ascii_buf(party_characters[ci].name, 5, name_buf);
+                fprintf(stderr, " [%d]=\"%s\"(lvl%d)", ci, name_buf, party_characters[ci].level);
+            }
             fprintf(stderr, "\n");
             fprintf(stderr, "slot %d (before):", slot + 1);
             for (size_t fi = 0; fi < sizeof(zf) / sizeof(zf[0]); fi++)
