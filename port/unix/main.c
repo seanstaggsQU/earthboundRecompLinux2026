@@ -993,6 +993,14 @@ int main(int argc, char *argv[]) {
                     game_state.party_order[2], game_state.party_order[3],
                     game_state.party_order[4], game_state.party_order[5],
                     game_state.party_count);
+            fprintf(stderr, " pc_party_members=[%d,%d,%d,%d,%d,%d] pc_party_count=%d",
+                    game_state.player_controlled_party_members[0],
+                    game_state.player_controlled_party_members[1],
+                    game_state.player_controlled_party_members[2],
+                    game_state.player_controlled_party_members[3],
+                    game_state.player_controlled_party_members[4],
+                    game_state.player_controlled_party_members[5],
+                    game_state.player_controlled_party_count);
             fprintf(stderr, "\n");
             fprintf(stderr, "slot %d (before):", slot + 1);
             for (size_t fi = 0; fi < sizeof(zf) / sizeof(zf[0]); fi++)
