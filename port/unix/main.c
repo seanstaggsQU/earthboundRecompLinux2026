@@ -978,6 +978,12 @@ int main(int argc, char *argv[]) {
             fprintf(stderr, "slot %d (context):", slot + 1);
             for (size_t fi = 0; fi < sizeof(ctx) / sizeof(ctx[0]); fi++)
                 fprintf(stderr, " %s=%d", ctx[fi].name, event_flag_get(ctx[fi].id));
+            /* party_ever_joined_mask: bit (1 << (char_id-1)), Jeff is
+             * char_id 3 -> bit 2 (value 4). Cross-checks FLG_JEFF (a
+             * dialogue-set story flag) against the actual party roster
+             * record, in case the flag and the roster ever disagree. */
+            fprintf(stderr, " party_ever_joined_mask=0x%02x (jeff_bit=%d)",
+                    party_ever_joined_mask, (party_ever_joined_mask & 0x04) != 0);
             fprintf(stderr, "\n");
             fprintf(stderr, "slot %d (before):", slot + 1);
             for (size_t fi = 0; fi < sizeof(zf) / sizeof(zf[0]); fi++)
