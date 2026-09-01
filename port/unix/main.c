@@ -1023,6 +1023,7 @@ int main(int argc, char *argv[]) {
                     game_state.player_controlled_party_members[4],
                     game_state.player_controlled_party_members[5],
                     game_state.player_controlled_party_count);
+            fprintf(stderr, " timer=%u money=%u", game_state.timer, game_state.money_carried);
             fprintf(stderr, "\n");
             fprintf(stderr, "slot %d (before):", slot + 1);
             for (size_t fi = 0; fi < sizeof(zf) / sizeof(zf[0]); fi++)
