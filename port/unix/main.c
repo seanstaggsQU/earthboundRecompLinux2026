@@ -376,6 +376,7 @@ int main(int argc, char *argv[]) {
     bool threed_zombie_flag_check = false;
     bool threed_zombie_flag_fix = false;
     bool jeff_flag_fix = false;
+    bool force_write_test = false;
     bool update_now = false; /* --update-now: drive a real check+download+install synchronously, then exit -- see its own comment below */
     bool load_state_at_boot = false; /* --load-state: resume from savestate.bin.0/.1 in CWD instead of a fresh boot */
     int dump_flags_frame = -1; /* --dump-flags N: print a hardcoded event-flag debug list on frame N */
@@ -467,6 +468,18 @@ int main(int argc, char *argv[]) {
              * general-purpose tool). Back up the .srm before running
              * this. Implies headless. */
             jeff_flag_fix = true;
+            platform_headless = true;
+        } else if (strcmp(argv[i], "--force-write-test") == 0) {
+            /* Minimal, unconditional save_game(slot) round-trip diagnostic:
+             * loads slot 0, flips game_state.timer by +1 (a real, harmless,
+             * always-different value so a rewrite is unambiguous even if
+             * nothing else changed), calls save_game(0), then reports the
+             * return value plus the file's resulting mtime/size. Exists
+             * specifically to test whether save_game() can actually write
+             * to whatever .srm --save points at, independent of any
+             * particular in-game Save menu action -- run against a
+             * scratch COPY of a real save, never the original. */
+            force_write_test = true;
             platform_headless = true;
         } else if (strcmp(argv[i], "--headless") == 0) {
             platform_headless = true;
@@ -1079,6 +1092,33 @@ int main(int argc, char *argv[]) {
             bool ok = save_game(slot);
             fprintf(stderr, "set to 1, re-save %s\n", ok ? "OK" : "FAILED");
         }
+        exit(0);
+    }
+
+    if (force_write_test) {
+        /* See --force-write-test's own doc comment above. */
+        if (!load_game(0)) {
+            fprintf(stderr, "load_game(0): FAILED (slot empty/unreadable)\n");
+            exit(1);
+        }
+        /* NOT game_state.timer -- save_game() (game_state.c:429) always
+         * overwrites it from core.play_timer right before copying, which
+         * is 0 in this headless context, making it a bad canary (already
+         * confirmed live: looked like "the write didn't stick" when it
+         * was actually just this field being recomputed, not a real
+         * failure). money_carried is a plain pass-through field. */
+        uint32_t before_money = game_state.money_carried;
+        game_state.money_carried = before_money + 1;
+        bool ok = save_game(0);
+        fprintf(stderr, "money_carried %u -> %u, save_game(0) returned %s\n",
+                before_money, game_state.money_carried, ok ? "true" : "false");
+        /* Re-load fresh to prove the new value actually landed on disk,
+         * not just in memory. */
+        game_state.money_carried = 0;
+        bool reload_ok = load_game(0);
+        fprintf(stderr, "reload: %s, money_carried now reads %u (%s)\n",
+                reload_ok ? "OK" : "FAILED", game_state.money_carried,
+                (game_state.money_carried == before_money + 1) ? "WRITE CONFIRMED" : "WRITE DID NOT STICK");
         exit(0);
     }
 
