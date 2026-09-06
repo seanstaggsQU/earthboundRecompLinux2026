@@ -946,6 +946,69 @@ bool key_items_selftest(void) {
         ok = false;
     }
 
+    /* --- 10. Regression test for this session's two Key Items pool fixes,
+     * both prompted by a real player report -- "once the key items fills
+     * up, new items vanish" -- ultimately traced to key_items_give()
+     * having no guard against giving the same item twice: a re-triggerable
+     * event (the same underlying bug CLASS as the Threed movement-opcode
+     * fix elsewhere this session) could burn a pool slot on every re-fire,
+     * eventually filling the pool and making every genuinely new item
+     * after that silently vanish via the "pool full" return. Fixed with a
+     * duplicate check in key_items_give() plus raising KEY_ITEMS_POOL_SIZE
+     * 48->64 for headroom. Uses key_items_give()/key_items_find() directly
+     * with synthetic ids (key_items_give() itself doesn't validate item
+     * type, same as section 5's direct CRUD check above), not real item
+     * ids -- only 44 real key items exist, fewer than KEY_ITEMS_POOL_SIZE. */
+    game_state_init();
+
+    const uint16_t DUP_ITEM = 200;
+    if (key_items_give(DUP_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- key_items_give() failed on an "
+                        "empty pool\n");
+        ok = false;
+    }
+    if (key_items_give(DUP_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- key_items_give() on an "
+                        "already-owned item returned failure instead of a no-op "
+                        "success\n");
+        ok = false;
+    }
+    int dup_slots_used = 0;
+    for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++)
+        if (key_items_pool[i] == (uint8_t)DUP_ITEM) dup_slots_used++;
+    if (dup_slots_used != 1) {
+        fprintf(stderr, "key_items_selftest: FAIL -- giving the same item twice "
+                        "used %d pool slots, expected exactly 1 (the whole point "
+                        "of the dup guard)\n", dup_slots_used);
+        ok = false;
+    }
+
+    /* Fill every remaining slot with distinct ids (one slot already used
+     * by DUP_ITEM above) and confirm the pool being genuinely full rejects
+     * one further, never-before-seen item cleanly -- returns 0, doesn't
+     * overflow key_items_pool[] or corrupt anything past it. */
+    for (uint16_t id = 1; id <= KEY_ITEMS_POOL_SIZE - 1; id++) {
+        if (key_items_give(id) == 0) {
+            fprintf(stderr, "key_items_selftest: FAIL -- key_items_give(%u) failed "
+                            "while filling the pool to capacity (%u of %u slots)\n",
+                            id, id, KEY_ITEMS_POOL_SIZE);
+            ok = false;
+            break;
+        }
+    }
+    const uint16_t OVERFLOW_ITEM = 250; /* distinct from DUP_ITEM and every 1..63 id above */
+    if (key_items_give(OVERFLOW_ITEM) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- key_items_give() succeeded on "
+                        "a genuinely full pool (should return 0, not silently drop "
+                        "or overflow)\n");
+        ok = false;
+    }
+    if (key_items_find(OVERFLOW_ITEM) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- an item key_items_give() "
+                        "rejected as pool-full is somehow findable in the pool\n");
+        ok = false;
+    }
+
     return ok;
 }
 

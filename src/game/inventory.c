@@ -1533,6 +1533,19 @@ void migrate_key_items_to_pool(uint16_t char_id) {
 }
 
 uint16_t key_items_give(uint16_t item_id) {
+    /* Already own it: treat as success (matches "you can't get a second
+     * Bicycle" reality -- key items are unique) rather than consuming
+     * another pool slot. None of this function's callers (give_item_to_
+     * specific_character/give_item_to_character above, migrate_key_items_
+     * to_pool below) checked for an existing copy before this guard was
+     * added, so a key item granted more than once -- e.g. by a scripted
+     * event that re-fires, the same class of bug already found and fixed
+     * once this session in cr_movement_cmd_set_event_flag() -- silently
+     * burned a pool slot every time instead of being a no-op, eventually
+     * filling the (then-48-slot) pool and making legitimately new items
+     * "vanish" via the pool-full return below. */
+    if (key_items_find(item_id)) return item_id;
+
     for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
         if (key_items_pool[i] == 0) {
             key_items_pool[i] = (uint8_t)item_id;

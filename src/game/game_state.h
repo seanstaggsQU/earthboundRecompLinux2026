@@ -162,9 +162,15 @@ enum CharacterMode {
  * party_members[], that's what makes it immune to the "key item vanishes
  * when you bench the character holding it" bug a fan mod (ShrineFox's
  * EarthBound Mod Menu) has, where lookups only scan the currently
- * controlled party. 44 key items exist in the current item table; 48
- * leaves a little headroom. See key_items_give/find/remove in inventory.h. */
-#define KEY_ITEMS_POOL_SIZE 48
+ * controlled party. 44 key items exist in the current item table; raised
+ * from the original 48 (reported filling up and silently dropping new
+ * items in real play -- key_items_give() had no duplicate check, so a
+ * key item granted more than once, e.g. by a re-triggerable event, ate a
+ * slot every time instead of being a no-op; see key_items_give()'s dedup
+ * check in inventory.c, added alongside this bump) to 64, using more of
+ * SaveBlock's spare padding below. See key_items_give/find/remove in
+ * inventory.h and WINDOW_KEY_ITEMS (window.c) for the scrollable browser. */
+#define KEY_ITEMS_POOL_SIZE 64
 
 /* Save block - 1280 bytes, matches save_block from structs.asm */
 PACKED_STRUCT
@@ -180,7 +186,7 @@ typedef struct {
      * written/checksummed as zeroed padding, they just have a name now.
      * See load_game()'s migration sweep for how pre-existing saves get
      * their key items moved here automatically. */
-    uint8_t    key_items_pool[KEY_ITEMS_POOL_SIZE]; /* 1203: 48 bytes */
+    uint8_t    key_items_pool[KEY_ITEMS_POOL_SIZE]; /* 1203: 64 bytes */
     /* party_ever_joined_mask: bit (1 << (char_id-1)) set the first time that
      * character ever joins the party (see migrate_key_items_to_pool()'s
      * callers), never cleared again even if they're later benched. Also
@@ -202,7 +208,7 @@ typedef struct {
      * immediately at new-game start, so no (b)-case save can have an
      * all-zero mask. load_game() uses "mask == 0" as the legacy-save
      * discriminator: see its migration sweep for the full logic. */
-    uint8_t    party_ever_joined_mask; /* 1251: 1 byte */
+    uint8_t    party_ever_joined_mask; /* 1267: 1 byte */
     uint8_t    padding[1280 - 32 - 473 - 95*6 - 128 - KEY_ITEMS_POOL_SIZE - 1]; /* remaining padding */
 } SaveBlock;
 END_PACKED_STRUCT

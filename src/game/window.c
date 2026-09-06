@@ -580,7 +580,7 @@ void set_window_title(uint16_t window_id, const char *title, int max_len) {
 
 void add_menu_item(const char *label, uint16_t userdata, uint16_t text_x, uint16_t text_y) {
     WindowInfo *w = get_window(win.current_focus_window);
-    if (!w || w->menu_count >= 24) return;
+    if (!w || w->menu_count >= MAX_MENU_ITEMS) return;
 
     MenuItem *item = &w->menu_items[w->menu_count];
     strncpy(item->label, label, MENU_LABEL_SIZE - 1);
@@ -601,7 +601,7 @@ void add_menu_item(const char *label, uint16_t userdata, uint16_t text_x, uint16
  */
 void add_menu_item_no_position(const char *label, uint16_t userdata) {
     WindowInfo *w = get_window(win.current_focus_window);
-    if (!w || w->menu_count >= 24) return;
+    if (!w || w->menu_count >= MAX_MENU_ITEMS) return;
 
     MenuItem *item = &w->menu_items[w->menu_count];
     strncpy(item->label, label, MENU_LABEL_SIZE - 1);
@@ -732,7 +732,7 @@ void open_window_and_print_menu(uint16_t columns, uint16_t start_index) {
     /* Assembly (layout_menu_options.asm lines 303-359): if items overflow,
      * add an overflow indicator at the last row with page=0 (always visible).
      * Selecting it cycles through pages. */
-    if (needs_pagination && w->menu_count < 24) {
+    if (needs_pagination && w->menu_count < MAX_MENU_ITEMS) {
         MenuItem *oi = &w->menu_items[w->menu_count];
         strncpy(oi->label, "...", MENU_LABEL_SIZE - 1);
         oi->label[MENU_LABEL_SIZE - 1] = '\0';

@@ -105,6 +105,18 @@
 #define WINDOW_FILE_SELECT_ASPECT     0x3A
 #define WINDOW_FILE_SELECT_TWEAKS     0x3B
 
+/* Max menu items a single window can hold at once (add_menu_item/
+ * add_menu_item_no_position bail past this; open_window_and_print_menu's
+ * pagination still has to fit every item -- across all pages -- in this
+ * one array, since paging only changes which page's items get *rendered*,
+ * not how many are *stored*). Originally 24, which every stock ROM-derived
+ * menu (Goods, PSI, Status, Settings, ...) comfortably fits under. Raised
+ * to fit WINDOW_KEY_ITEMS (this port's own addition, window.c), whose
+ * item count is player-progress-driven (up to KEY_ITEMS_POOL_SIZE,
+ * game_state.h) rather than a fixed ROM menu shape -- +1 for the "..."
+ * overflow indicator open_window_and_print_menu appends when paginating. */
+#define MAX_MENU_ITEMS 80
+
 /* Menu option - matches menu_option from structs.asm (45 bytes in asm) */
 #define MENU_LABEL_SIZE 26  /* asm: 25-byte label at offset 19, +1 for null */
 typedef struct {
@@ -186,7 +198,7 @@ typedef struct {
     uint8_t  title_tile_count;        /* number of VWF tile columns rendered for title (set once at set_window_title time) */
     char     title[WINDOW_TITLE_SIZE]; /* asm offset 60: window title text (tiny font) */
     uint8_t   palette_index;
-    MenuItem  menu_items[24];
+    MenuItem  menu_items[MAX_MENU_ITEMS];
     uint8_t   menu_count;
     uint8_t   current_option;       /* asm offset 43 */
     uint16_t *ABI_PTR_ALIGN content_tilemap; /* pointer into shared tilemap pool
