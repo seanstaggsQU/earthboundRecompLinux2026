@@ -488,6 +488,34 @@ bool load_game(int slot) {
     memcpy(key_items_pool, block->key_items_pool, sizeof(key_items_pool));
     party_ever_joined_mask = block->party_ever_joined_mask;
 
+    /* Sanitize key_items_pool[]: any entry that isn't a real key item
+     * (is_key_item_type() false) can never have been placed there by any
+     * legitimate code path -- key_items_give()'s only callers (give_item_
+     * to_specific_character/give_item_to_character, migrate_key_items_
+     * to_pool, and this function's own sweep below) all gate on
+     * is_key_item_type() first. Exists to repair a real, one-time
+     * transitional artifact: raising KEY_ITEMS_POOL_SIZE (game_state.h)
+     * moved party_ever_joined_mask's on-disk byte offset, so loading a
+     * save written before that change reinterprets its old mask byte
+     * (and old padding bytes) as brand-new trailing pool slots -- caught
+     * live on a real save: a stray "Great Charm" (a regular item, not a
+     * key item) turned up in key_items_pool at the exact byte offset the
+     * old party_ever_joined_mask used to occupy. Compacts left the same
+     * way key_items_remove() does, so no gap is left behind either.
+     * Harmless to run on every load going forward -- a no-op on a save
+     * already in the current format or one that never had this problem
+     * -- so this is ongoing hygiene, not a one-shot version-gated fix. */
+    {
+        int write_idx = 0;
+        for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+            uint8_t id = key_items_pool[i];
+            if (id != 0 && is_key_item_type(id))
+                key_items_pool[write_idx++] = id;
+        }
+        for (; write_idx < KEY_ITEMS_POOL_SIZE; write_idx++)
+            key_items_pool[write_idx] = 0;
+    }
+
     /* Port of load_game_slot.asm lines 92-93: game_state.timer → TIMER */
     core.play_timer = game_state.timer;
 
@@ -1006,6 +1034,50 @@ bool key_items_selftest(void) {
     if (key_items_find(OVERFLOW_ITEM) != 0) {
         fprintf(stderr, "key_items_selftest: FAIL -- an item key_items_give() "
                         "rejected as pool-full is somehow findable in the pool\n");
+        ok = false;
+    }
+
+    /* --- 11. Regression test for load_game()'s key_items_pool sanitize
+     * pass (added alongside this fix, see its doc comment there for the
+     * full story -- raising KEY_ITEMS_POOL_SIZE moved party_ever_joined_
+     * mask's on-disk byte offset, so a save written before that change
+     * reinterprets old mask/padding bytes as new trailing pool slots).
+     * Plant a non-key item directly in the pool (key_items_give() doesn't
+     * validate type, matching real reinterpreted-byte garbage), save,
+     * reload, and confirm it's gone while a real key item alongside it
+     * survives, with the array left compact (no gap where the bogus
+     * entry was removed). */
+    game_state_init();
+    const uint16_t REAL_ITEM = 202;  /* Town map (real key item) */
+    const uint16_t BOGUS_ITEM = 55;  /* Great Charm -- NOT a key item */
+    if (key_items_give(REAL_ITEM) == 0 || key_items_give(BOGUS_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- setup for sanitize-pass test "
+                        "couldn't populate the pool\n");
+        ok = false;
+    }
+    if (!save_game(0)) {
+        fprintf(stderr, "key_items_selftest: save_game(bogus pool entry) failed\n");
+        return false;
+    }
+    game_state_init();
+    if (!load_game(0)) {
+        fprintf(stderr, "key_items_selftest: load_game(bogus pool entry) failed\n");
+        return false;
+    }
+    if (key_items_find(BOGUS_ITEM) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- load_game()'s sanitize pass "
+                        "left a non-key item (Great Charm) in key_items_pool\n");
+        ok = false;
+    }
+    if (key_items_find(REAL_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- load_game()'s sanitize pass "
+                        "removed a REAL key item alongside the bogus one\n");
+        ok = false;
+    }
+    if (key_items_pool[0] != (uint8_t)REAL_ITEM || key_items_pool[1] != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- sanitize pass left a gap "
+                        "instead of compacting (pool[0]=%u pool[1]=%u, expected "
+                        "%u then 0)\n", key_items_pool[0], key_items_pool[1], REAL_ITEM);
         ok = false;
     }
 

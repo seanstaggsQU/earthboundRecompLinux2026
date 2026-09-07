@@ -171,10 +171,21 @@ static const uint16_t window_configs[][4] = {
      * would cap navigation at rows 0-2, one short of row 3. */
     [WINDOW_QUIT_CONFIRM] = { 14, 14, 16, 10 },
     /* Key Items pool browser, this port's own addition (WINDOW_KEY_ITEMS,
-     * window.h), Key Items pool feature. Same rect as WINDOW_INVENTORY
-     * (0x02) / WINDOW_ESCARGO_EXPRESS_ITEM (0x0D), never open at the same
-     * time as either, so no collision. */
-    [WINDOW_KEY_ITEMS] = { 7, 1, 24, 16 },
+     * window.h), Key Items pool feature. x/width match WINDOW_INVENTORY
+     * (0x02) / WINDOW_ESCARGO_EXPRESS_ITEM (0x0D) (never open at the same
+     * time as either, so no collision); it already extends further right
+     * than the Command Menu it's opened over (0x00, roughly x=1..14), so
+     * it's meant to cover it, same as any other pause-menu submenu.
+     * Height bumped 16->20 (max_rows 8->10, 20 unpaginated items at this
+     * window's 2 columns): with KEY_ITEMS_POOL_SIZE now 64 (game_state.h),
+     * a real save with a modest ~17 key items already needed a second,
+     * easy-to-miss page via open_window_and_print_menu()'s "..." overflow
+     * indicator at the old height -- reported live as a just-received key
+     * item "not visible anywhere" (it was on page 2 the whole time).
+     * Content area at height 20 is 22*18=396 entries, comfortably under
+     * WINDOW_TILEMAP_MAX (450, window.h) -- do not raise height past 22
+     * without rechecking that budget (22 * (height-2) <= 450). */
+    [WINDOW_KEY_ITEMS] = { 7, 1, 24, 20 },
     /* Aspect Ratio, this port's own addition to the Set Up cascade (see
      * window.h). Same shape as Music Mode (0x19, a title line + N single-
      * pick rows), just a little wider to fit "16:9 (Widescreen)". Height 10
