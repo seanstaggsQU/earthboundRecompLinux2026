@@ -535,7 +535,22 @@ bool load_game(int slot) {
      *       entirely 0 does (new code always sets Ness's bit at new-game
      *       start, so no save this code wrote can have an all-zero mask).
      *       Sweep every character unconditionally, matching this sweep's
-     *       original (pre-mask) behavior for such a save.
+     *       original (pre-mask) behavior for such a save. This CAN still
+     *       leak a not-yet-joined character's seeded starting item (e.g.
+     *       Poo's Tiny Ruby) into the pool on a true legacy save -- new-
+     *       game setup has always put it in items[] regardless of
+     *       whether the pool feature existed yet, so "holding one means
+     *       they received it" isn't actually reliable here (confirmed
+     *       live). Deliberately NOT gating this on party_members[]
+     *       membership instead: a legacy save's key item can just as
+     *       easily belong to a character who genuinely joined, then got
+     *       benched, and doing that would leave real, legitimately-owned
+     *       key items stuck in items[] forever for anyone but the
+     *       currently-active roster. Left as an unconditional sweep on
+     *       purpose; the retroactive repair pass below (using the fresh
+     *       mask sync just above it) is what actually catches and undoes
+     *       this specific leak, for any character it turns out to apply
+     *       to, without that false-positive risk.
      *   (b) a new-format save where a character hasn't joined the party
      *       yet: new-game setup deliberately leaves their INITIAL_STATS
      *       starting key item (e.g. Poo's Tiny Ruby) sitting in items[]
@@ -592,6 +607,51 @@ bool load_game(int slot) {
         uint8_t member = game_state.party_members[i];
         if (member >= 1 && member <= TOTAL_PARTY_COUNT)
             party_ever_joined_mask |= (uint8_t)(1 << (member - 1));
+    }
+
+    /* Retroactive repair for the legacy sweep's known gap, documented on
+     * its own unconditional-on-purpose comment above: a not-yet-joined
+     * character's seeded INITIAL_STATS key item can end up in the shared
+     * pool by way of that sweep (a true legacy save, mask==0, sweeps
+     * every character including one who's never actually joined -- kept
+     * that way deliberately rather than gated on party_members[], to
+     * avoid the opposite false positive for a real, legitimately-joined-
+     * then-benched character on such a save). Runs every load, right
+     * after the mask has been freshly synced from the current roster
+     * above, so it catches the leak within the SAME load_game() call that
+     * caused it, before it's ever visible to the player -- as well as
+     * repairing a save that already got corrupted by an OLDER binary
+     * before this pass existed. Detect it directly: for each of the 4
+     * INITIAL_STATS-seeded characters
+     * characters (Ness/Paula/Jeff/Poo) who, per the mask just synced
+     * above, have never joined, check whether any of their originally-
+     * seeded items (20-byte entries, items at offset 10 within each --
+     * see file_select.c's INITIAL_STATS_ENTRY_SIZE/layout comment, same
+     * source data) is sitting in the pool right now, and move it back
+     * into their items[] if so. Confirmed live: Poo's Tiny Ruby had
+     * leaked into the pool this way on a real save despite Poo never
+     * having joined. Harmless/idempotent on any save this never
+     * happened to (key_items_find() just won't match anything). */
+    {
+        const uint8_t *initial_stats = ASSET_DATA(ASSET_DATA_INITIAL_STATS_BIN);
+        for (int c = 0; c < 4; c++) {
+            if (party_ever_joined_mask & (1 << c))
+                continue; /* has joined at least once: nothing to undo */
+            const uint8_t *entry = initial_stats + c * 20;
+            for (int j = 0; j < 10; j++) {
+                uint8_t item_id = entry[10 + j];
+                if (item_id == 0 || !is_key_item_type(item_id)) continue;
+                if (!key_items_find(item_id)) continue; /* not (or no longer) in the pool */
+                CharStruct *ch = &party_characters[c];
+                for (int slot = 0; slot < ITEM_INVENTORY_SIZE; slot++) {
+                    if (ch->items[slot] == 0) {
+                        ch->items[slot] = item_id;
+                        key_items_remove(item_id);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     /* FLG_JEFF (event flag 14, no named C constant -- flags are referenced
@@ -1078,6 +1138,84 @@ bool key_items_selftest(void) {
         fprintf(stderr, "key_items_selftest: FAIL -- sanitize pass left a gap "
                         "instead of compacting (pool[0]=%u pool[1]=%u, expected "
                         "%u then 0)\n", key_items_pool[0], key_items_pool[1], REAL_ITEM);
+        ok = false;
+    }
+
+    /* --- 12. End-to-end check for a true legacy save (mask==0): its
+     * unconditional sweep (still unconditional on purpose, see its own
+     * doc comment above) DOES migrate a not-yet-joined character's seeded
+     * starting item into the pool same as everyone else's -- but the
+     * retroactive repair pass (section 13 below covers it in isolation;
+     * this section confirms the two passes compose correctly within one
+     * load_game() call) must undo that specific leak before load_game()
+     * returns, while leaving a currently-active character's real key item
+     * (Ness's, here) alone. This is exactly the live Tiny Ruby bug. */
+    game_state_init();
+    party_ever_joined_mask = 0; /* force the legacy_save branch */
+    const uint16_t NESS_LEGACY_ITEM = 177; /* ATM card */
+    const uint16_t POO_LEGACY_ITEM = 208;  /* Tiny ruby */
+    party_characters[0].items[0] = (uint8_t)NESS_LEGACY_ITEM;      /* Ness: IS in party_members below */
+    party_characters[POO - 1].items[0] = (uint8_t)POO_LEGACY_ITEM; /* Poo: seeded, NOT in party */
+    game_state.party_members[0] = 1; /* Ness active, Poo not */
+
+    if (!save_game(0)) {
+        fprintf(stderr, "key_items_selftest: save_game(true legacy save) failed\n");
+        return false;
+    }
+    game_state_init();
+    if (!load_game(0)) {
+        fprintf(stderr, "key_items_selftest: load_game(true legacy save) failed\n");
+        return false;
+    }
+    if (key_items_find(NESS_LEGACY_ITEM) == 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- legacy sweep didn't migrate "
+                        "Ness's (a currently-active character's) key item\n");
+        ok = false;
+    }
+    if (key_items_find(POO_LEGACY_ITEM) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- legacy sweep leaked "
+                        "not-yet-joined Poo's seeded key item into the pool "
+                        "(this is exactly the live Tiny Ruby bug)\n");
+        ok = false;
+    }
+    if (party_characters[POO - 1].items[0] != (uint8_t)POO_LEGACY_ITEM) {
+        fprintf(stderr, "key_items_selftest: FAIL -- legacy sweep disturbed "
+                        "not-yet-joined Poo's items[0] (should be untouched)\n");
+        ok = false;
+    }
+
+    /* --- 13. Regression test for load_game()'s retroactive repair pass: a
+     * save that's ALREADY corrupted (as if by the pre-fix legacy sweep bug
+     * above) must self-heal on load, not just avoid getting worse from
+     * here on. */
+    game_state_init();
+    game_state.party_members[0] = 1; /* Ness active */
+    party_ever_joined_mask = 0x01;   /* only Ness has ever joined -- a
+                                       * non-zero, "new-format" mask, same
+                                       * as the real corrupted save (0x07,
+                                       * not 0) so this exercises the repair
+                                       * pass specifically, not the sweep
+                                       * gate above */
+    key_items_give(POO_LEGACY_ITEM); /* simulate the leak directly: pool has
+                                       * it, Poo's items[0] does NOT --
+                                       * matches the live corrupted state */
+    if (!save_game(0)) {
+        fprintf(stderr, "key_items_selftest: save_game(pre-corrupted pool) failed\n");
+        return false;
+    }
+    game_state_init();
+    if (!load_game(0)) {
+        fprintf(stderr, "key_items_selftest: load_game(pre-corrupted pool) failed\n");
+        return false;
+    }
+    if (key_items_find(POO_LEGACY_ITEM) != 0) {
+        fprintf(stderr, "key_items_selftest: FAIL -- retroactive repair didn't "
+                        "remove not-yet-joined Poo's leaked key item from the pool\n");
+        ok = false;
+    }
+    if (party_characters[POO - 1].items[0] != (uint8_t)POO_LEGACY_ITEM) {
+        fprintf(stderr, "key_items_selftest: FAIL -- retroactive repair didn't "
+                        "restore the leaked key item to Poo's items[0]\n");
         ok = false;
     }
 
