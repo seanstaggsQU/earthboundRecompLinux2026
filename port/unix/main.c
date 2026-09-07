@@ -1178,6 +1178,19 @@ int main(int argc, char *argv[]) {
                 game_state.party_members[2], game_state.party_members[3],
                 game_state.party_members[4], game_state.party_members[5],
                 game_state.player_controlled_party_count);
+        for (uint16_t c = 0; c < TOTAL_PARTY_COUNT; c++) {
+            fprintf(stderr, "char %u items:", c + 1);
+            for (int s = 0; s < ITEM_INVENTORY_SIZE; s++) {
+                uint8_t id = party_characters[c].items[s];
+                if (id == 0) continue;
+                const ItemConfig *entry = get_item_entry(id);
+                char name_buf[ITEM_NAME_LEN + 1];
+                if (entry) eb_to_ascii_buf(entry->name, ITEM_NAME_LEN, name_buf);
+                else snprintf(name_buf, sizeof(name_buf), "?");
+                fprintf(stderr, " [%d]=%u\"%s\"", s, id, name_buf);
+            }
+            fprintf(stderr, "\n");
+        }
         exit(0);
     }
 
