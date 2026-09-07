@@ -34,6 +34,7 @@
 #include "game/audio.h"
 #include "game/game_state.h"
 #include "game/display_text.h"
+#include "game/inventory.h"
 #include "game/settings.h"
 #include "core/log.h"
 #include "core/state_dump.h"
@@ -377,6 +378,8 @@ int main(int argc, char *argv[]) {
     bool threed_zombie_flag_fix = false;
     bool jeff_flag_fix = false;
     bool force_write_test = false;
+    int dump_item_id = -1; /* --dump-item ID: print get_item_entry()'s decoded type/flags for one item, no save I/O */
+    int dump_key_items_slot = -1; /* --dump-key-items-pool SLOT: read-only load_game(SLOT), print every non-zero key_items_pool[] entry with its resolved name -- no save_game() call, safe on a real save */
     bool update_now = false; /* --update-now: drive a real check+download+install synchronously, then exit -- see its own comment below */
     bool load_state_at_boot = false; /* --load-state: resume from savestate.bin.0/.1 in CWD instead of a fresh boot */
     int dump_flags_frame = -1; /* --dump-flags N: print a hardcoded event-flag debug list on frame N */
@@ -480,6 +483,16 @@ int main(int argc, char *argv[]) {
              * particular in-game Save menu action -- run against a
              * scratch COPY of a real save, never the original. */
             force_write_test = true;
+            platform_headless = true;
+        } else if (strcmp(argv[i], "--dump-item") == 0 && i + 1 < argc) {
+            /* One-off diagnostic: print get_item_entry(ID)'s decoded name/
+             * type/flags. No save_game()/load_game() at all -- only reads
+             * the loaded asset item table -- so no destructive-write guard
+             * needed, unlike every other --*-test/--fix-* flag here. */
+            dump_item_id = atoi(argv[++i]);
+            platform_headless = true;
+        } else if (strcmp(argv[i], "--dump-key-items-pool") == 0 && i + 1 < argc) {
+            dump_key_items_slot = atoi(argv[++i]);
             platform_headless = true;
         } else if (strcmp(argv[i], "--headless") == 0) {
             platform_headless = true;
@@ -1119,6 +1132,52 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "reload: %s, money_carried now reads %u (%s)\n",
                 reload_ok ? "OK" : "FAILED", game_state.money_carried,
                 (game_state.money_carried == before_money + 1) ? "WRITE CONFIRMED" : "WRITE DID NOT STICK");
+        exit(0);
+    }
+
+    if (dump_item_id >= 0) {
+        const ItemConfig *entry = get_item_entry((uint16_t)dump_item_id);
+        if (!entry) {
+            fprintf(stderr, "--dump-item %d: get_item_entry() returned NULL (no such item)\n",
+                    dump_item_id);
+            exit(1);
+        }
+        char name_buf[ITEM_NAME_LEN + 1];
+        eb_to_ascii_buf(entry->name, ITEM_NAME_LEN, name_buf);
+        uint8_t type = entry->type & ITEM_TYPE_MASK;
+        fprintf(stderr, "item %d: name=\"%s\" type=0x%02x is_key_item=%s flags=0x%02x\n",
+                dump_item_id, name_buf, type,
+                is_key_item_type((uint16_t)dump_item_id) ? "true" : "false",
+                entry->flags);
+        exit(0);
+    }
+
+    if (dump_key_items_slot >= 0) {
+        /* Read-only: load_game() only, never save_game() -- safe to run
+         * against a real player's .srm. */
+        if (!load_game(dump_key_items_slot)) {
+            fprintf(stderr, "--dump-key-items-pool %d: load_game() failed "
+                            "(slot empty/unreadable)\n", dump_key_items_slot);
+            exit(1);
+        }
+        int count = 0;
+        for (int i = 0; i < KEY_ITEMS_POOL_SIZE; i++) {
+            uint8_t id = key_items_pool[i];
+            if (id == 0) continue;
+            const ItemConfig *entry = get_item_entry(id);
+            char name_buf[ITEM_NAME_LEN + 1];
+            if (entry) eb_to_ascii_buf(entry->name, ITEM_NAME_LEN, name_buf);
+            else snprintf(name_buf, sizeof(name_buf), "?");
+            fprintf(stderr, "pool[%d] = item %u \"%s\"\n", i, id, name_buf);
+            count++;
+        }
+        fprintf(stderr, "%d/%d slots occupied. party_ever_joined_mask=0x%02x "
+                        "party_members=[%u,%u,%u,%u,%u,%u] player_controlled_count=%u\n",
+                count, KEY_ITEMS_POOL_SIZE, party_ever_joined_mask,
+                game_state.party_members[0], game_state.party_members[1],
+                game_state.party_members[2], game_state.party_members[3],
+                game_state.party_members[4], game_state.party_members[5],
+                game_state.player_controlled_party_count);
         exit(0);
     }
 
